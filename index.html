@@ -34,11 +34,12 @@
 html{background:#fff!important;color-scheme:light!important;}
 body{
   font-family:var(--fb);font-size:13px;
-  display:flex;flex-direction:column;height:100%;overflow:hidden;
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
   background:var(--hnxl)!important;color:var(--gr)!important;
   color-scheme:light!important;
   forced-color-adjust:none;
 }
+.main{flex:1;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
 @media(prefers-color-scheme:dark){
   html,body,*{color-scheme:light!important;background-color:unset;color:unset;}
 }
@@ -81,7 +82,7 @@ body{
 .snav.active{color:var(--hnl);border-bottom-color:var(--or);}
 /* MAIN */
 .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
-.screen{display:none;min-height:100%;}
+.screen{display:none;min-height:100%;padding-bottom:40px;}
 .screen.active{display:block;}
 .pg{padding:12px;}
 .pg-t{font-family:var(--fh);font-size:17px;font-weight:800;color:var(--gr);margin-bottom:2px;}
@@ -450,7 +451,33 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="pg-t">Quote</div><div class="pg-s">Calculate fees &amp; generate WhatsApp quotes</div>
     <!-- QUOTE DETAILS FIRST -->
     <div class="fsec">Quote Details</div>
-    <div class="f"><label>Service <span class="req">*</span></label><select class="fs" id="q_svc" onchange="onQSvc()"><option value="">Select service</option><option value="boarding">Dog Boarding</option><option value="daycare">Dog Daycare</option><option value="walk">Dog Walk</option><option value="dropin">Drop-in Visit</option><option value="dogsit">Dog Sit</option><option value="taxi">Pet Taxi</option><option value="training">Dog Training</option></select></div>
+    <div class="fsec">Add Service Lines</div>
+          <div class="fr">
+            <div class="f"><label>Service</label>
+              <select class="fs" id="ml_svc">
+                <option value="">Select service...</option>
+                <option value="boarding">&#x1F4A4; Boarding</option>
+                <option value="daycare">&#x2600;&#xFE0F; Daycare</option>
+                <option value="walk">&#x1F415; Dog Walk</option>
+                <option value="dropin">&#x1F511; Drop-in Visit</option>
+                <option value="dogsit">&#x1FA91; Dog Sit</option>
+                <option value="taxi">&#x1F695; Pet Taxi (flat rate)</option>
+                <option value="training">&#x1F3C5; Training</option>
+              </select>
+            </div>
+            <div class="f"><label>Manual rate (&#163;)</label><input class="fi" type="number" id="ml_rate" placeholder="Auto or override"></div>
+          </div>
+          <div class="fr">
+            <div class="f"><label>Start date</label><input class="fi" type="date" id="ml_sd"></div>
+            <div class="f"><label>End date</label><input class="fi" type="date" id="ml_ed"></div>
+          </div>
+          <div class="fr">
+            <div class="f"><label>Drop-off time</label><input class="fi" type="time" id="ml_st" value="09:00"></div>
+            <div class="f"><label>Pick-up time</label><input class="fi" type="time" id="ml_et" value="18:00"></div>
+          </div>
+          <button class="sbtn2" onclick="addSvcLine()" style="width:100%;margin-bottom:9px;">+ Add Service to Quote</button>
+          <div class="fsec">Quote Lines</div>
+          <div id="svcLines" style="margin-bottom:9px;"><div style="font-size:10px;color:var(--gr3);padding:5px 0;">No services added yet.</div></div>
     <div id="q_dt_wrap" style="display:none;">
       <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="q_dd" oninput="calcQ()"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="q_dt_t" value="09:00" oninput="calcQ()"></div></div>
       <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="q_pd" oninput="calcQ()"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="q_pt" value="09:00" oninput="calcQ()"></div></div>
@@ -640,8 +667,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Objective / Knowledge Gap</label><textarea class="fta" id="st_obj"></textarea></div>
     <div class="f"><label>Course Provider</label><input class="fi" id="st_prov"></div>
     <div class="f"><label>What I learnt / improved</label><textarea class="fta" id="st_learnt"></textarea></div>
-    <div class="fr"><div class="f"><label>CPD Points</label><input class="fi" id="st_cpd"></div><div class="f"><label>Certificate Link</label><input class="fi" id="st_cert"></div></div>
-    <div class="srow"><button class="sbtn2" onclick="submitTraining()">Save Record</button><button class="sbtn2 grey" style="font-size:11px;padding:6px 11px;" onclick="exportTraining()">Export CSV</button><span class="smsg" id="stStatus"></span></div>
+    <div class="fr"><div class="f"><label>CPD Points</label><input class="fi" id="st_cpd"></div><div class="f"><label>Certificate Link</label><input class="fi" id="st_link"></div></div>
+    <div class="srow"><input type="hidden" id="st_eid"><input type="hidden" id="st_ridx"><div id="stForm"></div><button class="sbtn2" onclick="submitTraining()">Save Record</button><button class="sbtn2 grey" style="font-size:11px;padding:6px 11px;" onclick="exportTraining()">Export CSV</button><span class="smsg" id="stStatus"></span></div>
     <div class="fsec" style="margin-top:14px;">Records <button class="hbtn" style="float:right;background:var(--gr);" onclick="loadTraining()">Load</button></div>
     <div id="stList" style="margin-top:7px;"><div class="hload">Tap Load to view</div></div>
     <div style="height:18px;"></div>
@@ -684,6 +711,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div style="display:flex;gap:6px;margin-top:8px;">
         <button class="sbtn2" style="flex:1;font-size:11px;padding:7px;" onclick="showAllActs()">Show All Matching</button>
         <button class="sbtn2 grey" style="flex:1;font-size:11px;padding:7px;" onclick="surpriseAct()">🎲 Surprise Me</button>
+      <button class="hbtn" onclick="syncActsFromSheet()" style="font-size:10px;">&#8635; Sync</button>
       </div>
     </div>
     <div id="surpriseWrap" style="display:none;"></div>
@@ -778,7 +806,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Separation anxiety (1–5)</label>
       <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
         <input type="range" id="reg_anxiety" min="1" max="5" value="1" oninput="updAnxBar()" style="flex:1;">
-        <div class="nb-bar" id="reg_ax_bar" style="width:72px;"><div class="nb-seg" id="axs0"></div><div class="nb-seg" id="axs1"></div><div class="nb-seg" id="axs2"></div><div class="nb-seg" id="axs3"></div><div class="nb-seg" id="axs4"></div></div>
+        <div class="nb-bar" id="reg_ax_bar" style="width:72px;"><div class="nb-seg" id="axs0"></div><div class="nb-seg" id="axs1"></div><div class="nb-seg" id="axs2"></div>
+<div class="fr"><div class="f"><label>Jogging suitability (1-5)</label><input class="fi" type="number" id="reg_jog" min="1" max="5" placeholder="1 = no jogging, 5 = keen runner"></div></div><div class="nb-seg" id="axs3"></div><div class="nb-seg" id="axs4"></div></div>
         <span class="nval" id="reg_axval">1</span>
       </div>
     </div>
@@ -813,7 +842,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Vet Info</label><input class="fi" id="reg_vet"></div>
     <div class="f"><label>Insurance</label><input class="fi" id="reg_insurance"></div>
     <div class="f"><label>Date of first meet &amp; greet</label><input class="fi" type="date" id="reg_meetgreet"></div>
-    <div class="fr"><div class="f"><label>Where did they hear about us?</label><select class="fs" id="reg_referral"><option value="">Select</option><option>Social media</option><option>Word of mouth</option><option>Search engine</option><option>Leaflets</option><option>Other</option></select></div><div class="f"><label>Referral notes</label><input class="fi" id="reg_ref_notes" placeholder="e.g. Referred by Sophie W."></div></div>
+    <div class="fr"><div class="f"><label>Where did they hear about us?</label><select class="fs" id="reg_referral"><option value="">Select</option><option>Social media</option><option>Word of mouth</option><option>Search engine</option><option>Leaflets</option><option>Rover</option><option>Others</option><option>Other</option></select></div><div class="f"><label>Referral notes</label><input class="fi" id="reg_ref_notes" placeholder="e.g. Referred by Sophie W."></div></div>
     <div class="fsec">Service</div>
     <div class="fr"><div class="f"><label>Service type</label><select class="fs" id="reg_svc"><option value="">Select</option><option>Boarding</option><option>Dog Walking</option><option>Both</option></select></div><div class="f"><label>Status</label><select class="fs" id="reg_status"><option>Active</option><option>Inactive</option></select></div></div>
     <div class="f"><label>Remarks</label><textarea class="fta" id="reg_remarks"></textarea></div>
@@ -880,7 +909,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="tpl_eidx">
       <div class="f"><label>Template name <span class="req">*</span></label><input class="fi" id="tpl_name" placeholder="e.g. Booking confirmation"></div>
-      <div class="f"><label>Category (optional)</label><input class="fi" id="tpl_cat" placeholder="e.g. Reminder — Packing list"></div>
+      <div class="f"><label>Category (optional)</label><select class="fs" id="tpl_cat"><option value="">Select category *</option><option>Payment</option><option>Review</option><option>Drop-off</option></select></div>
       <div class="f"><label>Content</label>
         <div class="tpl-bts"><button class="tplb or" onclick="saveTplHub()">Save</button><button class="tplb" onclick="redoTplHub()">Redo</button></div>
         <textarea class="fta" id="tpl_content" style="min-height:160px;font-size:11px;"></textarea>
@@ -896,7 +925,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="act_eidx">
       <div class="f"><label>Title <span class="req">*</span></label><input class="fi" id="act_title" placeholder="e.g. Oldbury Court field walk"></div>
-      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Walk</option><option>Game</option><option>Field Visit</option><option>Training</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
+      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Walk</option><option>Game</option><option>Field Visit</option><option>Training</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
+<div class="f"><label>Energy level</label><select class="fs" id="act_energy"><option value="">Select...</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select></div>
+<div class="f"><label>Weather suitability</label><select class="fs" id="act_weather"><option value="">Select...</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select></div>
       <div class="fr"><div class="f"><label>Duration (mins)</label><input class="fi" type="number" id="act_dur"></div><div class="f"><label>Distance from home (mins drive)</label><input class="fi" type="number" id="act_dist"></div></div>
       <div class="f"><label>Location</label><input class="fi" id="act_location" placeholder="e.g. Oldbury Court Estate, BS16 2JP"></div>
       <div class="f"><label>Cost (£) if any</label><input class="fi" type="number" id="act_cost" placeholder="0" step="0.01"></div>

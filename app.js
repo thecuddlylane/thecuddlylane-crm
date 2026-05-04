@@ -2,7 +2,7 @@
 
 // ==================== UTILITIES ====================
 function todayStr(){return new Date().toISOString().split('T')[0];}
-function fmtDate(d){if(!d)return'-';try{return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch(e){return d;}}
+function fmtDate(d){if(!d)return'-';try{const dt=new Date(d+'T12:00:00');const dy=String(dt.getDate()).padStart(2,'0');const mo=String(dt.getMonth()+1).padStart(2,'0');const yr=dt.getFullYear();return dy+'/'+mo+'/'+yr;}catch(e){return d;}}
 function fmtDateFull(d){if(!d)return'-';try{return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
 function gv(id){const el=document.getElementById(id);return el?el.value||'':(console.warn('gv:',id),'');}
 function calcAge(b){if(!b)return'';try{const dob=new Date(b+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<1?Math.floor((now-dob)/2592000000)+'mo':y+'yr';}catch(e){return'';}}
@@ -24,17 +24,18 @@ const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
-let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={};
+let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[];
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
 
 // ==================== PIN ====================
 let _pinE='';
 function initPin(){const p=localStorage.getItem('tcl_pin');if(!p){skipPin();return;}document.getElementById('pinScreen').classList.add('active');}
-function pk(d){_pinE+=d;updPD();if(_pinE.length===4){if(_pinE===localStorage.getItem('tcl_pin')){document.getElementById('pinScreen').classList.remove('active');}else{document.getElementById('pinErr').textContent='Incorrect PIN';_pinE='';updPD();setTimeout(()=>document.getElementById('pinErr').textContent='',2000);}}}
+function pk(d){_pinE+=d;updPD();if(_pinE.length===4){if(_pinE===localStorage.getItem('tcl_pin')){onPinSuccess();}else{document.getElementById('pinErr').textContent='Incorrect PIN';_pinE='';updPD();setTimeout(()=>document.getElementById('pinErr').textContent='',2000);}}}
 function pdel(){_pinE=_pinE.slice(0,-1);updPD();}
 function updPD(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('on',i<_pinE.length);}
-function skipPin(){document.getElementById('pinScreen').classList.remove('active');}
+function skipPin(){document.getElementById('pinScreen').classList.remove('active');refreshBoard();}
+function onPinSuccess(){document.getElementById('pinScreen').classList.remove('active');refreshBoard();}
 
 // ==================== CONFIG ====================
 function getSID(){return localStorage.getItem('tcl_sid')||'';}
@@ -135,7 +136,7 @@ async function refreshBoard(){
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
-function mapDog(r,i){return{cid:r[0]||genId(r[1]||'Dog'),name:r[1]||'',breed:r[2]||'',gender:r[3]||'',birthday:r[4]||'',bdayType:r[5]||'exact',weight:r[6]||'',neut:r[7]||'',chip:r[8]||'',rescue:r[9]||'',nervous:r[10]||'',anxiety:r[11]||'',dogfriends:r[12]||'',food:r[13]||'',foodMeasure:r[14]||'',dietNotes:r[15]||'',allerg:r[16]||'',med:r[17]||'',medSchedule:r[18]||'',fears:r[19]||'',notouch:r[20]||'',vacc:r[21]||'',flea:r[22]||'',behav:r[23]||'',walk:r[24]||'',car:r[25]||'',sleep:r[26]||'',escape:r[27]||'',toilet:r[28]||'',alone:r[29]||'',commands:r[30]||'',sitters:r[31]||'',updates:r[32]||'',updatesCustom:r[33]||'',rel:r[34]||'',notes:r[35]||'',owner:r[36]||'',phone:r[37]||'',addr:r[38]||'',postcode:r[39]||'',emergency:r[40]||'',vet:r[41]||'',ins:r[42]||'',meetgreet:r[43]||'',referral:r[44]||'',refNotes:r[45]||'',svc:r[46]||'',status:r[47]||'',remarks:r[48]||'',emoji:r[49]||'',rowIdx:i+2};}
+function mapDog(r,i){return{cid:r[0]||genId(r[1]||'Dog'),name:r[1]||'',breed:r[2]||'',gender:r[3]||'',birthday:r[4]||'',bdayType:r[5]||'exact',weight:r[6]||'',neut:r[7]||'',chip:r[8]||'',rescue:r[9]||'',nervous:r[10]||'',anxiety:r[11]||'',dogfriends:r[12]||'',food:r[13]||'',foodMeasure:r[14]||'',dietNotes:r[15]||'',allerg:r[16]||'',med:r[17]||'',medSchedule:r[18]||'',fears:r[19]||'',notouch:r[20]||'',vacc:r[21]||'',flea:r[22]||'',behav:r[23]||'',walk:r[24]||'',car:r[25]||'',sleep:r[26]||'',escape:r[27]||'',toilet:r[28]||'',alone:r[29]||'',commands:r[30]||'',sitters:r[31]||'',updates:r[32]||'',updatesCustom:r[33]||'',rel:r[34]||'',notes:r[35]||'',owner:r[36]||'',phone:r[37]||'',addr:r[38]||'',postcode:r[39]||'',emergency:r[40]||'',vet:r[41]||'',ins:r[42]||'',meetgreet:r[43]||'',referral:r[44]||'',refNotes:r[45]||'',svc:r[46]||'',status:r[47]||'',remarks:r[48]||'',emoji:r[49]||'',jog:r[50]||'',rowIdx:i+2};}
 function mapBk(r,i){return{id:r[0]||'',dog:r[1]||'',svc:r[2]||'',sd:r[3]||'',st:r[4]||'',ed:r[5]||'',et:r[6]||'',dropLoc:r[7]||'',pickLoc:r[8]||'',rev:parseFloat(r[9])||0,tips:parseFloat(r[10])||0,prepay:parseFloat(r[11])||0,finalPay:parseFloat(r[12])||0,unit:parseFloat(r[13])||0,discNotes:r[14]||'',roverPct:parseFloat(r[15])||0,roverAmt:parseFloat(r[16])||0,ch:r[17]||'TCL',pay:r[18]||'',status:r[19]||'',priv:r[20]==='Private',month:r[21]||'',rating:r[22]||'',feedback:r[23]||'',rem:[r[24]||'',r[25]||'',r[26]||'',r[27]||'',r[28]||''],ri:i+2};}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
@@ -166,16 +167,26 @@ function openProfile(dog){
   if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';wrap.appendChild(img);}
   img.style.display=photo?'block':'none';if(photo)img.src=photo;
   buildTodayLog();buildSummary(dog);buildProfInfo(dog);buildConsent(dog);buildServices(dog);
-  document.getElementById('histList').innerHTML='<div class="hload">Tap a filter to load</div>';
-  document.querySelectorAll('.hfb').forEach((b,i)=>b.classList.toggle('active',i===0));
+  document.getElementById('histList').innerHTML='<div class="hload">Loading...</div>';
+  document.querySelectorAll('.hfb').forEach(b=>b.classList.remove('active'));
+  const allBtn=document.querySelector('.hfb[onclick*="all"]');if(allBtn)allBtn.classList.add('active');
+  setTimeout(()=>{if(allBtn)filtHist('all',allBtn);},100);
   document.querySelectorAll('.ptc').forEach(c=>c.classList.remove('active'));document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
   document.getElementById('ptab-logs').classList.add('active');document.querySelector('.ptab[data-tab="logs"]').classList.add('active');
   showScreen('sc-profile');
 }
 
+function hasActiveBookingToday(dog){
+  const today=todayStr();
+  return bookings.some(b=>b.dog.toLowerCase()===dog.name.toLowerCase()&&b.sd<=today&&b.ed>=today&&b.status!=='Canceled');
+}
 function buildTodayLog(){
   const today=todayStr();const sv=JSON.parse(localStorage.getItem('log_'+(curDog&&curDog.cid)+'_'+today)||'{}');
   document.getElementById('logDateDisplay').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  if(!hasActiveBookingToday(curDog)){
+    document.getElementById('logsBody').innerHTML='<div class="empty" style="padding:20px;text-align:center;"><p style="color:var(--gr3);font-size:12px;">No active booking today.<br>Log via History for past dates.</p></div>';
+    document.getElementById('logNotes').value='';document.getElementById('logPrivate').checked=false;return;
+  }
   document.getElementById('logNotes').value=sv.notes||'';document.getElementById('logPrivate').checked=!!sv.priv;
   function tile(k,ico,lbl){return '<div class="tile'+(sv[k]?' done':'')+'" id="tl_'+k+'" onclick="togTile(\''+k+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+'</span></div>';}
   function inc(k,lbl,body){return '<div class="inc-tog" onclick="togInc(\''+k+'\')"><span>'+lbl+'</span><span style="font-size:10px;color:var(--gr3);">'+(sv['inc_'+k]?'&#9652;':'&#9660;')+'</span></div><div class="inc-fld'+(sv['inc_'+k]?' open':'')+'" id="inc_'+k+'">'+body+'</div>';}
@@ -183,8 +194,8 @@ function buildTodayLog(){
   const actOpts='<option value="">No specific activity</option>'+activities.filter(a=>a.cat==='Walk'||a.cat==='Game').map(a=>'<option>'+a.title+'</option>').join('');
   document.getElementById('logsBody').innerHTML=
     '<div class="cat-sec"><div class="cat-t">Food &amp; Medicine</div><div class="tile-row">'+tile('breakfast','&#9728;','Breakfast')+tile('medAm','&#128138;','AM Med')+tile('dinner','&#127769;','Dinner')+tile('medPm','&#128138;','PM Med')+tile('snack','&#127999;','Snack')+'</div></div>'+
-    '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('garden','&#127807;','Garden')+tile('walkPm','&#128062;','PM Walk')+tile('game','&#127918;','Game')+tile('beforeSleep','&#128564;','Bedtime')+'</div>'+
-    '<div style="margin-top:5px;"><label style="font-size:9px;font-weight:600;color:var(--gr2);">Activity from library (optional)</label><select class="fs" id="log_act_sel" style="margin-top:3px;font-size:10px;">'+actOpts+'</select></div></div>'+
+    '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('garden','&#127807;','Garden Break')+tile('walkPm','&#128062;','PM Walk')+'</div>'+
+    '<div style="margin-top:5px;"><label style="font-size:9px;font-weight:600;color:var(--gr2);">Activity from library</label><div style="position:relative;margin-top:3px;"><input class="fi" id="log_act_search" placeholder="Search activities..." oninput="filterLogActs()" style="font-size:10px;"><div id="log_act_results" style="position:absolute;z-index:50;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);max-height:120px;overflow-y:auto;width:100%;display:none;"></div></div></div></div>'+
     '<div class="cat-sec"><div class="cat-t">Hygiene</div><div class="tile-row">'+tile('bowl','&#129379;','Bowl')+tile('room','&#129524;','Room')+tile('garment','&#129507;','Garment')+'</div></div>'+
     '<div class="cat-sec"><div class="cat-t">Incidents</div>'+
     inc('health','Health','<div class="fr"><div class="f"><label>Category</label><select class="fs" id="ih_cat"><option>Injury</option><option>Illness</option><option>Allergic reaction</option><option>Digestive</option><option>Behavioural</option><option>Medication</option><option>Other</option></select></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'health\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'health\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'health\',\'High\',event)">High</button></div><input type="hidden" id="ih_imp"></div></div><div class="f"><label>Issue</label><input class="fi" id="ih_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ih_desc" style="min-height:48px;"></textarea></div><div class="f"><label>Root cause</label><input class="fi" id="ih_cause"></div><div class="f"><label>Next steps</label><input class="fi" id="ih_next"></div>')+
@@ -202,7 +213,7 @@ async function saveLog(){
   const st=document.getElementById('logStatus');st.style.display='block';st.style.color='var(--gr2)';st.textContent='Saving...';
   const g=k=>sv[k]?'[Y]':'[ ]';const priv=sv.priv?'Private':'';
   const saves=[appendRow(TABS.DAILY,[today,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv])];
-  const actSel=document.getElementById('log_act_sel')?.value;
+  const actSel=document.getElementById('log_act_search')?.value?.trim();
   if(actSel)saves.push(appendRow(TABS.ACTLOG,[today,actSel,curDog.name,'',sv.notes||'','']));
   if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[today,curDog.name,curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv]));
   if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[today,gv('if_time'),curDog.name,curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv]));}
@@ -212,12 +223,12 @@ async function saveLog(){
 }
 function buildSummary(dog){
   const alerts=[],notes=[];
-  if(dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim())alerts.push('Medical: '+dog.med);
+  const medVal=(dog.med||'').toLowerCase().trim();if(medVal&&medVal!=='none'&&medVal!=='n/a'&&medVal!=='na')alerts.push('Medical: '+dog.med);
   if(dog.medSchedule)alerts.push('Med schedule: '+dog.medSchedule);
-  if(dog.allerg&&dog.allerg.toLowerCase()!=='none')alerts.push('Allergies: '+dog.allerg);
+  const algVal=(dog.allerg||'').toLowerCase().trim();if(algVal&&algVal!=='none'&&algVal!=='n/a'&&algVal!=='na')alerts.push('Allergies: '+dog.allerg);
   if(dog.fears)notes.push('Fears: '+dog.fears);if(dog.rescue==='Yes')notes.push('Rescue dog');
   if(parseInt(dog.nervous)>=4)notes.push('Very nervous ('+dog.nervous+'/5)');if(parseInt(dog.anxiety)>=4)notes.push('High sep. anxiety');
-  const lines=[dog.name+' - '+(dog.breed||'dog')+', owned by '+(dog.owner||'unknown')+'.'];
+  const ageStr=calcAge(dog.birthday);const lines=[dog.name+' - '+(dog.breed||'dog')+(ageStr?' ('+ageStr+')':'')+', owned by '+(dog.owner||'unknown')+'.'];
   if(notes.length)lines.push(notes.join('. ')+'.');if(dog.remarks)lines.push(dog.remarks);
   document.getElementById('sumText').textContent=lines.join(' ');
   document.getElementById('alertRows').innerHTML=alerts.map(a=>'<div class="alert-r">! '+a+'</div>').join('');
@@ -227,7 +238,7 @@ function buildProfInfo(dog){
   const nbar=(n,col)=>{const l=parseInt(n)||0;return'<div class="nb-bar" style="flex:1;">'+Array.from({length:5},(_,i)=>'<div class="nb-seg" style="background:'+(i<l?col:'var(--gr4)')+'"></div>').join('')+'</div><span style="font-size:9px;font-weight:700;color:var(--gr2);margin-left:3px;">'+l+'/5</span>';};
   const nc=v=>parseInt(v)>=4?'var(--rd)':parseInt(v)>=3?'var(--hn)':'var(--or)';
   document.getElementById('profInfoBody').innerHTML=
-    '<div class="isec"><div class="isec-t">Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender',dog.gender)+ir('Neutered',dog.neut)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Dog compatibility',dog.dogfriends)+ir('Relationships',dog.rel)+'</div>'+
+    '<div class="isec"><div class="isec-t">Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender',dog.gender)+ir('Neutered',dog.neut)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival">'+dog.jog+'/5</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
     '<div class="isec"><div class="isec-t">Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+ir('Last vaccination',dog.vacc)+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="isec"><div class="isec-t">Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates+(dog.updatesCustom?' - '+dog.updatesCustom:''))+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="isec"><div class="isec-t">Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
@@ -239,11 +250,15 @@ async function filtHist(type,btn){
   const list=document.getElementById('histList');list.innerHTML='<div class="hload">Loading...</div>';
   try{
     let all=[];const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rows=await readSheet(tab,'A2:R');histCache[tab]=rows.map((r,i)=>({tab,row:r,ri:i+2}));return histCache[tab];};
-    if(type==='all'){for(const t of[TABS.DAILY,TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL,TABS.ACTLOG])all=all.concat(await ft(t));}
+    if(type==='all'){
+      for(const t of[TABS.DAILY,TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL])all=all.concat(await ft(t));
+      if(histCache[TABS.ACTLOG])all=all.concat(histCache[TABS.ACTLOG]);
+      else{const rows=await readSheet(TABS.ACTLOG,'A2:F');histCache[TABS.ACTLOG]=rows.map((r,i)=>({tab:TABS.ACTLOG,row:r,ri:i+2}));all=all.concat(histCache[TABS.ACTLOG]);}
+    }
     else if(type==='incidents'){for(const t of[TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL])all=all.concat(await ft(t));}
     else if(type==='daily')all=await ft(TABS.DAILY);
     else if(type==='health')all=await ft(TABS.HEALTH);
-    else if(type==='activities')all=await ft(TABS.ACTLOG);
+    else if(type==='activities'){if(histCache[TABS.ACTLOG])all=histCache[TABS.ACTLOG];else{const rows=await readSheet(TABS.ACTLOG,'A2:F');histCache[TABS.ACTLOG]=rows.map((r,i)=>({tab:TABS.ACTLOG,row:r,ri:i+2}));all=histCache[TABS.ACTLOG];}}
     const nm=curDog.name.toLowerCase();const flt=all.filter(({row})=>row.join(' ').toLowerCase().includes(nm));
     flt.sort((a,b)=>(b.row[0]||'').localeCompare(a.row[0]||''));
     list.innerHTML='';if(!flt.length){list.innerHTML='<div class="hload">No records found</div>';return;}
@@ -252,7 +267,10 @@ async function filtHist(type,btn){
       const cls={};cls[TABS.DAILY]='htd';cls[TABS.HEALTH]='hth';cls[TABS.FIGHT]='hti';cls[TABS.TRANSPORT]='hti';cls[TABS.TRIAL]='hti';cls[TABS.ACTLOG]='hta';
       const iP=row.includes('Private');
       let summary='';
-      if(tab===TABS.DAILY)summary='Breakfast:'+row[2]+' Dinner:'+row[4]+' Walk:'+row[7]+' Game:'+row[10]+(row[16]?' - '+row[16]:'');
+      if(tab===TABS.DAILY){
+        const ticks=[];if(row[2]==='[Y]')ticks.push('Breakfast');if(row[3]==='[Y]')ticks.push('AM Med');if(row[4]==='[Y]')ticks.push('Dinner');if(row[5]==='[Y]')ticks.push('PM Med');if(row[7]==='[Y]')ticks.push('AM Walk');if(row[8]==='[Y]')ticks.push('Garden');if(row[9]==='[Y]')ticks.push('PM Walk');if(row[11]==='[Y]')ticks.push('Bedtime');
+        summary=(ticks.length?ticks.join(' · '):'No activities')+(row[16]?' — '+row[16]:'');
+      }
       else if(tab===TABS.HEALTH)summary=(row[3]||'-')+' '+(row[4]||'');
       else if(tab===TABS.FIGHT)summary='Fight: '+(row[5]||'-');
       else if(tab===TABS.TRANSPORT)summary=(row[2]||'-')+' '+(row[5]||'-');
@@ -329,7 +347,7 @@ function selectEmoji(em){
   const modal=document.getElementById('emojiModal');if(modal)modal.classList.remove('open');
   if(curDog&&curDog.rowIdx){const vals=Object.values(mapDogToRow(curDog));updateRow(TABS.DOGS,curDog.rowIdx,vals).catch(()=>{});}
 }
-function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||''];}
+function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||'',d.jog||''];}
 function openEditProf(){
   if(!curDog)return;const d=curDog;
   document.getElementById('reg_eid').value=d.cid;document.getElementById('reg_ridx').value=d.rowIdx||'';
@@ -352,7 +370,7 @@ function updAnxBar(){const v=parseInt(document.getElementById('reg_anxiety').val
 function startReg(){
   document.getElementById('reg_eid').value='';document.getElementById('reg_ridx').value='';
   document.querySelector('#sc-register .pg-t').textContent='Register New Dog';document.getElementById('regBtn').textContent='Register Dog';
-  ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates_custom','reg_notes','reg_ref_notes','reg_meetgreet'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates_custom','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['reg_gender','reg_neut','reg_rescue','reg_car','reg_food','reg_svc','reg_updates','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();
   initBdayType();document.getElementById('regPhotoImg').style.display='none';document.getElementById('regPhotoEmoji').style.display='block';document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
@@ -371,7 +389,7 @@ async function registerDog(){
   const btn=document.getElementById('regBtn');const st=document.getElementById('regStatus');btn.disabled=true;btn.textContent='Saving...';
   const bt=gv('reg_bday_type');let bday='';if(bt==='approx'){const m=gv('reg_bday_m'),y=gv('reg_bday_y');bday=y&&m?y+'-'+m+'-01':'';}else bday=gv('reg_bday');
   const cid=eid||genId(name);
-  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),eid?curDog?.emoji||'':''];
+  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),eid?curDog?.emoji||'':'',gv('reg_jog')];
   try{
     if(eid&&ri)await updateRow(TABS.DOGS,ri,vals);else await appendRow(TABS.DOGS,vals);
     const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);}catch(e){}
@@ -386,6 +404,83 @@ function handlePh(e){const f=e.target.files[0];if(!f||!curDog)return;compressPho
 function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,data=>{document.getElementById('regPhotoImg').src=data;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=data;});}
 
 // ==================== QUOTE ====================
+// ==================== MULTI-SERVICE QUOTE ====================
+const SVC_EMOJIS={boarding:'\u{1F4A4}',daycare:'\u2600\uFE0F',walk:'\u{1F415}',dropin:'\u{1F511}',dogsit:'\u{1FA91}',taxi:'\u{1F695}',training:'\u{1F3C5}'};
+const SVC_NAMES={boarding:'Boarding',daycare:'Daycare',walk:'Dog Walk',dropin:'Drop-in Visit',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
+
+function addSvcLine(){
+  const svc=document.getElementById('ml_svc')?.value;if(!svc)return;
+  const isTaxi=svc==='taxi';
+  const dogs=isTaxi?[]:([..._selDogs].length?[..._selDogs]:[]);
+  const line={svc,dogs,sd:document.getElementById('ml_sd')?.value||'',ed:document.getElementById('ml_ed')?.value||'',st2:document.getElementById('ml_st')?.value||'09:00',et:document.getElementById('ml_et')?.value||'18:00',rate:parseFloat(document.getElementById('ml_rate')?.value)||0};
+  _svcLines.push(line);renderSvcLines();calcMultiQ();
+}
+function removeSvcLine(i){_svcLines.splice(i,1);renderSvcLines();calcMultiQ();}
+function renderSvcLines(){
+  const c=document.getElementById('svcLines');if(!c)return;
+  if(!_svcLines.length){c.innerHTML='<div style="font-size:10px;color:var(--gr3);padding:6px 0;">No services added yet. Add services above.</div>';return;}
+  c.innerHTML=_svcLines.map((l,i)=>{
+    const em=SVC_EMOJIS[l.svc]||'';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--gr4);">'+
+      '<span style="font-size:14px;">'+em+'</span>'+
+      '<div style="flex:1;font-size:10px;line-height:1.5;"><strong>'+(SVC_NAMES[l.svc]||l.svc)+'</strong>'+
+      (l.dogs&&l.dogs.length?' \u2014 '+l.dogs.join(' & '):'')+
+      (l.sd?' \u2014 '+fmtDate(l.sd)+(l.ed&&l.ed!==l.sd?' to '+fmtDate(l.ed):''):'')+
+      (l.rate?' \u2014 '+fmtGBP(l.rate):'')+'</div>'+
+      '<button onclick="removeSvcLine('+i+')" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:16px;line-height:1;">\u00d7</button></div>';
+  }).join('');
+}
+function calcMultiQ(){
+  if(!_svcLines.length){document.getElementById('q_result').style.display='none';return;}
+  const r=getRates();let total=0;const lines=[];const descParts=[];
+  _svcLines.forEach(l=>{
+    let amt=0;const isTaxi=l.svc==='taxi';
+    if(l.svc==='boarding'){
+      const addDogs=Math.max(0,(l.dogs?.length||1)-1);
+      if(l.sd&&l.ed){
+        const dropDt=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt=new Date(l.ed+'T'+(l.et||'09:00'));
+        const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));
+        const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;
+        let d=new Date(l.sd+'T12:00:00');const endD=new Date(l.ed+'T12:00:00');
+        while(d<endD){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
+        amt=(sN*r.board_std)+(hN*r.board_hol)+(addDogs*(sN*r.board_add+hN*r.board_addh));
+        const em='\u{1F4A4}';
+        lines.push([em+' Boarding'+(l.dogs.length?' ('+l.dogs.join(' & ')+')':''),amt]);
+        descParts.push(em+' Boarding: '+fmtDate(l.sd)+' - '+fmtDate(l.ed)+'\nDrop-off: '+l.st2+' | Pick-up: '+l.et+'\nNights: '+nights+(addDogs>0?'\nAdditional pet x'+addDogs:''));
+      }
+    }else if(l.svc==='daycare'){
+      const hol=l.sd?isHol(l.sd):false;const addDogs=Math.max(0,(l.dogs?.length||1)-1);
+      amt=(hol?r.day_hol:r.day_std)+(addDogs*(hol?r.day_addh:r.day_add));
+      const em='\u2600\uFE0F';
+      lines.push([em+' Daycare'+(l.dogs.length?' ('+l.dogs.join(' & ')+')':''),amt]);
+      descParts.push(em+' Daycare: '+fmtDate(l.sd||'')+(hol?' (Holiday)':''));
+    }else if(isTaxi){
+      amt=l.rate||r.t30r;
+      lines.push(['\u{1F695} Pet Taxi',amt]);
+      descParts.push('\u{1F695} Pet Taxi: '+fmtGBP(amt));
+    }else{
+      amt=l.rate;
+      const em=SVC_EMOJIS[l.svc]||'';
+      lines.push([em+' '+(SVC_NAMES[l.svc]||l.svc)+(l.dogs&&l.dogs.length?' ('+l.dogs.join(' & ')+')':''),amt]);
+      descParts.push(em+' '+(SVC_NAMES[l.svc]||l.svc)+': '+fmtGBP(amt));
+    }
+    total+=amt;
+  });
+  const discType=document.getElementById('q_disc_t')?.value||'none';const discVal=parseFloat(document.getElementById('q_disc_v')?.value)||0;
+  let discLine='';
+  if(discType==='pct'&&discVal>0){const da=total*(discVal/100);total-=da;discLine='Discount '+discVal+'%: -'+fmtGBP(da);lines.push(['Discount '+discVal+'%',-da]);}
+  else if(discType==='gbp'&&discVal>0){total-=discVal;discLine='Discount: -'+fmtGBP(discVal);lines.push(['Discount',-discVal]);}
+  const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
+  const prepayAmt=total*(prepayPct/100);const finalAmt=total-prepayAmt;
+  _cr={total,prepayAmt,finalAmt,lines,nights:0,rpn:0,addLine:'',discLine,holDates:[],selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts};
+  document.getElementById('q_total').textContent=fmtGBP(total);
+  document.getElementById('q_breakdown').innerHTML=lines.map((l,i)=>'<div class="q-ln"'+(i===lines.length-1?' style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:4px;"':'')+'>'+
+    '<span>'+l[0]+'</span><span>'+(l[1]<0?'-':'')+fmtGBP(Math.abs(l[1]))+'</span></div>').join('');
+  document.getElementById('q_prepay_show').textContent=fmtGBP(prepayAmt);
+  document.getElementById('q_final_show').textContent=fmtGBP(finalAmt);
+  document.getElementById('q_result').style.display='block';
+}
+
 function getRates(){return JSON.parse(localStorage.getItem('tcl_rates')||JSON.stringify(DR));}
 function getHolRanges(){return JSON.parse(localStorage.getItem('tcl_hol_ranges')||JSON.stringify(DEFAULT_RANGES));}
 function getTpls(){return JSON.parse(localStorage.getItem('tcl_tpls')||JSON.stringify({prepay:TP_PREPAY,final:TP_FINAL,payLink:'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:'KCHEUNG'}));}
@@ -418,7 +513,7 @@ function buildQDogMS(){
   if(!allDogs.length){c.innerHTML='<div style="padding:9px;font-size:10px;color:var(--gr3);">No dogs loaded - tap Refresh on the Board first</div>';return;}
   c.innerHTML=allDogs.map((d,i)=>'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>').join('');
 }
-function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';buildQDogMS();buildMainDogBtns();calcQ();}
+function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';buildQDogMS();buildMainDogBtns();calcMultiQ();}
 function buildMainDogBtns(){const w=document.getElementById('q_main_dog_wrap');const c=document.getElementById('q_main_dog_btns');if(!w||!c)return;if(_selDogs.length<=1){w.style.display='none';_mainDog=_selDogs[0]||'';return;}w.style.display='block';c.innerHTML=_selDogs.map((n,i)=>'<button class="main-dog-pill'+(_mainDog===n?' active':'')+'" onclick="setMainDog('+i+')">* '+n+'</button>').join('');}
 function setMainDog(i){_mainDog=_selDogs[i];buildMainDogBtns();calcQ();}
 function onQSvc(){
@@ -469,16 +564,26 @@ function calcQ(){
   document.getElementById('q_prepay_show').textContent=fmtGBP(prepayAmt);document.getElementById('q_final_show').textContent=fmtGBP(finalAmt);
 }
 function genQuote(type){
-  const t=getTpls();const tpl=type==='prepay'?t.prepay:t.final;const svc=document.getElementById('q_svc').value;
-  const svcN={boarding:'Boarding',daycare:'Daycare',walk:'Dog Walk',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Dog Training'};
-  const dd=document.getElementById('q_dd')?.value||'';const pd=document.getElementById('q_pd')?.value||dd;const dt=document.getElementById('q_dt_t')?.value||'TBC';const pt=document.getElementById('q_pt')?.value||'TBC';
-  const dogNames=_cr.selDogs.join(' & ')||'your dog';const payRef=document.getElementById('q_payref').value||(t.payRefPfx||'KCHEUNG');
-  const holStr=_cr.holDates.length?'Holiday rate applies: '+_cr.holDates.join(', '):'';
-  const vars={ownerName:document.getElementById('q_owner').value||'there',dogs:dogNames,service:svcN[svc]||svc,dropoff:fmtDate(dd),pickup:fmtDate(pd),dropoffTime:dt,pickupTime:pt,nights:_cr.nights>1?'Nights: '+_cr.nights:'',ratePerNight:_cr.rpn.toFixed(2),addDogLine:_cr.addLine||'',total:_cr.total.toFixed(2),prepayAmt:_cr.prepayAmt.toFixed(2),finalAmt:_cr.finalAmt.toFixed(2),discount:_cr.discLine?'Discount: '+_cr.discLine:'',holidayDates:holStr,payRef,payLink:t.payLink||'[payment link]'};
-  let msg=tpl;Object.entries(vars).forEach(([k,v])=>{msg=msg.replace(new RegExp('{{'+k+'}}','g'),v);});msg=msg.replace(/\n{3,}/g,'\n\n').trim();
-  const outId=type==='prepay'?'q_out_prepay':'q_out_final';document.getElementById(outId).style.display='block';document.getElementById(outId).textContent=msg;copyText(msg);
-  const allBtns=document.querySelectorAll('.cpbtn');allBtns.forEach(b=>{if((type==='prepay'&&!b.classList.contains('bl')&&!b.classList.contains('gn'))||(type==='final'&&b.classList.contains('bl'))){b.textContent='Copied!';setTimeout(()=>b.textContent=type==='prepay'?'Copy Prepayment Quote':'Copy Final Payment Quote',2000);}});
+  const t=getTpls();const ownerName=document.getElementById('q_owner').value||'there';
+  const payRef=document.getElementById('q_payref').value||(t.payRefPfx||'KCHEUNG');
+  const allDogNames=[...new Set((_svcLines||[]).flatMap(l=>l.dogs||[]))].join(' & ')||_cr.selDogs.join(' & ')||'your dog';
+  const greeting=type==='prepay'?'Thank you for choosing THE CUDDLY LANE!':'Your booking is confirmed \u2014 please settle the balance before drop-off.';
+  const serviceLines=(_cr.descParts||[]).join('\n\n');
+  let msg='Hi '+ownerName+',\n\n'+greeting+'\n\nHere is the quote for '+allDogNames+' with THE CUDDLY LANE:\n\n'+serviceLines;
+  if(_cr.discLine)msg+='\n\n'+_cr.discLine;
+  msg+='\n\nTotal: '+fmtGBP(_cr.total);
+  if(type==='prepay'){
+    msg+='\n\nPrepayment (non-refundable, transferable to other dates):\n'+fmtGBP(_cr.prepayAmt)+'\n\nPayment reference: '+payRef+'\n'+(t.payLink||'[payment link]')+'\n\nThank you!\nKatie & Osbert';
+  }else{
+    msg+='\nPrepayment received: '+fmtGBP(_cr.prepayAmt)+'\nBalance due: '+fmtGBP(_cr.finalAmt)+'\n\nPayment reference: '+payRef+'\n'+(t.payLink||'[payment link]')+'\n\nLooking forward to seeing '+allDogNames+'!\nKatie & Osbert';
+  }
+  msg=msg.replace(/\n{3,}/g,'\n\n').trim();
+  const outId=type==='prepay'?'q_out_prepay':'q_out_final';
+  document.getElementById(outId).style.display='block';document.getElementById(outId).textContent=msg;copyText(msg);
+  const allBtns=document.querySelectorAll('.cpbtn');
+  allBtns.forEach(b=>{if((type==='prepay'&&!b.classList.contains('bl')&&!b.classList.contains('gn'))||(type==='final'&&b.classList.contains('bl'))){b.textContent='Copied!';setTimeout(()=>b.textContent=type==='prepay'?'Copy Prepayment Quote':'Copy Final Payment Quote',2000);}});
 }
+
 async function createBookingsFromQuote(){
   const svc=document.getElementById('q_svc').value;if(!svc){alert('Complete the quote first');return;}
   const dd=document.getElementById('q_dd')?.value||'';const pd=document.getElementById('q_pd')?.value||dd;const dt=document.getElementById('q_dt_t')?.value||'09:00';const pt=document.getElementById('q_pt')?.value||'09:00';
@@ -514,7 +619,7 @@ function openBkModal(editId=null,fromProf=false){
   }else{
     sel.value='';if(fromProf&&curDog)sel.value=curDog.name;updateDogIdHint();
     ['bm_rev','bm_tips','bm_prepay','bm_final','bm_unit','bm_disc_notes','bm_drop_loc','bm_pick_loc','bm_rating','bm_feedback'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    document.getElementById('bm_rpct').value='20';document.getElementById('bm_sd').value=todayStr();document.getElementById('bm_ed').value=todayStr();document.getElementById('bm_channel').value='TCL';document.getElementById('bm_pay').value='';document.getElementById('bm_status').value='Quoted';document.getElementById('bm_priv').checked=false;buildReminderRows([]);
+    document.getElementById('bm_rpct').value='15';document.getElementById('bm_sd').value=todayStr();document.getElementById('bm_ed').value=todayStr();document.getElementById('bm_channel').value='TCL';document.getElementById('bm_pay').value='';document.getElementById('bm_status').value='Quoted';document.getElementById('bm_priv').checked=false;buildReminderRows([]);
   }
   calcBal();toggleRover();modal.classList.add('open');
 }
@@ -624,8 +729,39 @@ function drawChart(yr,tgts){
 
 // ==================== TRAINING ====================
 let trainRecords=[];
-async function submitTraining(){const who=gv('st_who');if(!who){alert('Select staff member');return;}const btn=document.querySelector('[onclick="submitTraining()"]');const st=document.getElementById('stStatus');btn.disabled=true;const vals=[gv('st_date'),who,gv('st_cat'),gv('st_obj'),gv('st_prov'),gv('st_learnt'),gv('st_cpd'),gv('st_cert'),''];try{await appendRow(TABS.TRAIN,vals);st.textContent='Saved!';st.className='smsg ok';['st_obj','st_prov','st_learnt','st_cpd','st_cert'].forEach(id=>document.getElementById(id).value='');setTimeout(()=>st.className='smsg',3000);}catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent='Save Record';}}
-async function loadTraining(){const list=document.getElementById('stList');list.innerHTML='<div class="hload">Loading...</div>';try{const rows=await readSheet(TABS.TRAIN,'A2:I');trainRecords=rows.map(r=>({date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',cert:r[7]||''}));list.innerHTML=trainRecords.slice().reverse().slice(0,20).map(r=>'<div class="hi"><div class="hi-h"><span class="hi-d">'+r.date+'</span><span style="font-size:9px;font-weight:700;color:var(--gr);">'+r.staff+'</span>'+(r.cat?'<span class="htype hti">'+r.cat+'</span>':'')+'</div>'+(r.obj?'<div class="hsum">'+r.obj+'</div>':'')+(r.cpd?'<div style="font-size:8px;color:var(--gn);margin-top:2px;">CPD: '+r.cpd+' pts</div>':'')+'</div>').join('')||'<div class="hload">No records</div>';}catch(e){list.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}}
+async function submitTraining(){
+  const who=gv('st_who');if(!who){alert('Select staff member');return;}
+  const btn=document.querySelector('[onclick="submitTraining()"]');const st=document.getElementById('stStatus');if(btn)btn.disabled=true;
+  const eid=gv('st_eid');const ri=parseInt(gv('st_ridx'))||null;
+  const vals=[gv('st_date'),who,gv('st_cat'),gv('st_obj'),gv('st_prov'),gv('st_learnt'),gv('st_cpd'),gv('st_link'),''];
+  try{
+    if(eid&&ri)await updateRow(TABS.TRAIN,ri,vals);else await appendRow(TABS.TRAIN,vals);
+    st.textContent=eid?'Updated!':'Saved!';st.className='smsg ok';
+    ['st_obj','st_prov','st_learnt','st_cpd','st_link'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    const eidEl=document.getElementById('st_eid');if(eidEl)eidEl.value='';
+    const ridxEl=document.getElementById('st_ridx');if(ridxEl)ridxEl.value='';
+    if(btn){btn.textContent='Save Record';}
+    await loadTraining();setTimeout(()=>st.className='smsg',3000);
+  }catch(e){st.textContent=e.message;st.className='smsg err';}finally{if(btn)btn.disabled=false;}
+}
+function editTrainingRow(ri,r){
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  s('st_eid',ri);s('st_ridx',ri);s('st_date',r[0]);s('st_who',r[1]);s('st_cat',r[2]);s('st_obj',r[3]);s('st_prov',r[4]);s('st_learnt',r[5]);s('st_cpd',r[6]);s('st_link',r[7]);
+  const btn=document.querySelector('[onclick="submitTraining()"]');if(btn)btn.textContent='Update Record';
+  const stEl=document.getElementById('stStatus');if(stEl){stEl.textContent='Editing record...';stEl.className='smsg';}
+  const form=document.getElementById('stForm');if(form)form.scrollIntoView({behavior:'smooth'});
+}
+async function loadTraining(){
+  const list=document.getElementById('stList');list.innerHTML='<div class="hload">Loading...</div>';
+  try{
+    const rows=await readSheet(TABS.TRAIN,'A2:I');
+    trainRecords=rows.map((r,i)=>({ri:i+2,date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',link:r[7]||''}));
+    list.innerHTML=trainRecords.slice().reverse().slice(0,30).map(r=>{
+      const rd=JSON.stringify([r.date,r.staff,r.cat,r.obj,r.prov,r.learnt,r.cpd,r.link]).replace(/'/g,"\\'");
+      return '<div class="hi"><div class="hi-h"><span class="hi-d">'+r.date+'</span><span style="font-size:9px;font-weight:700;color:var(--gr);">'+r.staff+'</span>'+(r.cat?'<span class="htype hti">'+r.cat+'</span>':'')+'<button class="ebtn" style="margin-left:auto;" onclick="editTrainingRow('+r.ri+','+rd+')">Edit</button></div>'+(r.obj?'<div class="hsum">'+r.obj+'</div>':'')+(r.cpd?'<div style="font-size:8px;color:var(--gn);margin-top:2px;">CPD: '+r.cpd+' pts</div>':'')+(r.link?'<div style="font-size:8px;margin-top:2px;"><a href="'+r.link+'" target="_blank" style="color:var(--bl);">Link</a></div>':'')+'</div>';
+    }).join('')||'<div class="hload">No records</div>';
+  }catch(e){list.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
+}
 function exportTraining(){const recs=trainRecords.length?trainRecords:[{date:'',staff:'No records - tap Load first',cat:'',obj:'',prov:'',learnt:'',cpd:'',cert:''}];const rows=[['THE CUDDLY LANE - Staff Training Log'],['AWLA Licence: AWLA/124654'],[''],['Date','Staff Member','Category','Development Objective','Course Provider','What I Learnt','CPD Points','Certificate Link'],...recs.map(r=>[r.date,r.staff,r.cat,r.obj,r.prov,r.learnt,r.cpd,r.cert])];const csv=rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='TCL-Training-'+todayStr()+'.csv';a.click();}
 
 // ==================== MESSAGE TEMPLATES ====================
@@ -649,11 +785,20 @@ function renderTplHub(){
 function openTplHub(idx){document.getElementById('tpl_eidx').value=idx!==null?idx:'';document.getElementById('tplMTitle').textContent=idx!==null?'Edit Template':'New Template';document.getElementById('tpl_name').value=idx!==null?msgTpls[idx].name:'';document.getElementById('tpl_cat').value=idx!==null?(msgTpls[idx].cat||''):'';document.getElementById('tpl_content').value=idx!==null?msgTpls[idx].content:'';document.getElementById('tplModal').classList.add('open');}
 async function saveTplHub(){
   const name=document.getElementById('tpl_name').value.trim();if(!name){alert('Template name required');return;}
-  const content=document.getElementById('tpl_content').value;const cat=document.getElementById('tpl_cat').value;const idx=document.getElementById('tpl_eidx').value;const st=document.getElementById('tplHubStatus');
-  if(idx!==''){const prev=msgTpls[parseInt(idx)];msgTpls[parseInt(idx)]={...prev,_prev:{name:prev.name,content:prev.content,cat:prev.cat||''},name,content,cat};}else{msgTpls.push({name,content,cat});}
-  saveMsgTpls();
-  try{await appendRow(TABS.TPLS,[name,cat,content,new Date().toISOString()]);st.textContent='Saved & synced!';st.className='smsg ok';}catch(e){st.textContent='Saved locally (sheet: '+e.message+')';st.className='smsg err';}
-  setTimeout(()=>{st.className='smsg';renderTplHub();document.getElementById('tplModal').classList.remove('open');},2000);
+  const content=document.getElementById('tpl_content').value;const cat=document.getElementById('tpl_cat').value;
+  if(!cat){alert('Category is required');return;}
+  const idx2=document.getElementById('tpl_eidx').value;const st=document.getElementById('tplHubStatus');
+  if(idx2!==''){const prev=msgTpls[parseInt(idx2)];msgTpls[parseInt(idx2)]={...prev,_prev:{name:prev.name,content:prev.content,cat:prev.cat||''},name,content,cat};}
+  else{msgTpls.push({name,content,cat});}
+  saveMsgTpls();st.textContent='Saving...';st.className='smsg';
+  try{
+    const rows=await readSheet(TABS.TPLS,'A2:D').catch(()=>[]);
+    const existIdx=rows.findIndex(r=>r[0]===name);
+    if(existIdx>=0){await updateRow(TABS.TPLS,existIdx+2,[name,cat,content,new Date().toISOString()]);}
+    else{await appendRow(TABS.TPLS,[name,cat,content,new Date().toISOString()]);}
+    st.textContent='Saved & synced!';st.className='smsg ok';
+  }catch(e){st.textContent='Saved locally (sheet: '+e.message+')';st.className='smsg err';}
+  setTimeout(()=>{st.className='smsg';renderTplHub();document.getElementById('tplModal').classList.remove('open');},1800);
 }
 function redoTplHub(){const idx=document.getElementById('tpl_eidx').value;if(idx!==''){const t=msgTpls[parseInt(idx)];if(t._prev){document.getElementById('tpl_name').value=t._prev.name;document.getElementById('tpl_content').value=t._prev.content;document.getElementById('tpl_cat').value=t._prev.cat||'';alert('Reverted.');}else alert('No previous version.');}else alert('Save first.');}
 async function syncTplsFromSheet(){
@@ -708,6 +853,19 @@ function renderActs(){
   }).join('');
 }
 function showAllActs(){renderActs();}
+function filterLogActs(){
+  const q=(document.getElementById('log_act_search')?.value||'').toLowerCase();
+  const res=document.getElementById('log_act_results');if(!res)return;
+  if(!q){res.style.display='none';return;}
+  const matches=activities.filter(a=>a.title.toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length){res.style.display='none';return;}
+  res.innerHTML=matches.map(a=>'<div style="padding:6px 9px;font-size:10px;cursor:pointer;border-bottom:1px solid var(--gr4);" onclick="selectLogAct(\''+a.title+'\')" onmousedown="event.preventDefault()">'+a.title+'</div>').join('');
+  res.style.display='block';
+}
+function selectLogAct(title){
+  const inp=document.getElementById('log_act_search');if(inp)inp.value=title;
+  const res=document.getElementById('log_act_results');if(res)res.style.display='none';
+}
 function surpriseAct(){
   const pool=getFilteredActs();if(!pool.length){alert('No activities match these filters');return;}
   const a=pool[Math.floor(Math.random()*pool.length)];const w=document.getElementById('surpriseWrap');w.style.display='block';
@@ -723,11 +881,27 @@ function openActModal(idx){
 }
 async function saveAct(){
   const title=document.getElementById('act_title').value.trim();if(!title){alert('Title required');return;}
-  const idx=document.getElementById('act_eidx').value;const st=document.getElementById('actStatus');
+  const idx2=document.getElementById('act_eidx').value;const st=document.getElementById('actStatus');
   const act={title,cat:gv('act_cat'),io:gv('act_io'),energy:gv('act_energy'),weather:gv('act_weather'),dur:gv('act_dur'),dist:gv('act_dist'),location:gv('act_location'),mapsUrl:gv('act_maps'),cost:gv('act_cost'),notes:gv('act_notes')};
-  if(idx!=='')activities[parseInt(idx)]=act;else activities.push(act);saveActivities();
-  try{await appendRow(TABS.ACTS,[act.title,act.cat,act.io,act.energy,act.weather,act.location,act.mapsUrl,act.dur,act.dist,act.cost,act.notes]);st.textContent='Saved!';st.className='smsg ok';}catch(e){st.textContent='Saved locally (sheet: '+e.message+')';st.className='smsg err';}
+  if(idx2!=='')activities[parseInt(idx2)]=act;else activities.push(act);saveActivities();
+  st.textContent='Saving...';st.className='smsg';
+  try{
+    const rows=await readSheet(TABS.ACTS,'A2:K').catch(()=>[]);
+    const existIdx=rows.findIndex(r=>r[0]===act.title);
+    if(existIdx>=0){await updateRow(TABS.ACTS,existIdx+2,[act.title,act.cat,act.io,act.energy,act.weather,act.location,act.mapsUrl,act.dur,act.dist,act.cost,act.notes]);}
+    else{await appendRow(TABS.ACTS,[act.title,act.cat,act.io,act.energy,act.weather,act.location,act.mapsUrl,act.dur,act.dist,act.cost,act.notes]);}
+    st.textContent='Saved & synced!';st.className='smsg ok';
+  }catch(e){st.textContent='Saved locally (sheet: '+e.message+')';st.className='smsg err';}
   setTimeout(()=>{st.className='smsg';document.getElementById('actModal').classList.remove('open');renderActs();},1600);
+}
+async function syncActsFromSheet(){
+  try{
+    const rows=await readSheet(TABS.ACTS,'A2:K');
+    if(rows.length){
+      activities=rows.filter(r=>r[0]).map(r=>({title:r[0]||'',cat:r[1]||'',io:r[2]||'',energy:r[3]||'',weather:r[4]||'',location:r[5]||'',mapsUrl:r[6]||'',dur:r[7]||'',dist:r[8]||'',cost:r[9]||'',notes:r[10]||''}));
+      saveActivities();renderActs();alert('Activities synced from sheet!');
+    }else alert('No activities found in sheet.');
+  }catch(e){alert('Sync failed: '+e.message);}
 }
 
 // ==================== EXPORT ====================
