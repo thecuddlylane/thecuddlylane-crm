@@ -14,11 +14,11 @@ function copyText(msg){if(navigator.clipboard&&window.isSecureContext){navigator
 function maskKey(k){if(!k||k.length<12)return k?'****':'';return k.slice(0,6)+'...****...'+k.slice(-4);}
 
 // ==================== CONSTANTS ====================
-const TABS={DOGS:'Dogs',BK:'Bookings',DAILY:'Daily-Log',HEALTH:'Health-Log',FIGHT:'Fight-Log',TRANSPORT:'Transport-Log',TRIAL:'Trial-Log',COSTS:'Costs',TARGETS:'Targets',TRAIN:'Staff-Training',CONSENT:'Consent',TPLS:'Templates',ACTS:'Activities',ACTLOG:'Activity-Log'};
+const TABS={DOGS:'Dogs',BK:'Bookings',DAILY:'Daily-Log',HEALTH:'Health-Log',FIGHT:'Fight-Log',TRANSPORT:'Transport-Log',TRIAL:'Trial-Log',COSTS:'Costs',TARGETS:'Targets',TRAIN:'Staff-Training',CONSENT:'Consent',TPLS:'Templates',ACTS:'Activities',ACTLOG:'Activity-Log',RATES:'Rates'};
 const DR={board_std:38,board_hol:44,board_add:31,board_addh:35.65,day_std:28,day_hol:33,day_add:23,day_addh:26.45,evening_pct:25,t15s:12,t15r:20,t30s:17,t30r:30,t60s:45,t60r:80};
 const DEFAULT_RANGES=[{start:'2026-04-03',end:'2026-04-06',label:'Easter 2026'},{start:'2026-05-01',end:'2026-05-04',label:'May Bank Hol'},{start:'2026-05-22',end:'2026-05-25',label:'Late May BH'},{start:'2026-07-24',end:'2026-08-30',label:'Summer 2026'},{start:'2026-12-24',end:'2027-01-03',label:'Christmas 2026'}];
-const TP_PREPAY='Hi {{ownerName}},\n\nHere is the quote for {{dogs}} with THE CUDDLY LANE:\n\n{{service}}: {{dropoff}} - {{pickup}}\nDrop-off: {{dropoffTime}}\nPick-up: {{pickupTime}}\n{{nights}}\nRate: \u00a3{{ratePerNight}} per night\n{{addDogLine}}\n{{holidayDates}}\nTotal: \u00a3{{total}}\n{{discount}}\n\nPrepayment (non-refundable, transferable to other dates):\n\u00a3{{prepayAmt}}\n\nPayment reference: {{payRef}}\n{{payLink}}\n\nThank you!\nKatie & Osbert';
-const TP_FINAL='Hi {{ownerName}},\n\n{{dogs}} booking starts {{dropoff}} - please settle the balance before drop-off.\n\n{{service}}: {{dropoff}} - {{pickup}}\nDrop-off: {{dropoffTime}}\nPick-up: {{pickupTime}}\n\nTotal: \u00a3{{total}}\nPrepayment received: \u00a3{{prepayAmt}}\nBalance due: \u00a3{{finalAmt}}\n\nPayment reference: {{payRef}}\n{{payLink}}\n\nLooking forward to seeing {{dogs}}!\nKatie & Osbert';
+const TP_PREPAY='Hi {{ownerName}},\n\nHere is your quote for *{{dogs}}* with THE CUDDLY LANE \ud83d\udc3e\n\n{{service}}\n{{discount}}\n*Total: {{total}}*\n\nPrepayment required (non-refundable, transferable to other dates):\n*{{prepayAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nThank you!\nKatie & Osbert \ud83d\udc36';
+const TP_FINAL='Hi {{ownerName}},\n\nYour booking is confirmed \u2014 please settle the balance before drop-off \ud83d\udc3e\n\n{{service}}\n{{discount}}\n*Total: {{total}}*\nPrepayment received: {{prepayAmt}}\n*Balance due: {{finalAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nLooking forward to seeing *{{dogs}}*!\nKatie & Osbert \ud83d\udc36';
 const REMINDER_TYPES=['Packing list sent','Drop-off location confirmed','Pick-up location confirmed','Drop-off time confirmed','Pick-up time confirmed'];
 const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
@@ -103,6 +103,7 @@ async function doCreateSheet(){
     {n:TABS.TPLS,h:['Name','Category','Content','LastUpdated']},
     {n:TABS.ACTS,h:['Title','Category','IndoorOutdoor','EnergyLevel','Weather','Location','MapsURL','DurationMins','DistanceMins','Cost','Notes']},
     {n:TABS.ACTLOG,h:['Date','ActivityTitle','Dogs','Staff','DurationMins','Notes']},
+    {n:TABS.RATES,h:['Key','Value','UpdatedAt']},
   ];
   try{await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+getSID()+':batchUpdate',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({requests:sheets.map(sh=>({addSheet:{properties:{title:sh.n}}}))})});}catch(e){}
   for(const sh of sheets){try{await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+getSID()+'/values/'+encodeURIComponent(sh.n+'!A1')+'?valueInputOption=RAW',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({values:[sh.h]})});}catch(e){}}
@@ -141,7 +142,7 @@ function mapBk(r,i){return{id:r[0]||'',dog:r[1]||'',svc:r[2]||'',sd:r[3]||'',st:
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
   const in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().split('T')[0];
-  const bm={};bookings.filter(b=>b.status!=='Canceled'&&b.status!=='Quoted').forEach(b=>{const n=b.dog.toLowerCase();if(!bm[n]||b.sd>bm[n].sd)bm[n]=b;});
+  const bm={};bookings.filter(b=>b.status!=='Canceled').forEach(b=>{const n=b.dog.toLowerCase();if(!bm[n]||b.sd>bm[n].sd)bm[n]=b;});
   let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)):allDogs;
   const active=[],week=[],upcoming=[],other=[];
   dogs.forEach(d=>{const bk=bm[d.name.toLowerCase()];if(bk&&bk.sd<=today&&bk.ed>=today)active.push(d);else if(bk&&bk.sd>today&&bk.sd<=in7s)week.push(d);else if(bk&&bk.sd>in7s)upcoming.push(d);else other.push(d);});
@@ -156,7 +157,9 @@ function renderCards(dogs,c,cls){
     c.appendChild(card);
   });
 }
-function refreshDogDropdowns(){const sel=document.getElementById('bm_dog');if(sel){const cur=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(d.name+' - '+d.cid,d.name)));if(cur)sel.value=cur;}buildQDogMS();}
+function dogOptLabel(d){return(d.emoji||defEmoji(d))+' '+d.name+' - '+d.cid;}
+function refreshDogDropdowns(){const sel=document.getElementById('bm_dog');if(sel){const cur=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(cur)sel.value=cur;}buildQDogMS();}
+function filterBmDog(){const q=(document.getElementById('bm_dog_search')?.value||'').toLowerCase();const sel=document.getElementById('bm_dog');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(prev)sel.value=prev;}
 
 // ==================== PROFILE ====================
 function openProfile(dog){
@@ -276,13 +279,21 @@ async function filtHist(type,btn){
       const iP=row.includes('Private');
       let summary='';
       if(tab===TABS.DAILY){
-        const icons=[];
-        if(row[2]==='[Y]')icons.push('🍽️');if(row[3]==='[Y]')icons.push('💊AM');
-        if(row[4]==='[Y]')icons.push('🥘');if(row[5]==='[Y]')icons.push('💊PM');
-        if(row[7]==='[Y]')icons.push('🐾AM');if(row[8]==='[Y]')icons.push('🌿');if(row[9]==='[Y]')icons.push('🐾PM');
-        const bowl=row[12]?row[12]+' bowl':'';const room=row[13]?row[13]:'';
-        const meta=[bowl,room].filter(Boolean).join(' · ');
-        summary=(icons.length?icons.join(' '):'—')+(meta?' | '+meta:'')+(row[16]?'\n'+row[16]:'');
+        const done=[];
+        if(row[2]==='[Y]')done.push('🍽️ Breakfast');
+        if(row[3]==='[Y]')done.push('💊 Med AM');
+        if(row[4]==='[Y]')done.push('🥘 Dinner');
+        if(row[5]==='[Y]')done.push('💊 Med PM');
+        if(row[6]==='[Y]')done.push('🍪 Snack');
+        if(row[7]==='[Y]')done.push('🐾 AM Walk');
+        if(row[8]==='[Y]')done.push('🌿 Garden');
+        if(row[9]==='[Y]')done.push('🐾 PM Walk');
+        if(row[10]==='[Y]')done.push('🎮 Play');
+        if(row[11]==='[Y]')done.push('🌙 Before Sleep');
+        const clean=v=>(!v||v.includes('[')||v==='Private')?'':v.trim();
+        const bowl=clean(row[12]);const room=clean(row[13]);const notes=clean(row[16]);
+        const meta=[bowl?bowl+' bowl':'',room].filter(Boolean).join(' · ');
+        summary=(done.length?done.join(' · '):'Nothing logged')+(meta?' · '+meta:'')+(notes?' — '+notes:'');
       }
       else if(tab===TABS.HEALTH)summary=(row[3]||'-')+' '+(row[4]||'');
       else if(tab===TABS.FIGHT)summary='Fight: '+(row[5]||'-');
@@ -363,6 +374,15 @@ function selectEmoji(em){
   const modal=document.getElementById('emojiModal');if(modal)modal.classList.remove('open');
   if(curDog&&curDog.rowIdx){const vals=Object.values(mapDogToRow(curDog));updateRow(TABS.DOGS,curDog.rowIdx,vals).catch(()=>{});}
 }
+function previewCustomEmoji(){
+  const v=document.getElementById('emojiCustomInput')?.value||'';
+  const preview=document.getElementById('emojiCustomPreview');if(preview)preview.textContent=v;
+}
+function useCustomEmoji(){
+  const v=(document.getElementById('emojiCustomInput')?.value||'').trim();
+  if(!v){alert('Type an emoji first');return;}
+  selectEmoji(v);
+}
 function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||'',d.jog||''];}
 function openEditProf(){
   if(!curDog)return;const d=curDog;
@@ -426,25 +446,45 @@ function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,d
 const SVC_EMOJIS={boarding:'\u{1F4A4}',daycare:'\u2600\uFE0F',walk:'\u{1F415}',dropin:'\u{1F511}',dogsit:'\u{1FA91}',taxi:'\u{1F695}',training:'\u{1F3C5}'};
 const SVC_NAMES={boarding:'Boarding',daycare:'Daycare',walk:'Dog Walk',dropin:'Drop-in Visit',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
 
+const DATE_SVCS=['boarding','daycare'];
+function onMLSvc(){
+  const svc=document.getElementById('ml_svc')?.value;
+  const isDate=DATE_SVCS.includes(svc);
+  const dw=document.getElementById('ml_date_wrap');const qw=document.getElementById('ml_qty_wrap');
+  if(dw)dw.style.display=isDate?'block':'none';
+  if(qw)qw.style.display=(!isDate&&svc&&svc!=='taxi')?'block':'none';
+}
 function addSvcLine(){
   const svc=document.getElementById('ml_svc')?.value;if(!svc)return;
-  const isTaxi=svc==='taxi';
+  const isTaxi=svc==='taxi';const isDate=DATE_SVCS.includes(svc);
   const dogs=isTaxi?[]:([..._selDogs].length?[..._selDogs]:[]);
-  const line={svc,dogs,sd:document.getElementById('ml_sd')?.value||'',ed:document.getElementById('ml_ed')?.value||'',st2:document.getElementById('ml_st')?.value||'09:00',et:document.getElementById('ml_et')?.value||'18:00',rate:parseFloat(document.getElementById('ml_rate')?.value)||0};
+  const qty=!isDate&&!isTaxi?parseInt(document.getElementById('ml_qty')?.value)||1:1;
+  const sd=isDate||isTaxi?document.getElementById('ml_sd')?.value||'':document.getElementById('ml_qty_date')?.value||'';
+  const line={svc,dogs,sd,ed:isDate?document.getElementById('ml_ed')?.value||'':sd,st2:document.getElementById('ml_st')?.value||'09:00',et:document.getElementById('ml_et')?.value||'18:00',rate:parseFloat(document.getElementById('ml_rate')?.value)||0,qty};
   _svcLines.push(line);renderSvcLines();calcMultiQ();
+  document.getElementById('ml_qty').value='1';
+}
+function addExtraCost(){document.getElementById('ml_extra_wrap').style.display=document.getElementById('ml_extra_wrap').style.display==='none'?'block':'none';}
+function confirmExtraCost(){
+  const label=document.getElementById('ml_extra_label')?.value.trim();
+  const amt=parseFloat(document.getElementById('ml_extra_amt')?.value)||0;
+  if(!label||!amt){alert('Enter a label and amount');return;}
+  _svcLines.push({svc:'extra',label,rate:amt,dogs:[]});
+  document.getElementById('ml_extra_label').value='';document.getElementById('ml_extra_amt').value='';
+  document.getElementById('ml_extra_wrap').style.display='none';
+  renderSvcLines();calcMultiQ();
 }
 function removeSvcLine(i){_svcLines.splice(i,1);renderSvcLines();calcMultiQ();}
 function renderSvcLines(){
   const c=document.getElementById('svcLines');if(!c)return;
-  if(!_svcLines.length){c.innerHTML='<div style="font-size:10px;color:var(--gr3);padding:6px 0;">No services added yet. Add services above.</div>';return;}
+  if(!_svcLines.length){c.innerHTML='<div style="font-size:10px;color:var(--gr3);padding:6px 0;">No services added yet.</div>';return;}
   c.innerHTML=_svcLines.map((l,i)=>{
-    const em=SVC_EMOJIS[l.svc]||'';
-    return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--gr4);">'+
+    const em=l.svc==='extra'?'\u2795':SVC_EMOJIS[l.svc]||'';
+    const name=l.svc==='extra'?(l.label||'Extra cost'):(SVC_NAMES[l.svc]||l.svc);
+    const detail=[l.dogs&&l.dogs.length?l.dogs.join(' & '):'',l.sd?fmtDate(l.sd)+(l.ed&&l.ed!==l.sd?' \u2192 '+fmtDate(l.ed):''):'',l.qty&&l.qty>1?'\u00d7'+l.qty:'',l.rate?fmtGBP(l.rate*(l.qty||1)):''].filter(Boolean).join(' \u00b7 ');
+    return'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--gr4);">'+
       '<span style="font-size:14px;">'+em+'</span>'+
-      '<div style="flex:1;font-size:10px;line-height:1.5;"><strong>'+(SVC_NAMES[l.svc]||l.svc)+'</strong>'+
-      (l.dogs&&l.dogs.length?' \u2014 '+l.dogs.join(' & '):'')+
-      (l.sd?' \u2014 '+fmtDate(l.sd)+(l.ed&&l.ed!==l.sd?' to '+fmtDate(l.ed):''):'')+
-      (l.rate?' \u2014 '+fmtGBP(l.rate):'')+'</div>'+
+      '<div style="flex:1;font-size:10px;line-height:1.5;"><strong>'+name+'</strong>'+(detail?' <span style="color:var(--gr3);">'+detail+'</span>':'')+'</div>'+
       '<button onclick="removeSvcLine('+i+')" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:16px;line-height:1;">\u00d7</button></div>';
   }).join('');
 }
@@ -452,43 +492,55 @@ function calcMultiQ(){
   if(!_svcLines.length){document.getElementById('q_result').style.display='none';return;}
   const r=getRates();let total=0;const lines=[];const descParts=[];
   _svcLines.forEach(l=>{
-    let amt=0;const isTaxi=l.svc==='taxi';
+    let amt=0;
+    if(l.svc==='extra'){
+      amt=l.rate||0;
+      lines.push(['\u2795 '+(l.label||'Extra cost'),amt]);
+      descParts.push('\u2795 '+(l.label||'Extra cost')+': '+fmtGBP(amt));
+      total+=amt;return;
+    }
+    const isTaxi=l.svc==='taxi';
     if(l.svc==='boarding'){
-      const addDogs=Math.max(0,(l.dogs?.length||1)-1);
+      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
+      const mainDog=dogs[0];const addDogs=dogs.slice(1);
       if(l.sd&&l.ed){
         const dropDt=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt=new Date(l.ed+'T'+(l.et||'09:00'));
         const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));
         const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;
         let d=new Date(l.sd+'T12:00:00');const endD=new Date(l.ed+'T12:00:00');
         while(d<endD){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
-        amt=(sN*r.board_std)+(hN*r.board_hol)+(addDogs*(sN*r.board_add+hN*r.board_addh));
-        const em='\u{1F4A4}';
-        const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
-        lines.push([em+' Boarding'+(dogStr?' ('+dogStr+')':''),amt]);
-        let dp=em+' Boarding'+(dogStr?' ('+dogStr+')':'')+': '+fmtDate(l.sd)+' \u2014 '+fmtDate(l.ed)+'\nDrop-off: '+l.st2+' | Pick-up: '+l.et+'\n'+nights+' night'+(nights!==1?'s':'')+' \u2014 '+fmtGBP(amt);
-        if(hN>0&&sN>0)dp+='\n('+sN+' std + '+hN+' holiday)';else if(hN>0)dp+='\n(Holiday rate)';
-        if(addDogs>0)dp+='\nAdditional dog \u00D7'+addDogs;
+        const mainAmt=(sN*r.board_std)+(hN*r.board_hol);
+        amt=mainAmt;
+        const em='\u{1F4A4}';const allDogStr=dogs.join(' & ');
+        lines.push([em+' Boarding \u2014 '+mainDog+' (main)',mainAmt]);
+        let dp=em+' Boarding ('+allDogStr+'): '+fmtDate(l.sd)+' \u2014 '+fmtDate(l.ed)+'\nDrop-off: '+l.st2+' | Pick-up: '+l.et+'\n'+nights+' night'+(nights!==1?'s':'');
+        dp+='\n'+mainDog+' (main): '+fmtGBP(r.board_std)+'/night'+(hN>0?' \u00B7 Holiday '+fmtGBP(r.board_hol)+'/night':'');
+        dp+=' = '+fmtGBP(mainAmt);
+        addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*r.board_addh);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n'+dog+' (additional): '+fmtGBP(r.board_add)+'/night'+(hN>0?' \u00B7 Holiday '+fmtGBP(r.board_addh)+'/night':'');dp+=' = '+fmtGBP(addAmt);});
+        if(hN>0){const holExtra=(sN>0?(r.board_hol-r.board_std)*hN:0)+(addDogs.length?(r.board_addh-r.board_add)*hN*addDogs.length:0);dp+='\n\u26A0\uFE0F Holiday rate applies on '+hN+' night'+(hN!==1?'s':'')+' ('+holDates.slice(0,3).map(x=>fmtDate(x)).join(', ')+(holDates.length>3?'\u2026':'')+')';if(holExtra>0)dp+=' \u2014 +'+fmtGBP(holExtra)+' vs standard';}
         descParts.push(dp);
       }
     }else if(l.svc==='daycare'){
-      const hol=l.sd?isHol(l.sd):false;const addDogs=Math.max(0,(l.dogs?.length||1)-1);
-      amt=(hol?r.day_hol:r.day_std)+(addDogs*(hol?r.day_addh:r.day_add));
-      const em='\u2600\uFE0F';
-      const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
-      lines.push([em+' Daycare'+(dogStr?' ('+dogStr+')':''),amt]);
-      let dp=em+' Daycare'+(dogStr?' ('+dogStr+')':'')+': '+fmtDate(l.sd||'')+(hol?' (Holiday)':'')+' \u2014 '+fmtGBP(amt);
-      if(addDogs>0)dp+='\nAdditional dog \u00D7'+addDogs;
+      const hol=l.sd?isHol(l.sd):false;
+      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
+      const mainDog=dogs[0];const addDogs=dogs.slice(1);
+      const mainAmt=hol?r.day_hol:r.day_std;amt=mainAmt;
+      const em='\u2600\uFE0F';const allDogStr=dogs.join(' & ');
+      lines.push([em+' Daycare \u2014 '+mainDog+(hol?' (holiday)':''),mainAmt]);
+      let dp=em+' Daycare ('+allDogStr+'): '+fmtDate(l.sd||'')+(hol?' \u26A0\uFE0F Holiday rate':'')+'\n'+mainDog+': '+fmtGBP(mainAmt);
+      addDogs.forEach(dog=>{const addAmt=hol?r.day_addh:r.day_add;amt+=addAmt;lines.push([em+' Daycare \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n'+dog+' (additional): '+fmtGBP(addAmt);});
+      if(hol)dp+='\n\u26A0\uFE0F Holiday rate applies on this day';
       descParts.push(dp);
     }else if(isTaxi){
       amt=l.rate||r.t30r;
       lines.push(['\u{1F695} Pet Taxi',amt]);
-      descParts.push('\u{1F695} Pet Taxi'+(l.sd?' \u2014 '+fmtDate(l.sd):'')+' \u2014 '+fmtGBP(amt));
+      descParts.push('\u{1F695} Pet Taxi'+(l.sd?' \u2014 '+fmtDate(l.sd):'')+': '+fmtGBP(amt));
     }else{
-      amt=l.rate;
-      const em=SVC_EMOJIS[l.svc]||'';
-      const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
-      lines.push([em+' '+(SVC_NAMES[l.svc]||l.svc)+(dogStr?' ('+dogStr+')':''),amt]);
-      descParts.push(em+' '+(SVC_NAMES[l.svc]||l.svc)+(dogStr?' ('+dogStr+')':'')+': '+fmtGBP(amt));
+      const qty=l.qty||1;amt=(l.rate||0)*qty;
+      const em=SVC_EMOJIS[l.svc]||'';const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
+      const label=em+' '+(SVC_NAMES[l.svc]||l.svc)+(dogStr?' ('+dogStr+')':'');
+      lines.push([label+(qty>1?' \u00D7'+qty:''),amt]);
+      descParts.push(label+(qty>1?'\n\u00D7'+qty+' sessions @ '+fmtGBP(l.rate||0)+' = '+fmtGBP(amt):': '+fmtGBP(amt)));
     }
     total+=amt;
   });
@@ -498,12 +550,13 @@ function calcMultiQ(){
   else if(discType==='gbp'&&discVal>0){total-=discVal;discLine='Discount: -'+fmtGBP(discVal);lines.push(['Discount',-discVal]);}
   const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
   const prepayAmt=total*(prepayPct/100);const finalAmt=total-prepayAmt;
-  _cr={total,prepayAmt,finalAmt,lines,nights:0,rpn:0,addLine:'',discLine,holDates:[],selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts};
+  _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts};
   document.getElementById('q_total').textContent=fmtGBP(total);
   document.getElementById('q_breakdown').innerHTML=lines.map((l,i)=>'<div class="q-ln"'+(i===lines.length-1?' style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:4px;"':'')+'>'+
     '<span>'+l[0]+'</span><span>'+(l[1]<0?'-':'')+fmtGBP(Math.abs(l[1]))+'</span></div>').join('');
   document.getElementById('q_prepay_show').textContent=fmtGBP(prepayAmt);
   document.getElementById('q_final_show').textContent=fmtGBP(finalAmt);
+  const apEl=document.getElementById('q_actual_prepay');if(apEl&&!apEl.value)apEl.placeholder='Defaults to '+fmtGBP(prepayAmt);
   document.getElementById('q_result').style.display='block';
 }
 
@@ -518,7 +571,17 @@ function loadQSettings(){
   const pl=document.getElementById('tpl_paylink');const pp=document.getElementById('tpl_payref_pfx');if(pl)pl.value=t.payLink||'';if(pp)pp.value=t.payRefPfx||'';
 }
 function toggleSP(id){document.getElementById('sp-'+id).classList.toggle('open');}
-function saveRates(){const r={};['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r'].forEach(k=>r[k]=parseFloat(document.getElementById('r_'+k)?.value)||DR[k]);localStorage.setItem('tcl_rates',JSON.stringify(r));const s=document.getElementById('rateStatus');s.textContent='Rates saved!';s.className='smsg ok';setTimeout(()=>s.className='smsg',3000);calcQ();}
+async function saveRates(){const r={};['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r'].forEach(k=>r[k]=parseFloat(document.getElementById('r_'+k)?.value)||DR[k]);localStorage.setItem('tcl_rates',JSON.stringify(r));const s=document.getElementById('rateStatus');s.textContent='Saving...';s.className='smsg';
+  try{
+    const rows=await readSheet(TABS.RATES,'A2:C').catch(()=>[]);const existIdx=rows.findIndex(r=>r[0]==='tcl_rates');
+    if(existIdx>=0){await updateRow(TABS.RATES,existIdx+2,['tcl_rates',JSON.stringify(r),new Date().toISOString()]);}
+    else{await appendRow(TABS.RATES,['tcl_rates',JSON.stringify(r),new Date().toISOString()]);}
+    s.textContent='Rates saved & synced!';s.className='smsg ok';
+  }catch(e){s.textContent='Saved locally (sheet: '+e.message+')';s.className='smsg err';}
+  setTimeout(()=>s.className='smsg',3000);calcMultiQ();}
+async function loadRatesFromSheet(){const s=document.getElementById('rateStatus');s.textContent='Loading...';s.className='smsg';
+  try{const rows=await readSheet(TABS.RATES,'A2:C');const rRow=rows.find(r=>r[0]==='tcl_rates');if(rRow&&rRow[1]){const r=JSON.parse(rRow[1]);localStorage.setItem('tcl_rates',JSON.stringify(r));loadQSettings();s.textContent='Rates loaded from sheet!';s.className='smsg ok';}else{s.textContent='No rates found in sheet';s.className='smsg err';}
+  }catch(e){s.textContent='Error: '+e.message;s.className='smsg err';}setTimeout(()=>s.className='smsg',3000);}
 let _holYrFilter=null;
 function renderHolYrBtns(){const yrs=[...new Set(getHolRanges().map(r=>r.start.slice(0,4)))].sort();const el=document.getElementById('holYrBtns');if(!el)return;el.innerHTML=yrs.map(y=>{const oc="setHolYr('"+y+"')";return'<button class="hyrb'+(_holYrFilter===y?' active':'')+'" onclick="'+oc+'">'+y+'</button>';}).join('');renderHolList();}
 function setHolYr(y){_holYrFilter=_holYrFilter===y?null:y;renderHolYrBtns();}
@@ -587,12 +650,19 @@ function calcQ(){
   document.getElementById('q_hol_note').textContent=holDates.length?'Holiday rate: '+holDates.slice(0,4).join(', '):'';
   document.getElementById('q_prepay_show').textContent=fmtGBP(prepayAmt);document.getElementById('q_final_show').textContent=fmtGBP(finalAmt);
 }
+function updateFinalShow(){const ap=parseFloat(document.getElementById('q_actual_prepay')?.value);if(!isNaN(ap)&&ap>0){document.getElementById('q_final_show').textContent=fmtGBP(Math.max(0,_cr.total-ap));}}
 function genQuote(type){
+  calcMultiQ();// always recalculate to pick up latest discount/prepay changes
   const t=getTpls();const ownerName=document.getElementById('q_owner').value||'there';
   const payRef=document.getElementById('q_payref').value||(t.payRefPfx||'KCHEUNG');
-  const allDogNames=[...new Set((_svcLines||[]).flatMap(l=>l.dogs||[]))].join(' & ')||_cr.selDogs.join(' & ')||'your dog';
+  const allDogNames=[...new Set((_svcLines||[]).flatMap(l=>l.svc!=='extra'?l.dogs||[]:[]))].filter(Boolean).join(' & ')||_cr.selDogs.join(' & ')||'your dog';
   const serviceBlock=(_cr.descParts||[]).join('\n\n');
+  const actualPrepay=parseFloat(document.getElementById('q_actual_prepay')?.value)||_cr.prepayAmt;
+  const balanceDue=Math.max(0,_cr.total-actualPrepay);
   let msg='Hi '+ownerName+',\n\n';
+  // clear the other output box
+  const otherId=type==='prepay'?'q_out_final':'q_out_prepay';
+  document.getElementById(otherId).style.display='none';document.getElementById(otherId).textContent='';
   if(type==='prepay'){
     msg+='Here is your quote for *'+allDogNames+'* with THE CUDDLY LANE \ud83d\udc3e\n\n';
     msg+=serviceBlock;
@@ -606,8 +676,8 @@ function genQuote(type){
     msg+=serviceBlock;
     if(_cr.discLine)msg+='\n\n'+_cr.discLine;
     msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
-    msg+='\nPrepayment received: '+fmtGBP(_cr.prepayAmt);
-    msg+='\n*Balance due: '+fmtGBP(_cr.finalAmt)+'*';
+    msg+='\nPrepayment received: '+fmtGBP(actualPrepay);
+    msg+='\n*Balance due: '+fmtGBP(balanceDue)+'*';
     msg+='\n\nPayment reference: *'+payRef+'*\n'+(t.payLink||'[payment link]');
     msg+='\n\nLooking forward to seeing *'+allDogNames+'*!\nKatie & Osbert \ud83d\udc36';
   }
@@ -620,29 +690,39 @@ function genQuote(type){
 
 async function createBookingsFromQuote(){
   if(!_svcLines.length){alert('Complete the quote first');return;}
-  const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
+  calcMultiQ();
+  const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training',extra:'Extra'};
+  // build per-dog revenue map from _cr.lines
+  const revenueMap={};
+  _cr.lines.forEach(l=>{const m=l[0].match(/—\s*(.+?)(?:\s*\(|$)/);if(m&&m[1]&&l[1]>0)revenueMap[m[1].trim()]=l[1];});
   let created=0;
   for(const line of _svcLines){
-    const dogs=line.dogs&&line.dogs.length?line.dogs:[''];
+    if(line.svc==='extra')continue;
+    const dogs=line.dogs&&line.dogs.length?line.dogs:(_selDogs.length?_selDogs:['']);
     const sd=line.sd||'';const ed=line.ed||sd;const st=line.st2||'09:00';const et=line.et||'18:00';
     const svcLabel=svcN[line.svc]||line.svc;
     for(const dogName of dogs){
       const id='BK-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
       const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
-      const vals=[id,dogName,svcLabel,sd,st,ed,et,'','',0,0,0,0,0,'',0,0,'TCL','','Quoted','',month,'','','','','','',''];
+      const rev=revenueMap[dogName]||0;
+      const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
+      const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
+      const vals=[id,dogName,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
       try{await appendRow(TABS.BK,vals);bookings.push(mapBk(vals,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
-  if(created)alert(created+' booking'+(created>1?'s':'')+' created. Open Bookings to add payment details.');
+  if(created){renderBoard();alert(created+' booking'+(created>1?'s':'')+' created with revenue pre-filled. Check Bookings to adjust.');}
 }
 function quoteFromBk(){
   const dog=document.getElementById('bm_dog').value;const svc=document.getElementById('bm_svc').value;const sd=document.getElementById('bm_sd').value;const ed=document.getElementById('bm_ed').value;const bst=document.getElementById('bm_st').value;const et=document.getElementById('bm_et').value;
+  const actualPrepay=parseFloat(document.getElementById('bm_prepay')?.value)||0;
   const svcMap={Boarding:'boarding',DayCare:'daycare',Walking:'walk','Drop-in':'dropin','Dog Sit':'dogsit','Pet Taxi':'taxi',Training:'training'};
   const svcKey=svcMap[svc]||'boarding';
   _svcLines=[{svc:svcKey,dogs:dog?[dog]:[],sd,ed,st2:bst||'09:00',et:et||'18:00',rate:0}];
   _selDogs=dog?[dog]:[];_mainDog=dog||'';
   const dogData=allDogs.find(d=>d.name.toLowerCase()===(dog||'').toLowerCase());
   if(dogData)document.getElementById('q_owner').value=dogData.owner;
+  if(actualPrepay>0){const apEl=document.getElementById('q_actual_prepay');if(apEl)apEl.value=actualPrepay.toFixed(2);}
   document.getElementById('bkModal').classList.remove('open');switchSection('quote');
   renderSvcLines();buildQDogMS();buildMainDogBtns();calcMultiQ();
 }
@@ -653,7 +733,8 @@ function openBkModal(editId=null,fromProf=false){
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
   document.getElementById('bkMTitle').textContent=ed?'Edit Booking':'Add Booking';document.getElementById('bkBtn').textContent=ed?'Save Changes':'Save Booking';
   document.getElementById('bkDelBtn').style.display=ed?'block':'none';
-  const sel=document.getElementById('bm_dog');sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(d.name+' - '+d.cid,d.name)));
+  const searchEl=document.getElementById('bm_dog_search');if(searchEl)searchEl.value='';
+  const sel=document.getElementById('bm_dog');sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));
   if(ed){
     const ss=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v!=null?v:''};
     sel.value=ed.dog;updateDogIdHint();ss('bm_svc',ed.svc);ss('bm_sd',ed.sd);ss('bm_st',ed.st);ss('bm_ed',ed.ed);ss('bm_et',ed.et);ss('bm_drop_loc',ed.dropLoc||'');ss('bm_pick_loc',ed.pickLoc||'');ss('bm_rev',ed.rev||0);ss('bm_tips',ed.tips||0);ss('bm_prepay',ed.prepay||0);ss('bm_final',ed.finalPay||0);ss('bm_unit',ed.unit||0);ss('bm_disc_notes',ed.discNotes||'');ss('bm_channel',ed.ch||'TCL');ss('bm_pay',ed.pay||'');ss('bm_status',ed.status||'Quoted');ss('bm_rpct',ed.roverPct||15);ss('bm_ramt',ed.roverAmt||0);ss('bm_rating',ed.rating||'');ss('bm_feedback',ed.feedback||'');document.getElementById('bm_priv').checked=ed.priv||false;buildReminderRows(ed.rem||[]);
@@ -722,7 +803,8 @@ function renderBk(){
   document.getElementById('bkBody').innerHTML=recs.map(r=>{
     const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);const bal=paid-owed;
     const oc="openBkModal('"+r.id+"')";
-    return'<tr onclick="'+oc+'"><td>'+(r.priv?'[P] ':'')+r.dog+'</td><td style="font-size:8px;">'+r.svc+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
+    const dg=allDogs.find(d=>d.name===r.dog);const em=dg?(dg.emoji||defEmoji(dg)):'🐶';
+    return'<tr onclick="'+oc+'"><td>'+(r.priv?'🔒 ':'')+em+' '+r.dog+'</td><td style="font-size:8px;">'+r.svc+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
   }).join('');
 }
 

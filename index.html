@@ -455,7 +455,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="fsec">Add Service Lines</div>
           <div class="fr">
             <div class="f"><label>Service</label>
-              <select class="fs" id="ml_svc">
+              <select class="fs" id="ml_svc" onchange="onMLSvc()">
                 <option value="">Select service...</option>
                 <option value="boarding">&#x1F4A4; Boarding</option>
                 <option value="daycare">&#x2600;&#xFE0F; Daycare</option>
@@ -468,25 +468,44 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
             </div>
             <div class="f"><label>Manual rate (&#163;)</label><input class="fi" type="number" id="ml_rate" placeholder="Auto or override"></div>
           </div>
-          <div class="fr">
-            <div class="f"><label>Start date</label><input class="fi" type="date" id="ml_sd"></div>
-            <div class="f"><label>End date</label><input class="fi" type="date" id="ml_ed"></div>
+          <div id="ml_date_wrap">
+            <div class="fr">
+              <div class="f"><label>Start date</label><input class="fi" type="date" id="ml_sd"></div>
+              <div class="f"><label>End date</label><input class="fi" type="date" id="ml_ed"></div>
+            </div>
+            <div class="fr">
+              <div class="f"><label>Drop-off time</label><input class="fi" type="time" id="ml_st" value="09:00"></div>
+              <div class="f"><label>Pick-up time</label><input class="fi" type="time" id="ml_et" value="18:00"></div>
+            </div>
           </div>
-          <div class="fr">
-            <div class="f"><label>Drop-off time</label><input class="fi" type="time" id="ml_st" value="09:00"></div>
-            <div class="f"><label>Pick-up time</label><input class="fi" type="time" id="ml_et" value="18:00"></div>
+          <div id="ml_qty_wrap" style="display:none;">
+            <div class="fr">
+              <div class="f"><label>Quantity (e.g. 5 walks)</label><input class="fi" type="number" id="ml_qty" value="1" min="1"></div>
+              <div class="f"><label>Date (optional)</label><input class="fi" type="date" id="ml_qty_date"></div>
+            </div>
           </div>
-          <button class="sbtn2" onclick="addSvcLine()" style="width:100%;margin-bottom:9px;">+ Add Service to Quote</button>
+          <div class="fr" style="margin-top:4px;">
+            <button class="sbtn2" onclick="addSvcLine()" style="flex:1;">+ Add Service</button>
+            <button class="sbtn2" onclick="addExtraCost()" style="flex:1;background:var(--gr4);color:var(--gr2);">+ Extra Cost</button>
+          </div>
+          <div id="ml_extra_wrap" style="display:none;background:var(--gr5);border-radius:var(--r);padding:9px;margin-top:6px;margin-bottom:4px;">
+            <div class="fr">
+              <div class="f"><label>Extra cost label</label><input class="fi" id="ml_extra_label" placeholder="e.g. Dog food purchase"></div>
+              <div class="f"><label>Amount (£)</label><input class="fi" type="number" id="ml_extra_amt" placeholder="0.00" step="0.01"></div>
+            </div>
+            <button class="sbtn2" onclick="confirmExtraCost()" style="width:100%;margin-top:4px;font-size:10px;">Add Extra Cost to Quote</button>
+          </div>
+          <div style="margin-bottom:5px;"></div>
           <div class="fsec">Quote Lines</div>
           <div id="svcLines" style="margin-bottom:9px;"><div style="font-size:10px;color:var(--gr3);padding:5px 0;">No services added yet.</div></div>
     <div id="q_dt_wrap" style="display:none;">
-      <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="q_dd" oninput="calcQ()"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="q_dt_t" value="09:00" oninput="calcQ()"></div></div>
-      <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="q_pd" oninput="calcQ()"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="q_pt" value="09:00" oninput="calcQ()"></div></div>
+      <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="q_dd" oninput="calcMultiQ()"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="q_dt_t" value="09:00" oninput="calcMultiQ()"></div></div>
+      <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="q_pd" oninput="calcMultiQ()"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="q_pt" value="09:00" oninput="calcMultiQ()"></div></div>
     </div>
     <div id="q_taxi_wrap" style="display:none;">
-      <div class="fr"><div class="f"><label>Duration</label><select class="fs" id="q_taxi_d" onchange="calcQ()"><option value="15s">15 min Single</option><option value="15r">15 min Return</option><option value="30s">30 min Single</option><option value="30r">30 min Return</option><option value="60s">60 min Single</option><option value="60r">60 min Return</option></select></div><div class="f"><label>Date</label><input class="fi" type="date" id="q_taxi_dt" oninput="calcQ()"></div></div>
+      <div class="fr"><div class="f"><label>Duration</label><select class="fs" id="q_taxi_d" onchange="calcMultiQ()"><option value="15s">15 min Single</option><option value="15r">15 min Return</option><option value="30s">30 min Single</option><option value="30r">30 min Return</option><option value="60s">60 min Single</option><option value="60r">60 min Return</option></select></div><div class="f"><label>Date</label><input class="fi" type="date" id="q_taxi_dt" oninput="calcMultiQ()"></div></div>
     </div>
-    <div id="q_manual_wrap" style="display:none;"><div class="fr"><div class="f"><label>Rate (£)</label><input class="fi" type="number" id="q_rate" oninput="calcQ()"></div><div class="f"><label>Sessions</label><input class="fi" type="number" id="q_qty" value="1" oninput="calcQ()"></div></div></div>
+    <div id="q_manual_wrap" style="display:none;"><div class="fr"><div class="f"><label>Rate (£)</label><input class="fi" type="number" id="q_rate" oninput="calcMultiQ()"></div><div class="f"><label>Sessions</label><input class="fi" type="number" id="q_qty" value="1" oninput="calcMultiQ()"></div></div></div>
     <div id="q_shared_wrap">
       <div class="f"><label>Select dogs <span class="req">*</span></label>
         <input class="fi" id="q_dog_search" placeholder="Search dog..." oninput="buildQDogMS()" style="margin-bottom:4px;">
@@ -501,10 +520,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <div class="f"><label>Payment reference</label><input class="fi" id="q_payref" placeholder="e.g. ObiMay2026"></div>
       </div>
       <div class="fr">
-        <div class="f"><label>Discount type</label><select class="fs" id="q_disc_t" onchange="calcQ()"><option value="none">No discount</option><option value="pct">% discount</option><option value="gbp">£ discount</option></select></div>
-        <div class="f"><label>Discount value</label><input class="fi" type="number" id="q_disc_v" value="0" oninput="calcQ()"></div>
+        <div class="f"><label>Discount type</label><select class="fs" id="q_disc_t" onchange="calcMultiQ()"><option value="none">No discount</option><option value="pct">% discount</option><option value="gbp">£ discount</option></select></div>
+        <div class="f"><label>Discount value</label><input class="fi" type="number" id="q_disc_v" value="0" oninput="calcMultiQ()"></div>
       </div>
-      <div class="f"><label>Prepayment %</label><select class="fs" id="q_prepay_pct" onchange="calcQ()"><option value="50">50% prepayment</option><option value="100">100% full payment</option><option value="30">30% prepayment</option><option value="0">No prepayment</option></select></div>
+      <div class="f"><label>Prepayment %</label><select class="fs" id="q_prepay_pct" onchange="calcMultiQ()"><option value="50">50% prepayment</option><option value="100">100% full payment</option><option value="30">30% prepayment</option><option value="0">No prepayment</option></select></div>
     </div>
     <div id="q_result" style="display:none;">
       <div class="q-res">
@@ -516,6 +535,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px;background:var(--wh);border-radius:var(--r2);padding:9px 11px;border:1px solid var(--gr4);">
         <div style="font-size:10px;color:var(--gr3);">Prepayment</div><div style="font-size:12px;font-weight:700;color:var(--or);text-align:right;" id="q_prepay_show">£0</div>
         <div style="font-size:10px;color:var(--gr3);">Final payment</div><div style="font-size:12px;font-weight:700;text-align:right;color:var(--gr);" id="q_final_show">£0</div>
+      </div>
+      <div style="margin-top:7px;background:var(--wh);border-radius:var(--r2);padding:9px 11px;border:1px solid var(--gr4);">
+        <label style="font-size:10px;color:var(--gr3);display:block;margin-bottom:4px;">For final payment quote — actual prepay already received (£):</label>
+        <input class="fi" type="number" id="q_actual_prepay" placeholder="Defaults to prepayment above" step="0.01" oninput="updateFinalShow()">
       </div>
       <button class="cpbtn" onclick="genQuote('prepay')">Copy Prepayment Quote</button>
       <div class="q-out" id="q_out_prepay"></div>
@@ -536,7 +559,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
           <div class="fr"><div class="f"><label>15min Single (£)</label><input class="fi" id="r_t15s" type="number" step="0.5"></div><div class="f"><label>15min Return (£)</label><input class="fi" id="r_t15r" type="number" step="0.5"></div></div>
           <div class="fr"><div class="f"><label>30min Single (£)</label><input class="fi" id="r_t30s" type="number" step="0.5"></div><div class="f"><label>30min Return (£)</label><input class="fi" id="r_t30r" type="number" step="0.5"></div></div>
           <div class="fr"><div class="f"><label>60min Single (£)</label><input class="fi" id="r_t60s" type="number" step="0.5"></div><div class="f"><label>60min Return (£)</label><input class="fi" id="r_t60r" type="number" step="0.5"></div></div>
-          <button class="sbtn2" style="width:100%;margin-top:4px;" onclick="saveRates()">Save Rates</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px;">
+            <button class="sbtn2" onclick="saveRates()">Save &amp; Sync to Sheet</button>
+            <button class="sbtn2" onclick="loadRatesFromSheet()" style="background:var(--gr4);color:var(--gr2);">Load from Sheet</button>
+          </div>
           <span class="smsg" id="rateStatus" style="display:block;margin-top:5px;"></span>
         </div>
       </div>
@@ -905,7 +931,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       </div>
       <input type="hidden" id="bm_eid"><input type="hidden" id="bm_ridx">
       <div class="f"><label>Dog Name <span class="req">*</span></label>
-        <select class="fs" id="bm_dog"><option value="">Select dog</option></select>
+        <input class="fi" id="bm_dog_search" placeholder="Search dog..." oninput="filterBmDog()" style="margin-bottom:4px;font-size:11px;">
+        <select class="fs" id="bm_dog" onchange="updateDogIdHint()"><option value="">Select dog</option></select>
         <div style="font-size:9px;color:var(--gr3);margin-top:2px;" id="bm_dog_id"></div>
       </div>
       <div class="f"><label>Service</label><select class="fs" id="bm_svc"><option>Boarding</option><option>DayCare</option><option>Walking</option><option>Drop-in</option><option>Dog Sit</option><option>Pet Taxi</option><option>Training</option></select></div>
@@ -959,7 +986,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="tpl_eidx">
       <div class="f"><label>Template name <span class="req">*</span></label><input class="fi" id="tpl_name" placeholder="e.g. Booking confirmation"></div>
-      <div class="f"><label>Category <span class="req">*</span></label><select class="fs" id="tpl_cat"><option value="">Select category...</option><option>Payment</option><option>Review</option><option>Drop-off</option></select></div>
+      <div class="f"><label>Category <span class="req">*</span></label><select class="fs" id="tpl_cat"><option value="">Select category...</option><option>Payment</option><option>Review</option><option>Drop-off</option><option>Others</option></select></div>
       <div class="f"><label>Content</label>
         <div class="tpl-bts"><button class="tplb or" onclick="saveTplHub()">Save</button><button class="tplb" onclick="redoTplHub()">Redo</button></div>
         <textarea class="fta" id="tpl_content" style="min-height:160px;font-size:11px;"></textarea>
@@ -991,7 +1018,17 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="modal" id="emojiModal" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
     <div class="mhdr"><div class="mttl">Pick Emoji</div><button class="mcl" onclick="document.getElementById('emojiModal').classList.remove('open')">&#x2715;</button></div>
-    <div class="mbdy"><div id="emojiGrid" class="emoji-grid"></div></div>
+    <div class="mbdy">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:10px;color:var(--gr2);display:block;margin-bottom:4px;">Type or paste any emoji:</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input class="fi" id="emojiCustomInput" placeholder="e.g. 🐕" style="font-size:20px;max-width:80px;text-align:center;" oninput="previewCustomEmoji()">
+          <button class="sbtn2" onclick="useCustomEmoji()" style="font-size:11px;">Use this</button>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--gr3);margin-bottom:6px;">Or choose from presets:</div>
+      <div id="emojiGrid" class="emoji-grid"></div>
+    </div>
   </div>
 </div>
 <!-- RESTORE CONFIRM -->
