@@ -8,7 +8,7 @@ function gv(id){const el=document.getElementById(id);return el?el.value||'':(con
 function calcAge(b){if(!b)return'';try{const dob=new Date(b+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<1?Math.floor((now-dob)/2592000000)+'mo':y+'yr';}catch(e){return'';}}
 function defEmoji(d){const b=(d.breed||'').toLowerCase();if(b.includes('retriever')||b.includes('golden'))return'\u{1F9AE}';if(b.includes('husky'))return'\u{1F43A}';if(b.includes('collie'))return'\u{1F429}';if(b.includes('bulldog')||b.includes('pug')||b.includes('french'))return'\u{1F43E}';if(b.includes('shiba'))return'\u{1F98A}';if(b.includes('lab'))return'\u{1F415}';return'\u{1F436}';}
 function genId(n){return 'TCL-'+n.substring(0,2).toUpperCase()+String(Date.now()).slice(-4);}
-function ir(k,v){if(!v||!v.toString().trim())return'';return '<div class="irow"><span class="ikey">'+k+'</span><span class="ival">'+v+'</span></div>';}
+function ir(k,v){if(!v||!v.toString().trim())return'';const lv=v.toString().toLowerCase().trim();if(lv==='n/a'||lv==='na'||lv==='none'||lv==='-')return'';return '<div class="irow"><span class="ikey">'+k+'</span><span class="ival">'+v+'</span></div>';}
 function fmtGBP(n){return '\u00a3'+(parseFloat(n)||0).toFixed(2);}
 function copyText(msg){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(msg).catch(()=>{});}else{const ta=document.createElement('textarea');ta.value=msg;ta.style.cssText='position:fixed;top:-9999px;opacity:0;';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}}
 function maskKey(k){if(!k||k.length<12)return k?'****':'';return k.slice(0,6)+'...****...'+k.slice(-4);}
@@ -89,7 +89,7 @@ async function doCreateSheet(){
   const s=document.getElementById('cfgStatus');s.textContent='Creating structure...';
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
-    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner','Phone','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Emoji']},
+    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner','Phone','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Emoji','Jogging']},
     {n:TABS.BK,h:['ID','DogName','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5']},
     {n:TABS.DAILY,h:['Date','Dog','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','Game','BeforeSleep','Bowl','Room','Garment','CustomerID','Notes','Private']},
     {n:TABS.HEALTH,h:['Date','Dog','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
@@ -119,7 +119,7 @@ function showScreen(id,push=true){
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs')renderCostTable();if(id==='sc-templates')renderTplHub();if(id==='sc-activities')renderActs();
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs')renderCostTable();if(id==='sc-templates')renderTplHub();if(id==='sc-activities')renderActs();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -185,8 +185,14 @@ function buildTodayLog(){
   document.getElementById('logDateDisplay').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   if(!hasActiveBookingToday(curDog)){
     document.getElementById('logsBody').innerHTML='<div class="empty" style="padding:20px;text-align:center;"><p style="color:var(--gr3);font-size:12px;">No active booking today.<br>Log via History for past dates.</p></div>';
-    document.getElementById('logNotes').value='';document.getElementById('logPrivate').checked=false;return;
+    document.getElementById('logNotes').value='';document.getElementById('logPrivate').checked=false;
+    document.getElementById('logNotes').style.display='none';document.querySelector('label[for="logPrivate"]')&&(document.querySelector('label[for="logPrivate"]').style.display='none');
+    const saveBtn=document.querySelector('.slb[onclick="saveLog()"]');if(saveBtn)saveBtn.style.display='none';
+    return;
   }
+  document.getElementById('logNotes').style.display='';
+  const privLabel=document.querySelector('label[for="logPrivate"]');if(privLabel)privLabel.style.display='';
+  const saveBtn=document.querySelector('.slb[onclick="saveLog()"]');if(saveBtn)saveBtn.style.display='';
   document.getElementById('logNotes').value=sv.notes||'';document.getElementById('logPrivate').checked=!!sv.priv;
   function tile(k,ico,lbl){return '<div class="tile'+(sv[k]?' done':'')+'" id="tl_'+k+'" onclick="togTile(\''+k+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+'</span></div>';}
   function inc(k,lbl,body){return '<div class="inc-tog" onclick="togInc(\''+k+'\')"><span>'+lbl+'</span><span style="font-size:10px;color:var(--gr3);">'+(sv['inc_'+k]?'&#9652;':'&#9660;')+'</span></div><div class="inc-fld'+(sv['inc_'+k]?' open':'')+'" id="inc_'+k+'">'+body+'</div>';}
@@ -194,7 +200,7 @@ function buildTodayLog(){
   const actOpts='<option value="">No specific activity</option>'+activities.filter(a=>a.cat==='Walk'||a.cat==='Game').map(a=>'<option>'+a.title+'</option>').join('');
   document.getElementById('logsBody').innerHTML=
     '<div class="cat-sec"><div class="cat-t">Food &amp; Medicine</div><div class="tile-row">'+tile('breakfast','&#9728;','Breakfast')+tile('medAm','&#128138;','AM Med')+tile('dinner','&#127769;','Dinner')+tile('medPm','&#128138;','PM Med')+tile('snack','&#127999;','Snack')+'</div></div>'+
-    '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('garden','&#127807;','Garden Break')+tile('walkPm','&#128062;','PM Walk')+'</div>'+
+    '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('walkPm','&#128062;','PM Walk')+tile('garden','&#127807;','Garden Break')+'</div>'+
     '<div style="margin-top:5px;"><label style="font-size:9px;font-weight:600;color:var(--gr2);">Activity from library</label><div style="position:relative;margin-top:3px;"><input class="fi" id="log_act_search" placeholder="Search activities..." oninput="filterLogActs()" style="font-size:10px;"><div id="log_act_results" style="position:absolute;z-index:50;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);max-height:120px;overflow-y:auto;width:100%;display:none;"></div></div></div></div>'+
     '<div class="cat-sec"><div class="cat-t">Hygiene</div><div class="tile-row">'+tile('bowl','&#129379;','Bowl')+tile('room','&#129524;','Room')+tile('garment','&#129507;','Garment')+'</div></div>'+
     '<div class="cat-sec"><div class="cat-t">Incidents</div>'+
@@ -226,7 +232,7 @@ function buildSummary(dog){
   const medVal=(dog.med||'').toLowerCase().trim();if(medVal&&medVal!=='none'&&medVal!=='n/a'&&medVal!=='na')alerts.push('Medical: '+dog.med);
   if(dog.medSchedule)alerts.push('Med schedule: '+dog.medSchedule);
   const algVal=(dog.allerg||'').toLowerCase().trim();if(algVal&&algVal!=='none'&&algVal!=='n/a'&&algVal!=='na')alerts.push('Allergies: '+dog.allerg);
-  if(dog.fears)notes.push('Fears: '+dog.fears);if(dog.rescue==='Yes')notes.push('Rescue dog');
+  const fearsVal=(dog.fears||'').toLowerCase().trim();if(fearsVal&&fearsVal!=='none'&&fearsVal!=='n/a'&&fearsVal!=='na'&&fearsVal!=='-')notes.push('Fears: '+dog.fears);if(dog.rescue==='Yes')notes.push('Rescue dog');
   if(parseInt(dog.nervous)>=4)notes.push('Very nervous ('+dog.nervous+'/5)');if(parseInt(dog.anxiety)>=4)notes.push('High sep. anxiety');
   const ageStr=calcAge(dog.birthday);const lines=[dog.name+' - '+(dog.breed||'dog')+(ageStr?' ('+ageStr+')':'')+', owned by '+(dog.owner||'unknown')+'.'];
   if(notes.length)lines.push(notes.join('. ')+'.');if(dog.remarks)lines.push(dog.remarks);
@@ -249,7 +255,7 @@ async function filtHist(type,btn){
   document.querySelectorAll('.hfb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(!curDog)return;
   const list=document.getElementById('histList');list.innerHTML='<div class="hload">Loading...</div>';
   try{
-    let all=[];const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rows=await readSheet(tab,'A2:R');histCache[tab]=rows.map((r,i)=>({tab,row:r,ri:i+2}));return histCache[tab];};
+    let all=[];const TAB_RANGE={[TABS.ACTLOG]:'A2:F'};const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rng=TAB_RANGE[tab]||'A2:R';const rows=await readSheet(tab,rng).catch(()=>[]);histCache[tab]=rows.map((r,i)=>({tab,row:r,ri:i+2}));return histCache[tab];};
     if(type==='all'){
       for(const t of[TABS.DAILY,TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL])all=all.concat(await ft(t));
       if(histCache[TABS.ACTLOG])all=all.concat(histCache[TABS.ACTLOG]);
@@ -259,8 +265,10 @@ async function filtHist(type,btn){
     else if(type==='daily')all=await ft(TABS.DAILY);
     else if(type==='health')all=await ft(TABS.HEALTH);
     else if(type==='activities'){if(histCache[TABS.ACTLOG])all=histCache[TABS.ACTLOG];else{const rows=await readSheet(TABS.ACTLOG,'A2:F');histCache[TABS.ACTLOG]=rows.map((r,i)=>({tab:TABS.ACTLOG,row:r,ri:i+2}));all=histCache[TABS.ACTLOG];}}
-    const nm=curDog.name.toLowerCase();const flt=all.filter(({row})=>row.join(' ').toLowerCase().includes(nm));
+    const nm=curDog.name.toLowerCase();let flt=all.filter(({row})=>row.join(' ').toLowerCase().includes(nm));
     flt.sort((a,b)=>(b.row[0]||'').localeCompare(a.row[0]||''));
+    // Deduplicate Daily logs — keep only latest entry per day
+    const seenDaily=new Set();flt=flt.filter(({tab,row})=>{if(tab!==TABS.DAILY)return true;const key=row[0]||'';if(seenDaily.has(key))return false;seenDaily.add(key);return true;});
     list.innerHTML='';if(!flt.length){list.innerHTML='<div class="hload">No records found</div>';return;}
     flt.slice(0,100).forEach(({tab,row,ri})=>{
       const lbl={};lbl[TABS.DAILY]='Daily';lbl[TABS.HEALTH]='Health';lbl[TABS.FIGHT]='Fight';lbl[TABS.TRANSPORT]='Transport';lbl[TABS.TRIAL]='Trial';lbl[TABS.ACTLOG]='Activity';
@@ -268,8 +276,13 @@ async function filtHist(type,btn){
       const iP=row.includes('Private');
       let summary='';
       if(tab===TABS.DAILY){
-        const ticks=[];if(row[2]==='[Y]')ticks.push('Breakfast');if(row[3]==='[Y]')ticks.push('AM Med');if(row[4]==='[Y]')ticks.push('Dinner');if(row[5]==='[Y]')ticks.push('PM Med');if(row[7]==='[Y]')ticks.push('AM Walk');if(row[8]==='[Y]')ticks.push('Garden');if(row[9]==='[Y]')ticks.push('PM Walk');if(row[11]==='[Y]')ticks.push('Bedtime');
-        summary=(ticks.length?ticks.join(' · '):'No activities')+(row[16]?' — '+row[16]:'');
+        const icons=[];
+        if(row[2]==='[Y]')icons.push('🍽️');if(row[3]==='[Y]')icons.push('💊AM');
+        if(row[4]==='[Y]')icons.push('🥘');if(row[5]==='[Y]')icons.push('💊PM');
+        if(row[7]==='[Y]')icons.push('🐾AM');if(row[8]==='[Y]')icons.push('🌿');if(row[9]==='[Y]')icons.push('🐾PM');
+        const bowl=row[12]?row[12]+' bowl':'';const room=row[13]?row[13]:'';
+        const meta=[bowl,room].filter(Boolean).join(' · ');
+        summary=(icons.length?icons.join(' '):'—')+(meta?' | '+meta:'')+(row[16]?'\n'+row[16]:'');
       }
       else if(tab===TABS.HEALTH)summary=(row[3]||'-')+' '+(row[4]||'');
       else if(tab===TABS.FIGHT)summary='Fight: '+(row[5]||'-');
@@ -333,6 +346,9 @@ function buildServices(dog){
 }
 
 // REGISTER
+function toggleSvcChip(btn){btn.classList.toggle('il');syncSvcChips();}
+function syncSvcChips(){const vals=Array.from(document.querySelectorAll('#reg_svc_chips .ib.il')).map(b=>b.dataset.svc);const el=document.getElementById('reg_svc');if(el)el.value=vals.join(', ');}
+function setSvcChips(val){document.querySelectorAll('#reg_svc_chips .ib').forEach(b=>{b.classList.toggle('il',val&&val.includes(b.dataset.svc));});syncSvcChips();}
 function toggleBdayType(){const t=document.getElementById('reg_bday_type').value;const ex=document.getElementById('reg_bday');const mo=document.getElementById('reg_bday_m');const yr=document.getElementById('reg_bday_y');if(t==='exact'){ex.style.display='';mo.style.display='none';yr.style.display='none';}else{ex.style.display='none';mo.style.display='';yr.style.display='';}}
 function initBdayType(){document.getElementById('reg_bday_type').value='exact';toggleBdayType();}
 function showEmojiPicker(){
@@ -360,26 +376,28 @@ function openEditProf(){
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();
   s('reg_dogfriends',d.dogfriends);s('reg_food',d.food);s('reg_food_measure',d.foodMeasure);s('reg_diet',d.dietNotes);s('reg_allergies',d.allerg);s('reg_medical',d.med);s('reg_med_schedule',d.medSchedule);s('reg_fears',d.fears);s('reg_touch',d.notouch);s('reg_vacc',d.vacc);s('reg_flea',d.flea);
   s('reg_behaviour',d.behav);s('reg_walk',d.walk);s('reg_car',d.car);s('reg_sleep',d.sleep);s('reg_escape',d.escape);s('reg_toilet',d.toilet);s('reg_alone',d.alone);s('reg_commands',d.commands);s('reg_sitters',d.sitters);s('reg_updates',d.updates);s('reg_updates_custom',d.updatesCustom);s('reg_rel',d.rel);s('reg_notes',d.notes);
-  s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);s('reg_svc',d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
+  s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
+  document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
   document.getElementById('reg_updates_custom_wrap').style.display=d.updates==='Custom'?'flex':'none';
   const p=localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';}
   showScreen('sc-register');
 }
 function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').value)||3;if(document.getElementById(pfx+'_nval'))document.getElementById(pfx+'_nval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--or)';for(let i=0;i<5;i++){const s=document.getElementById('rns'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function updAnxBar(){const v=parseInt(document.getElementById('reg_anxiety').value)||1;if(document.getElementById('reg_axval'))document.getElementById('reg_axval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--pu)':'var(--bl)';for(let i=0;i<5;i++){const s=document.getElementById('axs'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
+function updJogBar(){const v=parseInt(document.getElementById('reg_jog').value)||3;if(document.getElementById('reg_jogval'))document.getElementById('reg_jogval').textContent=v;const col=v>=4?'var(--gn)':v>=3?'var(--hn)':'var(--gr3)';for(let i=0;i<5;i++){const s=document.getElementById('jgs'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function startReg(){
   document.getElementById('reg_eid').value='';document.getElementById('reg_ridx').value='';
   document.querySelector('#sc-register .pg-t').textContent='Register New Dog';document.getElementById('regBtn').textContent='Register Dog';
   ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates_custom','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ['reg_gender','reg_neut','reg_rescue','reg_car','reg_food','reg_svc','reg_updates','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();
+  ['reg_gender','reg_neut','reg_rescue','reg_car','reg_food','reg_svc','reg_updates','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setSvcChips('');
+  document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();document.getElementById('reg_jog').value=3;updJogBar();
   initBdayType();document.getElementById('regPhotoImg').style.display='none';document.getElementById('regPhotoEmoji').style.display='block';document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
 }
 function duplicateDog(){
   if(!curDog)return;const d=curDog;startReg();
   const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   s('reg_breed',d.breed);s('reg_dogfriends',d.dogfriends);s('reg_food',d.food);s('reg_food_measure',d.foodMeasure);s('reg_diet',d.dietNotes);s('reg_allergies',d.allerg);s('reg_fears',d.fears);s('reg_touch',d.notouch);s('reg_vacc',d.vacc);
-  s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);s('reg_svc',d.svc);
+  s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();
   document.querySelector('#sc-register .pg-t').textContent='New Dog (same owner as '+d.name+')';
 }
@@ -445,24 +463,32 @@ function calcMultiQ(){
         while(d<endD){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
         amt=(sN*r.board_std)+(hN*r.board_hol)+(addDogs*(sN*r.board_add+hN*r.board_addh));
         const em='\u{1F4A4}';
-        lines.push([em+' Boarding'+(l.dogs.length?' ('+l.dogs.join(' & ')+')':''),amt]);
-        descParts.push(em+' Boarding: '+fmtDate(l.sd)+' - '+fmtDate(l.ed)+'\nDrop-off: '+l.st2+' | Pick-up: '+l.et+'\nNights: '+nights+(addDogs>0?'\nAdditional pet x'+addDogs:''));
+        const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
+        lines.push([em+' Boarding'+(dogStr?' ('+dogStr+')':''),amt]);
+        let dp=em+' Boarding'+(dogStr?' ('+dogStr+')':'')+': '+fmtDate(l.sd)+' \u2014 '+fmtDate(l.ed)+'\nDrop-off: '+l.st2+' | Pick-up: '+l.et+'\n'+nights+' night'+(nights!==1?'s':'')+' \u2014 '+fmtGBP(amt);
+        if(hN>0&&sN>0)dp+='\n('+sN+' std + '+hN+' holiday)';else if(hN>0)dp+='\n(Holiday rate)';
+        if(addDogs>0)dp+='\nAdditional dog \u00D7'+addDogs;
+        descParts.push(dp);
       }
     }else if(l.svc==='daycare'){
       const hol=l.sd?isHol(l.sd):false;const addDogs=Math.max(0,(l.dogs?.length||1)-1);
       amt=(hol?r.day_hol:r.day_std)+(addDogs*(hol?r.day_addh:r.day_add));
       const em='\u2600\uFE0F';
-      lines.push([em+' Daycare'+(l.dogs.length?' ('+l.dogs.join(' & ')+')':''),amt]);
-      descParts.push(em+' Daycare: '+fmtDate(l.sd||'')+(hol?' (Holiday)':''));
+      const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
+      lines.push([em+' Daycare'+(dogStr?' ('+dogStr+')':''),amt]);
+      let dp=em+' Daycare'+(dogStr?' ('+dogStr+')':'')+': '+fmtDate(l.sd||'')+(hol?' (Holiday)':'')+' \u2014 '+fmtGBP(amt);
+      if(addDogs>0)dp+='\nAdditional dog \u00D7'+addDogs;
+      descParts.push(dp);
     }else if(isTaxi){
       amt=l.rate||r.t30r;
       lines.push(['\u{1F695} Pet Taxi',amt]);
-      descParts.push('\u{1F695} Pet Taxi: '+fmtGBP(amt));
+      descParts.push('\u{1F695} Pet Taxi'+(l.sd?' \u2014 '+fmtDate(l.sd):'')+' \u2014 '+fmtGBP(amt));
     }else{
       amt=l.rate;
       const em=SVC_EMOJIS[l.svc]||'';
-      lines.push([em+' '+(SVC_NAMES[l.svc]||l.svc)+(l.dogs&&l.dogs.length?' ('+l.dogs.join(' & ')+')':''),amt]);
-      descParts.push(em+' '+(SVC_NAMES[l.svc]||l.svc)+': '+fmtGBP(amt));
+      const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
+      lines.push([em+' '+(SVC_NAMES[l.svc]||l.svc)+(dogStr?' ('+dogStr+')':''),amt]);
+      descParts.push(em+' '+(SVC_NAMES[l.svc]||l.svc)+(dogStr?' ('+dogStr+')':'')+': '+fmtGBP(amt));
     }
     total+=amt;
   });
@@ -511,18 +537,16 @@ async function saveTplSettingsAndSync(){
 function buildQDogMS(){
   const c=document.getElementById('q_dog_ms');if(!c)return;
   if(!allDogs.length){c.innerHTML='<div style="padding:9px;font-size:10px;color:var(--gr3);">No dogs loaded - tap Refresh on the Board first</div>';return;}
-  c.innerHTML=allDogs.map((d,i)=>'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>').join('');
+  const q=(document.getElementById('q_dog_search')?.value||'').toLowerCase();
+  const visible=allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q));
+  c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);return'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
 }
 function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';buildQDogMS();buildMainDogBtns();calcMultiQ();}
 function buildMainDogBtns(){const w=document.getElementById('q_main_dog_wrap');const c=document.getElementById('q_main_dog_btns');if(!w||!c)return;if(_selDogs.length<=1){w.style.display='none';_mainDog=_selDogs[0]||'';return;}w.style.display='block';c.innerHTML=_selDogs.map((n,i)=>'<button class="main-dog-pill'+(_mainDog===n?' active':'')+'" onclick="setMainDog('+i+')">* '+n+'</button>').join('');}
-function setMainDog(i){_mainDog=_selDogs[i];buildMainDogBtns();calcQ();}
-function onQSvc(){
-  const s=document.getElementById('q_svc').value;const isDt=s==='boarding'||s==='daycare';const isTx=s==='taxi';
-  document.getElementById('q_dt_wrap').style.display=isDt?'block':'none';document.getElementById('q_taxi_wrap').style.display=isTx?'block':'none';document.getElementById('q_manual_wrap').style.display=(!isDt&&!isTx&&s)?'block':'none';document.getElementById('q_shared_wrap').style.display=s?'block':'none';document.getElementById('q_result').style.display='none';
-  if(isDt){const t=todayStr();document.getElementById('q_dd').value=t;document.getElementById('q_pd').value=t;}calcQ();
-}
+function setMainDog(i){_mainDog=_selDogs[i];buildMainDogBtns();calcMultiQ();}
+function onQSvc(){}
 function calcQ(){
-  const svc=document.getElementById('q_svc').value;if(!svc)return;const r=getRates();const addDogs=Math.max(0,_selDogs.length-1);
+  const svc=document.getElementById('q_svc')?.value;if(!svc)return;const r=getRates();const addDogs=Math.max(0,_selDogs.length-1);
   const discType=document.getElementById('q_disc_t')?.value||'none';const discVal=parseFloat(document.getElementById('q_disc_v')?.value)||0;const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
   document.getElementById('q_result').style.display='block';let total=0,lines=[],nights=0,rpn=0,addLine='',discLine='',holDates=[];
   if(svc==='boarding'){
@@ -567,15 +591,25 @@ function genQuote(type){
   const t=getTpls();const ownerName=document.getElementById('q_owner').value||'there';
   const payRef=document.getElementById('q_payref').value||(t.payRefPfx||'KCHEUNG');
   const allDogNames=[...new Set((_svcLines||[]).flatMap(l=>l.dogs||[]))].join(' & ')||_cr.selDogs.join(' & ')||'your dog';
-  const greeting=type==='prepay'?'Thank you for choosing THE CUDDLY LANE!':'Your booking is confirmed \u2014 please settle the balance before drop-off.';
-  const serviceLines=(_cr.descParts||[]).join('\n\n');
-  let msg='Hi '+ownerName+',\n\n'+greeting+'\n\nHere is the quote for '+allDogNames+' with THE CUDDLY LANE:\n\n'+serviceLines;
-  if(_cr.discLine)msg+='\n\n'+_cr.discLine;
-  msg+='\n\nTotal: '+fmtGBP(_cr.total);
+  const serviceBlock=(_cr.descParts||[]).join('\n\n');
+  let msg='Hi '+ownerName+',\n\n';
   if(type==='prepay'){
-    msg+='\n\nPrepayment (non-refundable, transferable to other dates):\n'+fmtGBP(_cr.prepayAmt)+'\n\nPayment reference: '+payRef+'\n'+(t.payLink||'[payment link]')+'\n\nThank you!\nKatie & Osbert';
+    msg+='Here is your quote for *'+allDogNames+'* with THE CUDDLY LANE \ud83d\udc3e\n\n';
+    msg+=serviceBlock;
+    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
+    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
+    msg+='\n\nPrepayment required (non-refundable, transferable to other dates):\n*'+fmtGBP(_cr.prepayAmt)+'*';
+    msg+='\n\nPayment reference: *'+payRef+'*\n'+(t.payLink||'[payment link]');
+    msg+='\n\nThank you!\nKatie & Osbert \ud83d\udc36';
   }else{
-    msg+='\nPrepayment received: '+fmtGBP(_cr.prepayAmt)+'\nBalance due: '+fmtGBP(_cr.finalAmt)+'\n\nPayment reference: '+payRef+'\n'+(t.payLink||'[payment link]')+'\n\nLooking forward to seeing '+allDogNames+'!\nKatie & Osbert';
+    msg+='Your booking is confirmed \u2014 please settle the balance before drop-off \ud83d\udc3e\n\n';
+    msg+=serviceBlock;
+    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
+    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
+    msg+='\nPrepayment received: '+fmtGBP(_cr.prepayAmt);
+    msg+='\n*Balance due: '+fmtGBP(_cr.finalAmt)+'*';
+    msg+='\n\nPayment reference: *'+payRef+'*\n'+(t.payLink||'[payment link]');
+    msg+='\n\nLooking forward to seeing *'+allDogNames+'*!\nKatie & Osbert \ud83d\udc36';
   }
   msg=msg.replace(/\n{3,}/g,'\n\n').trim();
   const outId=type==='prepay'?'q_out_prepay':'q_out_final';
@@ -585,25 +619,32 @@ function genQuote(type){
 }
 
 async function createBookingsFromQuote(){
-  const svc=document.getElementById('q_svc').value;if(!svc){alert('Complete the quote first');return;}
-  const dd=document.getElementById('q_dd')?.value||'';const pd=document.getElementById('q_pd')?.value||dd;const dt=document.getElementById('q_dt_t')?.value||'09:00';const pt=document.getElementById('q_pt')?.value||'09:00';
-  const dogs=_cr.selDogs.length?_cr.selDogs:[''];const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
+  if(!_svcLines.length){alert('Complete the quote first');return;}
+  const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
   let created=0;
-  for(const dogName of dogs){
-    const id='BK-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
-    const month=dd?new Date(dd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
-    const vals=[id,dogName,svcN[svc]||svc,dd,dt,pd,pt,'','',0,0,0,0,0,'',0,0,'TCL','','Quoted','',month,'','','','','','',''];
-    try{await appendRow(TABS.BK,vals);bookings.push(mapBk(vals,bookings.length));created++;}catch(e){alert('Error for '+dogName+': '+e.message);}
+  for(const line of _svcLines){
+    const dogs=line.dogs&&line.dogs.length?line.dogs:[''];
+    const sd=line.sd||'';const ed=line.ed||sd;const st=line.st2||'09:00';const et=line.et||'18:00';
+    const svcLabel=svcN[line.svc]||line.svc;
+    for(const dogName of dogs){
+      const id='BK-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
+      const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
+      const vals=[id,dogName,svcLabel,sd,st,ed,et,'','',0,0,0,0,0,'',0,0,'TCL','','Quoted','',month,'','','','','','',''];
+      try{await appendRow(TABS.BK,vals);bookings.push(mapBk(vals,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
+    }
   }
   if(created)alert(created+' booking'+(created>1?'s':'')+' created. Open Bookings to add payment details.');
 }
 function quoteFromBk(){
   const dog=document.getElementById('bm_dog').value;const svc=document.getElementById('bm_svc').value;const sd=document.getElementById('bm_sd').value;const ed=document.getElementById('bm_ed').value;const bst=document.getElementById('bm_st').value;const et=document.getElementById('bm_et').value;
   const svcMap={Boarding:'boarding',DayCare:'daycare',Walking:'walk','Drop-in':'dropin','Dog Sit':'dogsit','Pet Taxi':'taxi',Training:'training'};
-  document.getElementById('q_svc').value=svcMap[svc]||'boarding';onQSvc();
-  if(document.getElementById('q_dd'))document.getElementById('q_dd').value=sd;if(document.getElementById('q_dt_t'))document.getElementById('q_dt_t').value=bst;if(document.getElementById('q_pd'))document.getElementById('q_pd').value=ed;if(document.getElementById('q_pt'))document.getElementById('q_pt').value=et;
-  const dogData=allDogs.find(d=>d.name.toLowerCase()===dog.toLowerCase());if(dogData)document.getElementById('q_owner').value=dogData.owner;
-  _selDogs=[dog];_mainDog=dog;buildQDogMS();buildMainDogBtns();document.getElementById('bkModal').classList.remove('open');switchSection('quote');calcQ();
+  const svcKey=svcMap[svc]||'boarding';
+  _svcLines=[{svc:svcKey,dogs:dog?[dog]:[],sd,ed,st2:bst||'09:00',et:et||'18:00',rate:0}];
+  _selDogs=dog?[dog]:[];_mainDog=dog||'';
+  const dogData=allDogs.find(d=>d.name.toLowerCase()===(dog||'').toLowerCase());
+  if(dogData)document.getElementById('q_owner').value=dogData.owner;
+  document.getElementById('bkModal').classList.remove('open');switchSection('quote');
+  renderSvcLines();buildQDogMS();buildMainDogBtns();calcMultiQ();
 }
 
 // ==================== BOOKINGS ====================
@@ -615,7 +656,7 @@ function openBkModal(editId=null,fromProf=false){
   const sel=document.getElementById('bm_dog');sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(d.name+' - '+d.cid,d.name)));
   if(ed){
     const ss=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v!=null?v:''};
-    sel.value=ed.dog;updateDogIdHint();ss('bm_svc',ed.svc);ss('bm_sd',ed.sd);ss('bm_st',ed.st);ss('bm_ed',ed.ed);ss('bm_et',ed.et);ss('bm_drop_loc',ed.dropLoc||'');ss('bm_pick_loc',ed.pickLoc||'');ss('bm_rev',ed.rev||0);ss('bm_tips',ed.tips||0);ss('bm_prepay',ed.prepay||0);ss('bm_final',ed.finalPay||0);ss('bm_unit',ed.unit||0);ss('bm_disc_notes',ed.discNotes||'');ss('bm_channel',ed.ch||'TCL');ss('bm_pay',ed.pay||'');ss('bm_status',ed.status||'Quoted');ss('bm_rpct',ed.roverPct||20);ss('bm_ramt',ed.roverAmt||0);ss('bm_rating',ed.rating||'');ss('bm_feedback',ed.feedback||'');document.getElementById('bm_priv').checked=ed.priv||false;buildReminderRows(ed.rem||[]);
+    sel.value=ed.dog;updateDogIdHint();ss('bm_svc',ed.svc);ss('bm_sd',ed.sd);ss('bm_st',ed.st);ss('bm_ed',ed.ed);ss('bm_et',ed.et);ss('bm_drop_loc',ed.dropLoc||'');ss('bm_pick_loc',ed.pickLoc||'');ss('bm_rev',ed.rev||0);ss('bm_tips',ed.tips||0);ss('bm_prepay',ed.prepay||0);ss('bm_final',ed.finalPay||0);ss('bm_unit',ed.unit||0);ss('bm_disc_notes',ed.discNotes||'');ss('bm_channel',ed.ch||'TCL');ss('bm_pay',ed.pay||'');ss('bm_status',ed.status||'Quoted');ss('bm_rpct',ed.roverPct||15);ss('bm_ramt',ed.roverAmt||0);ss('bm_rating',ed.rating||'');ss('bm_feedback',ed.feedback||'');document.getElementById('bm_priv').checked=ed.priv||false;buildReminderRows(ed.rem||[]);
   }else{
     sel.value='';if(fromProf&&curDog)sel.value=curDog.name;updateDogIdHint();
     ['bm_rev','bm_tips','bm_prepay','bm_final','bm_unit','bm_disc_notes','bm_drop_loc','bm_pick_loc','bm_rating','bm_feedback'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -756,7 +797,7 @@ async function loadTraining(){
   try{
     const rows=await readSheet(TABS.TRAIN,'A2:I');
     trainRecords=rows.map((r,i)=>({ri:i+2,date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',link:r[7]||''}));
-    list.innerHTML=trainRecords.slice().reverse().slice(0,30).map(r=>{
+    list.innerHTML=trainRecords.slice().reverse().map(r=>{
       const rd=JSON.stringify([r.date,r.staff,r.cat,r.obj,r.prov,r.learnt,r.cpd,r.link]).replace(/'/g,"\\'");
       return '<div class="hi"><div class="hi-h"><span class="hi-d">'+r.date+'</span><span style="font-size:9px;font-weight:700;color:var(--gr);">'+r.staff+'</span>'+(r.cat?'<span class="htype hti">'+r.cat+'</span>':'')+'<button class="ebtn" style="margin-left:auto;" onclick="editTrainingRow('+r.ri+','+rd+')">Edit</button></div>'+(r.obj?'<div class="hsum">'+r.obj+'</div>':'')+(r.cpd?'<div style="font-size:8px;color:var(--gn);margin-top:2px;">CPD: '+r.cpd+' pts</div>':'')+(r.link?'<div style="font-size:8px;margin-top:2px;"><a href="'+r.link+'" target="_blank" style="color:var(--bl);">Link</a></div>':'')+'</div>';
     }).join('')||'<div class="hload">No records</div>';
@@ -788,12 +829,14 @@ async function saveTplHub(){
   const content=document.getElementById('tpl_content').value;const cat=document.getElementById('tpl_cat').value;
   if(!cat){alert('Category is required');return;}
   const idx2=document.getElementById('tpl_eidx').value;const st=document.getElementById('tplHubStatus');
-  if(idx2!==''){const prev=msgTpls[parseInt(idx2)];msgTpls[parseInt(idx2)]={...prev,_prev:{name:prev.name,content:prev.content,cat:prev.cat||''},name,content,cat};}
+  let oldName='';
+  if(idx2!==''){const prev=msgTpls[parseInt(idx2)];oldName=prev.name;msgTpls[parseInt(idx2)]={...prev,_prev:{name:prev.name,content:prev.content,cat:prev.cat||''},name,content,cat};}
   else{msgTpls.push({name,content,cat});}
   saveMsgTpls();st.textContent='Saving...';st.className='smsg';
   try{
     const rows=await readSheet(TABS.TPLS,'A2:D').catch(()=>[]);
-    const existIdx=rows.findIndex(r=>r[0]===name);
+    const lookupName=oldName||name;
+    const existIdx=rows.findIndex(r=>r[0]===lookupName);
     if(existIdx>=0){await updateRow(TABS.TPLS,existIdx+2,[name,cat,content,new Date().toISOString()]);}
     else{await appendRow(TABS.TPLS,[name,cat,content,new Date().toISOString()]);}
     st.textContent='Saved & synced!';st.className='smsg ok';
@@ -911,7 +954,7 @@ function exportData(incPriv){const recs=incPriv?bookings:bookings.filter(r=>!r.p
 function registerSW(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}}
 
 // ==================== INIT ====================
-loadConfig();checkCreds();loadQSettings();
+loadConfig();checkCreds();loadQSettings();initPin();
 msgTpls=JSON.parse(localStorage.getItem('tcl_msg_tpls')||'[]');
 loadActivities();
 document.getElementById('boardDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
