@@ -110,6 +110,7 @@ body{
 .dc-photo{width:100%;aspect-ratio:4/3;background:var(--hnxl);display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden;}
 .dc-photo img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
 .live-badge{position:absolute;top:3px;right:3px;background:var(--gn);color:#fff;font-size:7px;font-weight:700;padding:2px 4px;border-radius:99px;}
+.dc-em-badge{position:absolute;bottom:3px;left:5px;font-size:15px;line-height:1;z-index:2;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
 .dcb{padding:5px 7px;}
 .dcb-n{font-family:var(--fh);font-size:11px;font-weight:800;color:var(--gr);}
 .dcb-b{font-size:8px;color:var(--gr3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -230,6 +231,7 @@ body{
 .q-ln{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:10px;}
 .q-ln:last-child{border-bottom:none;font-weight:700;font-size:11px;}
 .cpbtn{width:100%;background:var(--or);color:#fff;border:none;padding:8px;border-radius:var(--r2);font-size:11px;font-weight:700;font-family:var(--fh);cursor:pointer;margin-top:6px;}
+.cpbtn.pu{background:var(--pu);margin-top:4px;}
 .cpbtn.bl{background:var(--bl);margin-top:4px;}
 .cpbtn.gn{background:var(--gn);margin-top:4px;}
 .cpbtn:hover{opacity:.9;}
@@ -540,9 +542,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <label style="font-size:10px;color:var(--gr3);display:block;margin-bottom:4px;">For final payment quote — actual prepay already received (£):</label>
         <input class="fi" type="number" id="q_actual_prepay" placeholder="Defaults to prepayment above" step="0.01" oninput="updateFinalShow()">
       </div>
-      <button class="cpbtn" onclick="genQuote('prepay')">Copy Prepayment Quote</button>
+      <button class="cpbtn pu" data-qtype="quote" onclick="genQuote('quote')">Copy Quote</button>
+      <div class="q-out" id="q_out_quote"></div>
+      <button class="cpbtn" data-qtype="prepay" onclick="genQuote('prepay')">Copy Prepayment Quote</button>
       <div class="q-out" id="q_out_prepay"></div>
-      <button class="cpbtn bl" onclick="genQuote('final')">Copy Final Payment Quote</button>
+      <button class="cpbtn bl" data-qtype="final" onclick="genQuote('final')">Copy Final Payment Quote</button>
       <div class="q-out" id="q_out_final"></div>
       <button class="cpbtn gn" onclick="createBookingsFromQuote()">+ Create Booking(s) from Quote</button>
     </div>
@@ -578,7 +582,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="sp-panel">
         <div class="sp-hd"><div class="sp-ht">Quote Templates</div><span class="sp-tog" onclick="toggleSP('templates')">Edit</span></div>
         <div class="sp-bd" id="sp-templates">
-          <div class="f"><label>Prepayment template</label>
+          <div class="f"><label>Quote template (no payment details)</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('quote')">Save</button><button class="tplb" onclick="redoTpl('quote')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('quote')">Restore default</button></div>
+            <textarea class="fta" id="tpl_quote" style="min-height:130px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Prepayment quote template</label>
             <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('prepay')">Save</button><button class="tplb" onclick="redoTpl('prepay')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('prepay')">Restore default</button></div>
             <textarea class="fta" id="tpl_prepay" style="min-height:150px;font-size:10px;"></textarea>
           </div>
@@ -832,7 +840,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div style="display:flex;flex-direction:column;align-items:center;padding:12px 0;">
       <div id="regPhotoCircle" onclick="document.getElementById('regPhotoInput').click()" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
       <input type="file" id="regPhotoInput" accept="image/*" style="display:none;" onchange="handleRegPh(event)">
-      <div style="font-size:9px;color:var(--gr3);margin-top:5px;">Tap to add photo</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+        <span style="font-size:9px;color:var(--gr3);">Tap circle to add photo</span>
+        <button class="sbtn2" onclick="showEmojiPicker('register')" style="font-size:11px;padding:4px 10px;">😀 Emoji</button>
+      </div>
     </div>
     <input type="hidden" id="reg_eid"><input type="hidden" id="reg_ridx">
     <div class="fsec">Dog Details</div>

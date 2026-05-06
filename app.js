@@ -19,6 +19,7 @@ const DR={board_std:38,board_hol:44,board_add:31,board_addh:35.65,day_std:28,day
 const DEFAULT_RANGES=[{start:'2026-04-03',end:'2026-04-06',label:'Easter 2026'},{start:'2026-05-01',end:'2026-05-04',label:'May Bank Hol'},{start:'2026-05-22',end:'2026-05-25',label:'Late May BH'},{start:'2026-07-24',end:'2026-08-30',label:'Summer 2026'},{start:'2026-12-24',end:'2027-01-03',label:'Christmas 2026'}];
 const TP_PREPAY='Hi {{ownerName}},\n\nHere is your quote for *{{dogs}}* with THE CUDDLY LANE \ud83d\udc3e\n\n{{service}}\n{{discount}}\n*Total: {{total}}*\n\nPrepayment required (non-refundable, transferable to other dates):\n*{{prepayAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nThank you!\nKatie & Osbert \ud83d\udc36';
 const TP_FINAL='Hi {{ownerName}},\n\nYour booking is confirmed \u2014 please settle the balance before drop-off \ud83d\udc3e\n\n{{service}}\n{{discount}}\n*Total: {{total}}*\nPrepayment received: {{prepayAmt}}\n*Balance due: {{finalAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nLooking forward to seeing *{{dogs}}*!\nKatie & Osbert \ud83d\udc36';
+const TP_QUOTE='Hi {{ownerName}},\n\nHere is the rate for our service with THE CUDDLY LANE \u2601\ufe0f\u2728\n\n{{rateBlock}}\n\nHere is your quotation:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\n\nTo secure your booking, a 50% prepayment will be required (non-refundable, but transferable to other dates). Let us know if you\u2019d like to go ahead!\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
 const REMINDER_TYPES=['Packing list sent','Drop-off location confirmed','Pick-up location confirmed','Drop-off time confirmed','Pick-up time confirmed'];
 const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
@@ -26,6 +27,7 @@ const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\
 // STATE
 let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[];
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
+let _regEmoji='',_emojiCtx='profile';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
 
 // ==================== PIN ====================
@@ -153,7 +155,7 @@ function renderCards(dogs,c,cls){
   dogs.forEach(dog=>{
     const photo=localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo"><span>'+(dog.emoji||defEmoji(dog))+'</span>'+(photo?'<img src="'+photo+'" alt="">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div><div class="dcb-ch">'+(td.breakfast?'<span class="chip cg">Fed</span>':'')+(td.walkAm?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(cls==='wk'?'<span class="chip cb">This week</span>':'')+(cls==='up'?'<span class="chip cp">Upcoming</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div><div class="dcb-ch">'+(td.breakfast?'<span class="chip cg">Fed</span>':'')+(td.walkAm?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(cls==='wk'?'<span class="chip cb">This week</span>':'')+(cls==='up'?'<span class="chip cp">Upcoming</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
@@ -362,17 +364,23 @@ function syncSvcChips(){const vals=Array.from(document.querySelectorAll('#reg_sv
 function setSvcChips(val){document.querySelectorAll('#reg_svc_chips .ib').forEach(b=>{b.classList.toggle('il',val&&val.includes(b.dataset.svc));});syncSvcChips();}
 function toggleBdayType(){const t=document.getElementById('reg_bday_type').value;const ex=document.getElementById('reg_bday');const mo=document.getElementById('reg_bday_m');const yr=document.getElementById('reg_bday_y');if(t==='exact'){ex.style.display='';mo.style.display='none';yr.style.display='none';}else{ex.style.display='none';mo.style.display='';yr.style.display='';}}
 function initBdayType(){document.getElementById('reg_bday_type').value='exact';toggleBdayType();}
-function showEmojiPicker(){
+function showEmojiPicker(ctx){
+  _emojiCtx=ctx||'profile';
   const modal=document.getElementById('emojiModal');if(!modal)return;
-  const cur=curDog?curDog.emoji||defEmoji(curDog):'';
+  const cur=_emojiCtx==='register'?_regEmoji:(curDog?curDog.emoji||defEmoji(curDog):'');
+  const ci=document.getElementById('emojiCustomInput');if(ci)ci.value='';
   document.getElementById('emojiGrid').innerHTML=DOG_EMOJIS.map((e,i)=>'<button class="epick'+(e===cur?' sel':'')+'" data-em="'+i+'" style="font-size:20px;padding:5px;background:none;border:1px solid var(--gr4);border-radius:7px;cursor:pointer;">'+e+'</button>').join('');
   document.getElementById('emojiGrid').querySelectorAll('.epick').forEach((btn,i)=>{btn.onclick=()=>selectEmoji(DOG_EMOJIS[i]);});
   modal.classList.add('open');
 }
 function selectEmoji(em){
-  if(curDog){curDog.emoji=em;document.getElementById('profEmoji').textContent=em;}
+  if(_emojiCtx==='register'){
+    _regEmoji=em;const sp=document.getElementById('regPhotoEmoji');if(sp){sp.textContent=em;sp.style.display='block';}
+  }else{
+    if(curDog){curDog.emoji=em;document.getElementById('profEmoji').textContent=em;}
+    if(curDog&&curDog.rowIdx){const vals=Object.values(mapDogToRow(curDog));updateRow(TABS.DOGS,curDog.rowIdx,vals).catch(()=>{});}
+  }
   const modal=document.getElementById('emojiModal');if(modal)modal.classList.remove('open');
-  if(curDog&&curDog.rowIdx){const vals=Object.values(mapDogToRow(curDog));updateRow(TABS.DOGS,curDog.rowIdx,vals).catch(()=>{});}
 }
 function previewCustomEmoji(){
   const v=document.getElementById('emojiCustomInput')?.value||'';
@@ -399,7 +407,8 @@ function openEditProf(){
   s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
   document.getElementById('reg_updates_custom_wrap').style.display=d.updates==='Custom'?'flex':'none';
-  const p=localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';}
+  _regEmoji=d.emoji||'';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent=d.emoji||defEmoji(d);re.style.display='block';}
+  const p=localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';}
   showScreen('sc-register');
 }
 function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').value)||3;if(document.getElementById(pfx+'_nval'))document.getElementById(pfx+'_nval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--or)';for(let i=0;i<5;i++){const s=document.getElementById('rns'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
@@ -411,7 +420,7 @@ function startReg(){
   ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates_custom','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['reg_gender','reg_neut','reg_rescue','reg_car','reg_food','reg_svc','reg_updates','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setSvcChips('');
   document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();document.getElementById('reg_jog').value=3;updJogBar();
-  initBdayType();document.getElementById('regPhotoImg').style.display='none';document.getElementById('regPhotoEmoji').style.display='block';document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
+  _regEmoji='';initBdayType();document.getElementById('regPhotoImg').style.display='none';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent='🐶';re.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
 }
 function duplicateDog(){
   if(!curDog)return;const d=curDog;startReg();
@@ -427,7 +436,7 @@ async function registerDog(){
   const btn=document.getElementById('regBtn');const st=document.getElementById('regStatus');btn.disabled=true;btn.textContent='Saving...';
   const bt=gv('reg_bday_type');let bday='';if(bt==='approx'){const m=gv('reg_bday_m'),y=gv('reg_bday_y');bday=y&&m?y+'-'+m+'-01':'';}else bday=gv('reg_bday');
   const cid=eid||genId(name);
-  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),eid?curDog?.emoji||'':'',gv('reg_jog')];
+  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog')];
   try{
     if(eid&&ri)await updateRow(TABS.DOGS,ri,vals);else await appendRow(TABS.DOGS,vals);
     const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);}catch(e){}
@@ -513,11 +522,13 @@ function calcMultiQ(){
         amt=mainAmt;
         const em='\u{1F4A4}';const allDogStr=dogs.join(' & ');
         lines.push([em+' Boarding \u2014 '+mainDog+' (main)',mainAmt]);
-        let dp=em+' Boarding ('+allDogStr+'): '+fmtDate(l.sd)+' \u2014 '+fmtDate(l.ed)+'\nDrop-off: '+l.st2+' | Pick-up: '+l.et+'\n'+nights+' night'+(nights!==1?'s':'');
-        dp+='\n'+mainDog+' (main): '+fmtGBP(r.board_std)+'/night'+(hN>0?' \u00B7 Holiday '+fmtGBP(r.board_hol)+'/night':'');
-        dp+=' = '+fmtGBP(mainAmt);
-        addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*r.board_addh);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n'+dog+' (additional): '+fmtGBP(r.board_add)+'/night'+(hN>0?' \u00B7 Holiday '+fmtGBP(r.board_addh)+'/night':'');dp+=' = '+fmtGBP(addAmt);});
-        if(hN>0){const holExtra=(sN>0?(r.board_hol-r.board_std)*hN:0)+(addDogs.length?(r.board_addh-r.board_add)*hN*addDogs.length:0);dp+='\n\u26A0\uFE0F Holiday rate applies on '+hN+' night'+(hN!==1?'s':'')+' ('+holDates.slice(0,3).map(x=>fmtDate(x)).join(', ')+(holDates.length>3?'\u2026':'')+')';if(holExtra>0)dp+=' \u2014 +'+fmtGBP(holExtra)+' vs standard';}
+        const holRangeStr=holDates.length>0?fmtDate(holDates[0])+' \u2014 '+fmtDate(holDates[holDates.length-1]):'';
+        let dp=em+' Boarding ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
+        if(hN>0)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN+' night'+(hN!==1?'s':'')+(holRangeStr?' ('+holRangeStr+')':'');
+        dp+='\n\n'+mainDog+':\n';
+        if(sN>0&&hN>0){dp+=fmtGBP(r.board_std)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_std)+'\n'+fmtGBP(r.board_hol)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*r.board_hol)+'\nTotal: '+fmtGBP(mainAmt);}
+        else{dp+=fmtGBP(sN>0?r.board_std:r.board_hol)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(mainAmt);}
+        addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*r.board_addh);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n\n'+dog+' (additional dog):\n';if(sN>0&&hN>0){dp+=fmtGBP(r.board_add)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_add)+'\n'+fmtGBP(r.board_addh)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*r.board_addh)+'\nTotal: '+fmtGBP(addAmt);}else{dp+=fmtGBP(sN>0?r.board_add:r.board_addh)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(addAmt);}});
         descParts.push(dp);
       }
     }else if(l.svc==='daycare'){
@@ -562,12 +573,12 @@ function calcMultiQ(){
 
 function getRates(){return JSON.parse(localStorage.getItem('tcl_rates')||JSON.stringify(DR));}
 function getHolRanges(){return JSON.parse(localStorage.getItem('tcl_hol_ranges')||JSON.stringify(DEFAULT_RANGES));}
-function getTpls(){return JSON.parse(localStorage.getItem('tcl_tpls')||JSON.stringify({prepay:TP_PREPAY,final:TP_FINAL,payLink:'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:'KCHEUNG'}));}
+function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');return{prepay:s.prepay||TP_PREPAY,quote:s.quote||TP_QUOTE,final:s.final||TP_FINAL,payLink:s.payLink||'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:s.payRefPfx||'KCHEUNG'};}
 function isHol(d){return getHolRanges().some(r=>d>=r.start&&d<=r.end);}
 function getHolDates(sd,ed){const ranges=getHolRanges();const dates=[];let d=new Date(sd+'T12:00:00');const e=new Date(ed+'T12:00:00');while(d<e){const ds=d.toISOString().split('T')[0];if(ranges.some(r=>ds>=r.start&&ds<=r.end))dates.push(ds);d.setDate(d.getDate()+1);}return dates;}
 function loadQSettings(){
   const r=getRates();['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r'].forEach(k=>{const el=document.getElementById('r_'+k);if(el)el.value=r[k]||DR[k];});
-  renderHolList();renderHolYrBtns();const t=getTpls();const pe=document.getElementById('tpl_prepay');const fe=document.getElementById('tpl_final');if(pe)pe.value=t.prepay;if(fe)fe.value=t.final;
+  renderHolList();renderHolYrBtns();const t=getTpls();const pe=document.getElementById('tpl_prepay');const qe=document.getElementById('tpl_quote');const fe=document.getElementById('tpl_final');if(pe)pe.value=t.prepay;if(qe)qe.value=t.quote;if(fe)fe.value=t.final;
   const pl=document.getElementById('tpl_paylink');const pp=document.getElementById('tpl_payref_pfx');if(pl)pl.value=t.payLink||'';if(pp)pp.value=t.payRefPfx||'';
 }
 function toggleSP(id){document.getElementById('sp-'+id).classList.toggle('open');}
@@ -591,9 +602,9 @@ function removeHolRange(start,end){localStorage.setItem('tcl_hol_ranges',JSON.st
 function saveTpl(k){const c=document.getElementById('tpl_'+k)?.value;const t=getTpls();t['_prev_'+k]=t[k];t[k]=c;localStorage.setItem('tcl_tpls',JSON.stringify(t));alert('Saved locally. Use Save & Sync to push to Google Sheet.');}
 function redoTpl(k){const t=getTpls();if(t['_prev_'+k]){const tmp=t[k];t[k]=t['_prev_'+k];t['_prev_'+k]=tmp;localStorage.setItem('tcl_tpls',JSON.stringify(t));document.getElementById('tpl_'+k).value=t[k];alert('Reverted.');}else alert('No previous version.');}
 function confirmRestoreTpl(k){_restoreTplKey=k;document.getElementById('restoreInput').value='';document.getElementById('restoreConfirm').classList.add('open');}
-function doRestore(){if(document.getElementById('restoreInput').value.trim()!=='RESTORE'){alert('Type RESTORE to confirm');return;}const t=getTpls();t[_restoreTplKey]=_restoreTplKey==='prepay'?TP_PREPAY:TP_FINAL;delete t['_prev_'+_restoreTplKey];localStorage.setItem('tcl_tpls',JSON.stringify(t));document.getElementById('tpl_'+_restoreTplKey).value=t[_restoreTplKey];document.getElementById('restoreConfirm').classList.remove('open');alert('Restored.');}
+function doRestore(){if(document.getElementById('restoreInput').value.trim()!=='RESTORE'){alert('Type RESTORE to confirm');return;}const t=getTpls();t[_restoreTplKey]=_restoreTplKey==='prepay'?TP_PREPAY:_restoreTplKey==='quote'?TP_QUOTE:TP_FINAL;delete t['_prev_'+_restoreTplKey];localStorage.setItem('tcl_tpls',JSON.stringify(t));document.getElementById('tpl_'+_restoreTplKey).value=t[_restoreTplKey];document.getElementById('restoreConfirm').classList.remove('open');alert('Restored.');}
 async function saveTplSettingsAndSync(){
-  const t=getTpls();t.payLink=document.getElementById('tpl_paylink').value;t.payRefPfx=document.getElementById('tpl_payref_pfx').value;t.prepay=document.getElementById('tpl_prepay').value;t.final=document.getElementById('tpl_final').value;
+  const t=getTpls();t.payLink=document.getElementById('tpl_paylink').value;t.payRefPfx=document.getElementById('tpl_payref_pfx').value;t.prepay=document.getElementById('tpl_prepay').value;t.quote=document.getElementById('tpl_quote')?.value||t.quote;t.final=document.getElementById('tpl_final').value;
   localStorage.setItem('tcl_tpls',JSON.stringify(t));
   try{await appendRow(TABS.TPLS,['prepay-quote','Quote Templates',JSON.stringify({prepay:t.prepay,final:t.final,payLink:t.payLink,payRefPfx:t.payRefPfx}),new Date().toISOString()]);alert('Saved and synced!');}catch(e){alert('Saved locally. Sheet sync failed: '+e.message);}
 }
@@ -651,6 +662,19 @@ function calcQ(){
   document.getElementById('q_prepay_show').textContent=fmtGBP(prepayAmt);document.getElementById('q_final_show').textContent=fmtGBP(finalAmt);
 }
 function updateFinalShow(){const ap=parseFloat(document.getElementById('q_actual_prepay')?.value);if(!isNaN(ap)&&ap>0){document.getElementById('q_final_show').textContent=fmtGBP(Math.max(0,_cr.total-ap));}}
+function genRateBlock(){
+  const r=getRates();const svcs=[...new Set(_svcLines.filter(l=>l.svc!=='extra').map(l=>l.svc))];
+  return svcs.map(svc=>{
+    if(svc==='boarding')return '\ud83d\udca4 Boarding\nPer night (max. 24 hours): '+fmtGBP(r.board_std)+'\nHoliday rate: '+fmtGBP(r.board_hol)+'/night\nAdditional dog: '+fmtGBP(r.board_add)+'/night (holiday: '+fmtGBP(r.board_addh)+')';
+    if(svc==='daycare')return '\u2600\ufe0f Day Care\nPer session: '+fmtGBP(r.day_std)+'\nHoliday rate: '+fmtGBP(r.day_hol)+'/day\nAdditional dog: '+fmtGBP(r.day_add)+'/day (holiday: '+fmtGBP(r.day_addh)+')';
+    if(svc==='walk')return '\ud83d\udc15 Dog Walking\n30 min (single): '+fmtGBP(r.t30s)+' / (return): '+fmtGBP(r.t30r)+'\n60 min (single): '+fmtGBP(r.t60s)+' / (return): '+fmtGBP(r.t60r);
+    if(svc==='dropin')return '\ud83d\udd11 Drop-in Visit\n30 min: '+fmtGBP(r.t30s);
+    if(svc==='dogsit')return '\ud83d\udecb\ufe0f Dog Sit\nPer night: '+fmtGBP(r.board_std);
+    if(svc==='taxi')return '\ud83d\ude95 Pet Taxi\n15 min \u2014 single: '+fmtGBP(r.t15s)+' / return: '+fmtGBP(r.t15r)+'\n30 min \u2014 single: '+fmtGBP(r.t30s)+' / return: '+fmtGBP(r.t30r);
+    if(svc==='training')return '\ud83c\udfc5 Training\n60 min: '+fmtGBP(r.t60s);
+    return '';
+  }).filter(Boolean).join('\n\n');
+}
 function genQuote(type){
   calcMultiQ();// always recalculate to pick up latest discount/prepay changes
   const t=getTpls();const ownerName=document.getElementById('q_owner').value||'there';
@@ -660,10 +684,19 @@ function genQuote(type){
   const actualPrepay=parseFloat(document.getElementById('q_actual_prepay')?.value)||_cr.prepayAmt;
   const balanceDue=Math.max(0,_cr.total-actualPrepay);
   let msg='Hi '+ownerName+',\n\n';
-  // clear the other output box
-  const otherId=type==='prepay'?'q_out_final':'q_out_prepay';
-  document.getElementById(otherId).style.display='none';document.getElementById(otherId).textContent='';
-  if(type==='prepay'){
+  // clear other output boxes
+  ['q_out_prepay','q_out_quote','q_out_final'].forEach(id=>{if('q_out_'+type!==id){const el=document.getElementById(id);if(el){el.style.display='none';el.textContent='';}}});
+  if(type==='quote'){
+    const rateBlock=genRateBlock();
+    msg+='Here is the rate for our service with THE CUDDLY LANE \u2601\ufe0f\u2728\n\n';
+    msg+=rateBlock;
+    msg+='\n\nHere is your quotation:\n\n';
+    msg+=serviceBlock;
+    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
+    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
+    msg+='\n\nTo secure your booking, a 50% prepayment will be required (non-refundable, but transferable to other dates). Let us know if you\'d like to go ahead!';
+    msg+='\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
+  }else if(type==='prepay'){
     msg+='Here is your quote for *'+allDogNames+'* with THE CUDDLY LANE \ud83d\udc3e\n\n';
     msg+=serviceBlock;
     if(_cr.discLine)msg+='\n\n'+_cr.discLine;
@@ -682,10 +715,11 @@ function genQuote(type){
     msg+='\n\nLooking forward to seeing *'+allDogNames+'*!\nKatie & Osbert \ud83d\udc36';
   }
   msg=msg.replace(/\n{3,}/g,'\n\n').trim();
-  const outId=type==='prepay'?'q_out_prepay':'q_out_final';
+  const outId='q_out_'+type;
   document.getElementById(outId).style.display='block';document.getElementById(outId).textContent=msg;copyText(msg);
-  const allBtns=document.querySelectorAll('.cpbtn');
-  allBtns.forEach(b=>{if((type==='prepay'&&!b.classList.contains('bl')&&!b.classList.contains('gn'))||(type==='final'&&b.classList.contains('bl'))){b.textContent='Copied!';setTimeout(()=>b.textContent=type==='prepay'?'Copy Prepayment Quote':'Copy Final Payment Quote',2000);}});
+  const btnLabels={prepay:'Copy Prepayment Quote',quote:'Copy Quote',final:'Copy Final Payment Quote'};
+  const allBtns=document.querySelectorAll('.cpbtn[data-qtype]');
+  allBtns.forEach(b=>{if(b.dataset.qtype===type){b.textContent='Copied!';setTimeout(()=>b.textContent=btnLabels[type]||'Copy',2000);}});
 }
 
 async function createBookingsFromQuote(){
@@ -968,7 +1002,7 @@ function renderActs(){
       '<div class="act-meta">'+
       (a.location?'<span class="act-m">'+a.location+'</span>':'')+
       (a.dur?'<span class="act-m">'+a.dur+' mins</span>':'')+
-      (a.dist?'<span class="act-m">'+a.dist+' mins drive</span>':'')+
+      (a.dist!==undefined&&a.dist!==null&&a.dist!==''?'<span class="act-m">'+(parseInt(a.dist)>0?'🚗 '+a.dist+' mins drive':'🏠 At home')+'</span>':'')+
       (a.cost?'<span class="act-m">'+fmtGBP(a.cost)+'</span>':'')+
       (a.mapsUrl?'<a class="maps-btn" href="'+a.mapsUrl+'" target="_blank" onclick="event.stopPropagation()">Map</a>':'')+
       '<span class="act-last">'+lastStr+'</span>'+
@@ -994,7 +1028,8 @@ function selectLogAct(title){
 function surpriseAct(){
   const pool=getFilteredActs();if(!pool.length){alert('No activities match these filters');return;}
   const a=pool[Math.floor(Math.random()*pool.length)];const w=document.getElementById('surpriseWrap');w.style.display='block';
-  const meta=[a.cat,a.io,a.energy?a.energy+' energy':'',a.weather,a.dur?a.dur+' mins':'',a.dist?a.dist+' mins drive':'',a.cost?fmtGBP(a.cost):'',a.location].filter(Boolean).join(' - ');
+  const distStr=a.dist!==undefined&&a.dist!==null&&a.dist!==''?(parseInt(a.dist)>0?'🚗 '+a.dist+' mins drive':'🏠 At home'):'';
+  const meta=[a.cat,a.io,a.energy?a.energy+' energy':'',a.weather,a.dur?a.dur+' mins':'',distStr,a.cost?fmtGBP(a.cost):'',a.location].filter(Boolean).join(' - ');
   w.innerHTML='<div class="surprise-card"><div style="font-size:8px;color:var(--hnl);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Today&#39;s Activity Pick</div><div class="surprise-title">'+a.title+'</div><div class="surprise-meta">'+meta+'</div>'+(a.notes?'<div style="font-size:10px;color:rgba(255,255,255,.6);margin-bottom:13px;">'+a.notes+'</div>':'')+(a.mapsUrl?'<a class="maps-btn" href="'+a.mapsUrl+'" target="_blank" style="margin-bottom:12px;display:inline-flex;">Map</a><br>':'')+'<button class="surprise-btn" onclick="surpriseAct()">Try another</button></div>';
   document.getElementById('actList').innerHTML='';
 }
