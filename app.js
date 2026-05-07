@@ -15,7 +15,7 @@ function maskKey(k){if(!k||k.length<12)return k?'****':'';return k.slice(0,6)+'.
 
 // ==================== CONSTANTS ====================
 const TABS={DOGS:'Dogs',BK:'Bookings',DAILY:'Daily-Log',HEALTH:'Health-Log',FIGHT:'Fight-Log',TRANSPORT:'Transport-Log',TRIAL:'Trial-Log',COSTS:'Costs',TARGETS:'Targets',TRAIN:'Staff-Training',CONSENT:'Consent',TPLS:'Templates',ACTS:'Activities',ACTLOG:'Activity-Log',RATES:'Rates'};
-const DR={board_std:38,board_hol:44,board_add:31,board_addh:35.65,day_std:28,day_hol:33,day_add:23,day_addh:26.45,evening_pct:25,t15s:12,t15r:20,t30s:17,t30r:30,t60s:45,t60r:80};
+const DR={board_std:38,board_hol:44,board_add:31,board_addh:35.65,day_std:28,day_hol:33,day_add:23,day_addh:26.45,evening_pct:25,t15s:12,t15r:20,t30s:17,t30r:30,t60s:45,t60r:80,walk30:15,walk60:24,walk30a:12,walk60a:19,walk30_11:20,walk60_11:29,dropin30:15,dropin60:24,dropin30a:12,dropin60a:19};
 const DEFAULT_RANGES=[{start:'2026-04-03',end:'2026-04-06',label:'Easter 2026'},{start:'2026-05-01',end:'2026-05-04',label:'May Bank Hol'},{start:'2026-05-22',end:'2026-05-25',label:'Late May BH'},{start:'2026-07-24',end:'2026-08-30',label:'Summer 2026'},{start:'2026-12-24',end:'2027-01-03',label:'Christmas 2026'}];
 const TP_PREPAY='Hi {{ownerName}},\n\nHere is your quote for *{{dogs}}* with THE CUDDLY LANE \ud83d\udc3e\n\n{{service}}\n{{discount}}\n*Total: {{total}}*\n\nPrepayment required (non-refundable, transferable to other dates):\n*{{prepayAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nThank you!\nKatie & Osbert \ud83d\udc36';
 const TP_FINAL='Hi {{ownerName}},\n\nYour booking is confirmed \u2014 please settle the balance before drop-off \ud83d\udc3e\n\n{{service}}\n{{discount}}\n*Total: {{total}}*\nPrepayment received: {{prepayAmt}}\n*Balance due: {{finalAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nLooking forward to seeing *{{dogs}}*!\nKatie & Osbert \ud83d\udc36';
@@ -454,24 +454,56 @@ function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,d
 // ==================== MULTI-SERVICE QUOTE ====================
 const SVC_EMOJIS={boarding:'\u{1F4A4}',daycare:'\u2600\uFE0F',walk:'\u{1F415}',dropin:'\u{1F511}',dogsit:'\u{1FA91}',taxi:'\u{1F695}',training:'\u{1F3C5}'};
 const SVC_NAMES={boarding:'Boarding',daycare:'Daycare',walk:'Dog Walk',dropin:'Drop-in Visit',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
+const SVC_SUBTYPES={
+  walk:[{key:'w30g',label:'Group 30 min',rk:'walk30',rka:'walk30a'},{key:'w60g',label:'Group 60 min',rk:'walk60',rka:'walk60a'},{key:'w30_11',label:'1:1 30 min',rk:'walk30_11',rka:null},{key:'w60_11',label:'1:1 60 min',rk:'walk60_11',rka:null}],
+  dropin:[{key:'di30',label:'30 min',rk:'dropin30',rka:'dropin30a'},{key:'di60',label:'60 min',rk:'dropin60',rka:'dropin60a'}],
+  taxi:[{key:'t15s',label:'15 min — Single',rk:'t15s',rka:null},{key:'t15r',label:'15 min — Return',rk:'t15r',rka:null},{key:'t30s',label:'30 min — Single',rk:'t30s',rka:null},{key:'t30r',label:'30 min — Return',rk:'t30r',rka:null},{key:'t60s',label:'60 min — Single',rk:'t60s',rka:null},{key:'t60r',label:'60 min — Return',rk:'t60r',rka:null}],
+};
 
-const DATE_SVCS=['boarding','daycare'];
+const DATE_SVCS=['boarding','daycare','dogsit'];
 function onMLSvc(){
   const svc=document.getElementById('ml_svc')?.value;
   const isDate=DATE_SVCS.includes(svc);
-  const dw=document.getElementById('ml_date_wrap');const qw=document.getElementById('ml_qty_wrap');
-  if(dw)dw.style.display=isDate?'block':'none';
-  if(qw)qw.style.display=(!isDate&&svc&&svc!=='taxi')?'block':'none';
+  const hasSub=!!SVC_SUBTYPES[svc];
+  const dw=document.getElementById('ml_date_wrap');const qw=document.getElementById('ml_qty_wrap');const sw=document.getElementById('ml_sub_wrap');
+  // Date wrap: boarding/daycare/dogsit for full date range; taxi for service date (holiday detection)
+  if(dw)dw.style.display=(isDate||svc==='taxi')?'block':'none';
+  // Qty wrap: walk, dropin, training (session-based)
+  if(qw)qw.style.display=(!isDate&&svc&&svc!=='taxi'&&svc!=='training')?'block':'none';
+  // Training: show qty too
+  if(qw&&svc==='training')qw.style.display='block';
+  // Sub-type selector: walk, dropin, taxi
+  if(sw){
+    if(hasSub){
+      sw.style.display='block';
+      const sel=document.getElementById('ml_sub');
+      if(sel){sel.innerHTML=SVC_SUBTYPES[svc].map(s=>'<option value="'+s.key+'">'+s.label+'</option>').join('');onMLSub();}
+    }else{sw.style.display='none';}
+  }
+  // Auto-placeholder for dogsit
+  const rateEl=document.getElementById('ml_rate');
+  if(rateEl){if(svc==='dogsit'){const r=getRates();rateEl.placeholder='Auto ('+fmtGBP(r.board_std)+'/night)';}else if(!hasSub)rateEl.placeholder='Auto or override';}
+}
+function onMLSub(){
+  const svc=document.getElementById('ml_svc')?.value;const sub=document.getElementById('ml_sub')?.value;if(!svc||!sub)return;
+  const subDef=SVC_SUBTYPES[svc]?.find(s=>s.key===sub);if(!subDef)return;
+  const r=getRates();const rate=r[subDef.rk]||0;
+  const rateEl=document.getElementById('ml_rate');
+  if(rateEl){rateEl.value=rate||'';rateEl.placeholder='Auto or override';}
 }
 function addSvcLine(){
   const svc=document.getElementById('ml_svc')?.value;if(!svc)return;
   const isTaxi=svc==='taxi';const isDate=DATE_SVCS.includes(svc);
+  const sub=document.getElementById('ml_sub')?.value||'';
+  const subDef=SVC_SUBTYPES[svc]?.find(s=>s.key===sub);
   const dogs=isTaxi?[]:([..._selDogs].length?[..._selDogs]:[]);
   const qty=!isDate&&!isTaxi?parseInt(document.getElementById('ml_qty')?.value)||1:1;
-  const sd=isDate||isTaxi?document.getElementById('ml_sd')?.value||'':document.getElementById('ml_qty_date')?.value||'';
-  const line={svc,dogs,sd,ed:isDate?document.getElementById('ml_ed')?.value||'':sd,st2:document.getElementById('ml_st')?.value||'09:00',et:document.getElementById('ml_et')?.value||'18:00',rate:parseFloat(document.getElementById('ml_rate')?.value)||0,qty};
+  const sd=(isDate||isTaxi)?document.getElementById('ml_sd')?.value||'':document.getElementById('ml_qty_date')?.value||'';
+  const rateEl=document.getElementById('ml_rate');const manualRate=parseFloat(rateEl?.value)||0;
+  const r=getRates();const autoRate=subDef?r[subDef.rk]||0:0;
+  const line={svc,sub,rka:subDef?.rka||null,dogs,sd,ed:isDate?document.getElementById('ml_ed')?.value||'':sd,st2:document.getElementById('ml_st')?.value||'09:00',et:document.getElementById('ml_et')?.value||'18:00',rate:manualRate||autoRate,qty};
   _svcLines.push(line);renderSvcLines();calcMultiQ();
-  document.getElementById('ml_qty').value='1';
+  if(rateEl)rateEl.value='';const qtyEl=document.getElementById('ml_qty');if(qtyEl)qtyEl.value='1';
 }
 function addExtraCost(){document.getElementById('ml_extra_wrap').style.display=document.getElementById('ml_extra_wrap').style.display==='none'?'block':'none';}
 function confirmExtraCost(){
@@ -490,7 +522,8 @@ function renderSvcLines(){
   c.innerHTML=_svcLines.map((l,i)=>{
     const em=l.svc==='extra'?'\u2795':SVC_EMOJIS[l.svc]||'';
     const name=l.svc==='extra'?(l.label||'Extra cost'):(SVC_NAMES[l.svc]||l.svc);
-    const detail=[l.dogs&&l.dogs.length?l.dogs.join(' & '):'',l.sd?fmtDate(l.sd)+(l.ed&&l.ed!==l.sd?' \u2192 '+fmtDate(l.ed):''):'',l.qty&&l.qty>1?'\u00d7'+l.qty:'',l.rate?fmtGBP(l.rate*(l.qty||1)):''].filter(Boolean).join(' \u00b7 ');
+    const subLabel=l.sub&&SVC_SUBTYPES[l.svc]?SVC_SUBTYPES[l.svc].find(s=>s.key===l.sub)?.label||'':'';
+    const detail=[subLabel,l.dogs&&l.dogs.length?l.dogs.join(' & '):'',l.sd?fmtDate(l.sd)+(l.ed&&l.ed!==l.sd?' \u2192 '+fmtDate(l.ed):''):'',l.qty&&l.qty>1?'\u00d7'+l.qty:'',l.rate?fmtGBP(l.rate*(l.qty||1)):''].filter(Boolean).join(' \u00b7 ');
     return'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--gr4);">'+
       '<span style="font-size:14px;">'+em+'</span>'+
       '<div style="flex:1;font-size:10px;line-height:1.5;"><strong>'+name+'</strong>'+(detail?' <span style="color:var(--gr3);">'+detail+'</span>':'')+'</div>'+
@@ -543,9 +576,48 @@ function calcMultiQ(){
       if(hol)dp+='\n\u26A0\uFE0F Holiday rate applies on this day';
       descParts.push(dp);
     }else if(isTaxi){
-      amt=l.rate||r.t30r;
-      lines.push(['\u{1F695} Pet Taxi',amt]);
-      descParts.push('\u{1F695} Pet Taxi'+(l.sd?' \u2014 '+fmtDate(l.sd):'')+': '+fmtGBP(amt));
+      const subDef=SVC_SUBTYPES.taxi?.find(s=>s.key===l.sub);
+      const baseRate=l.rate||(subDef?r[subDef.rk]||0:r.t30r);
+      const holMult=l.sd&&isHol(l.sd)?1.15:1;
+      amt=Math.round(baseRate*holMult*100)/100;
+      const isHolDay=holMult>1;const subLabel=subDef?.label||'';
+      lines.push(['\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(isHolDay?' holiday +15%':''),amt]);
+      descParts.push('\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(l.sd?' \u2014 '+fmtDate(l.sd):'')+(isHolDay?' \uD83C\uDFDD\uFE0F Holiday rate (+15%)':'')+': '+fmtGBP(amt));
+    }else if(l.svc==='walk'||l.svc==='dropin'){
+      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
+      const mainDog=dogs[0];const addDogs=dogs.slice(1);
+      const holMult=l.sd&&isHol(l.sd)?1.15:1;const isHolDay=holMult>1;
+      const baseRate=l.rate||0;const mainRate=Math.round(baseRate*holMult*100)/100;
+      const addRateBase=l.rka?r[l.rka]||0:0;const addRate=Math.round(addRateBase*holMult*100)/100;
+      amt=mainRate;const em=SVC_EMOJIS[l.svc]||'';const svcName=SVC_NAMES[l.svc]||l.svc;
+      const subLabel=l.sub&&SVC_SUBTYPES[l.svc]?SVC_SUBTYPES[l.svc].find(s=>s.key===l.sub)?.label||'':'';
+      const allDogStr=dogs.join(' & ');
+      let dp=em+' '+svcName+(subLabel?' ('+subLabel+')':'')+(l.sd?' \u2014 '+fmtDate(l.sd):'');
+      if(isHolDay)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate (+15%)';
+      dp+='\n'+mainDog+': '+fmtGBP(mainRate);
+      lines.push([em+' '+svcName+' \u2014 '+mainDog+(isHolDay?' (holiday)':'')+(subLabel?' ('+subLabel+')':''),mainRate]);
+      addDogs.forEach(dog=>{amt+=addRate;lines.push([em+' '+svcName+' \u2014 '+dog+' (add-on'+(isHolDay?', holiday':'')+') ',addRate]);dp+='\n'+dog+' (additional): '+fmtGBP(addRate);});
+      if(addRate===0&&addDogs.length>0)dp+=' (no add-on rate for this type)';
+      descParts.push(dp);
+    }else if(l.svc==='dogsit'){
+      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
+      const em='\uD83E\uDEB1';const allDogStr=dogs.join(' & ');
+      if(l.sd&&l.ed){
+        const holDates2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
+        let d2=new Date(l.sd+'T12:00:00');const endD2=new Date(l.ed+'T12:00:00');
+        while(d2<endD2){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
+        const nights2=sN2+hN2;const mainAmt2=(sN2*r.board_std)+(hN2*r.board_hol);amt=mainAmt2;
+        let dp2=em+' Dog Sit ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
+        if(hN2>0)dp2+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN2+' night'+(hN2!==1?'s':'');
+        dp2+='\n\n'+dogs[0]+':\n';
+        if(sN2>0&&hN2>0){dp2+=fmtGBP(r.board_std)+'/night \u00D7 '+sN2+' night'+(sN2!==1?'s':'')+' = '+fmtGBP(sN2*r.board_std)+'\n'+fmtGBP(r.board_hol)+'/night \u00D7 '+hN2+' night'+(hN2!==1?'s':'')+' = '+fmtGBP(hN2*r.board_hol)+'\nTotal: '+fmtGBP(mainAmt2);}
+        else{dp2+=fmtGBP(sN2>0?r.board_std:r.board_hol)+'/night \u00D7 '+nights2+' night'+(nights2!==1?'s':'')+' = '+fmtGBP(mainAmt2);}
+        lines.push([em+' Dog Sit \u2014 '+dogs[0],mainAmt2]);descParts.push(dp2);
+      }else{
+        const qty2=l.qty||1;const nRate=l.rate||r.board_std;amt=nRate*qty2;
+        lines.push([em+' Dog Sit \u00D7'+qty2,amt]);
+        descParts.push(em+' Dog Sit ('+allDogStr+'): '+fmtGBP(nRate)+'/night \u00D7 '+qty2+' = '+fmtGBP(amt));
+      }
     }else{
       const qty=l.qty||1;amt=(l.rate||0)*qty;
       const em=SVC_EMOJIS[l.svc]||'';const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
@@ -577,12 +649,12 @@ function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');re
 function isHol(d){return getHolRanges().some(r=>d>=r.start&&d<=r.end);}
 function getHolDates(sd,ed){const ranges=getHolRanges();const dates=[];let d=new Date(sd+'T12:00:00');const e=new Date(ed+'T12:00:00');while(d<e){const ds=d.toISOString().split('T')[0];if(ranges.some(r=>ds>=r.start&&ds<=r.end))dates.push(ds);d.setDate(d.getDate()+1);}return dates;}
 function loadQSettings(){
-  const r=getRates();['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r'].forEach(k=>{const el=document.getElementById('r_'+k);if(el)el.value=r[k]||DR[k];});
+  const r=getRates();['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r','walk30','walk60','walk30a','walk60a','walk30_11','walk60_11','dropin30','dropin60','dropin30a','dropin60a'].forEach(k=>{const el=document.getElementById('r_'+k);if(el)el.value=r[k]!=null?r[k]:DR[k];});
   renderHolList();renderHolYrBtns();const t=getTpls();const pe=document.getElementById('tpl_prepay');const qe=document.getElementById('tpl_quote');const fe=document.getElementById('tpl_final');if(pe)pe.value=t.prepay;if(qe)qe.value=t.quote;if(fe)fe.value=t.final;
   const pl=document.getElementById('tpl_paylink');const pp=document.getElementById('tpl_payref_pfx');if(pl)pl.value=t.payLink||'';if(pp)pp.value=t.payRefPfx||'';
 }
 function toggleSP(id){document.getElementById('sp-'+id).classList.toggle('open');}
-async function saveRates(){const r={};['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r'].forEach(k=>r[k]=parseFloat(document.getElementById('r_'+k)?.value)||DR[k]);localStorage.setItem('tcl_rates',JSON.stringify(r));const s=document.getElementById('rateStatus');s.textContent='Saving...';s.className='smsg';
+async function saveRates(){const r={};['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r','walk30','walk60','walk30a','walk60a','walk30_11','walk60_11','dropin30','dropin60','dropin30a','dropin60a'].forEach(k=>r[k]=parseFloat(document.getElementById('r_'+k)?.value)||DR[k]);localStorage.setItem('tcl_rates',JSON.stringify(r));const s=document.getElementById('rateStatus');s.textContent='Saving...';s.className='smsg';
   try{
     const rows=await readSheet(TABS.RATES,'A2:C').catch(()=>[]);const existIdx=rows.findIndex(r=>r[0]==='tcl_rates');
     if(existIdx>=0){await updateRow(TABS.RATES,existIdx+2,['tcl_rates',JSON.stringify(r),new Date().toISOString()]);}
@@ -597,8 +669,8 @@ let _holYrFilter=null;
 function renderHolYrBtns(){const yrs=[...new Set(getHolRanges().map(r=>r.start.slice(0,4)))].sort();const el=document.getElementById('holYrBtns');if(!el)return;el.innerHTML=yrs.map(y=>{const oc="setHolYr('"+y+"')";return'<button class="hyrb'+(_holYrFilter===y?' active':'')+'" onclick="'+oc+'">'+y+'</button>';}).join('');renderHolList();}
 function setHolYr(y){_holYrFilter=_holYrFilter===y?null:y;renderHolYrBtns();}
 function renderHolList(){const ranges=getHolRanges();const f=_holYrFilter?ranges.filter(r=>r.start.startsWith(_holYrFilter)):ranges;const el=document.getElementById('holList');if(!el)return;el.innerHTML=f.map(r=>{const oc="removeHolRange('"+r.start+"','"+r.end+"')";return'<div class="hol-rng">'+r.label+' ('+r.start+' to '+r.end+')<button onclick="'+oc+'">x</button></div>';}).join('')||'<span style="font-size:9px;color:var(--gr3);">No holiday ranges</span>';}
-function addHolRange(){const s=document.getElementById('holStart').value,e=document.getElementById('holEnd').value;if(!s||!e||e<s){alert('Select valid start and end dates');return;}const ranges=getHolRanges();ranges.push({start:s,end:e,label:'Holiday '+new Date(s+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'})});localStorage.setItem('tcl_hol_ranges',JSON.stringify(ranges));renderHolList();renderHolYrBtns();document.getElementById('holStart').value='';document.getElementById('holEnd').value='';calcQ();}
-function removeHolRange(start,end){localStorage.setItem('tcl_hol_ranges',JSON.stringify(getHolRanges().filter(r=>!(r.start===start&&r.end===end))));renderHolList();renderHolYrBtns();calcQ();}
+function addHolRange(){const s=document.getElementById('holStart').value,e=document.getElementById('holEnd').value;if(!s||!e||e<s){alert('Select valid start and end dates');return;}const ranges=getHolRanges();ranges.push({start:s,end:e,label:'Holiday '+new Date(s+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'})});localStorage.setItem('tcl_hol_ranges',JSON.stringify(ranges));renderHolList();renderHolYrBtns();document.getElementById('holStart').value='';document.getElementById('holEnd').value='';calcMultiQ();}
+function removeHolRange(start,end){localStorage.setItem('tcl_hol_ranges',JSON.stringify(getHolRanges().filter(r=>!(r.start===start&&r.end===end))));renderHolList();renderHolYrBtns();calcMultiQ();}
 function saveTpl(k){const c=document.getElementById('tpl_'+k)?.value;const t=getTpls();t['_prev_'+k]=t[k];t[k]=c;localStorage.setItem('tcl_tpls',JSON.stringify(t));alert('Saved locally. Use Save & Sync to push to Google Sheet.');}
 function redoTpl(k){const t=getTpls();if(t['_prev_'+k]){const tmp=t[k];t[k]=t['_prev_'+k];t['_prev_'+k]=tmp;localStorage.setItem('tcl_tpls',JSON.stringify(t));document.getElementById('tpl_'+k).value=t[k];alert('Reverted.');}else alert('No previous version.');}
 function confirmRestoreTpl(k){_restoreTplKey=k;document.getElementById('restoreInput').value='';document.getElementById('restoreConfirm').classList.add('open');}
@@ -667,11 +739,11 @@ function genRateBlock(){
   return svcs.map(svc=>{
     if(svc==='boarding')return '\ud83d\udca4 Boarding\nPer night (max. 24 hours): '+fmtGBP(r.board_std)+'\nHoliday rate: '+fmtGBP(r.board_hol)+'/night\nAdditional dog: '+fmtGBP(r.board_add)+'/night (holiday: '+fmtGBP(r.board_addh)+')';
     if(svc==='daycare')return '\u2600\ufe0f Day Care\nPer session: '+fmtGBP(r.day_std)+'\nHoliday rate: '+fmtGBP(r.day_hol)+'/day\nAdditional dog: '+fmtGBP(r.day_add)+'/day (holiday: '+fmtGBP(r.day_addh)+')';
-    if(svc==='walk')return '\ud83d\udc15 Dog Walking\n30 min (single): '+fmtGBP(r.t30s)+' / (return): '+fmtGBP(r.t30r)+'\n60 min (single): '+fmtGBP(r.t60s)+' / (return): '+fmtGBP(r.t60r);
-    if(svc==='dropin')return '\ud83d\udd11 Drop-in Visit\n30 min: '+fmtGBP(r.t30s);
-    if(svc==='dogsit')return '\ud83d\udecb\ufe0f Dog Sit\nPer night: '+fmtGBP(r.board_std);
-    if(svc==='taxi')return '\ud83d\ude95 Pet Taxi\n15 min \u2014 single: '+fmtGBP(r.t15s)+' / return: '+fmtGBP(r.t15r)+'\n30 min \u2014 single: '+fmtGBP(r.t30s)+' / return: '+fmtGBP(r.t30r);
-    if(svc==='training')return '\ud83c\udfc5 Training\n60 min: '+fmtGBP(r.t60s);
+    if(svc==='walk')return '\ud83d\udc15 Dog Walking\nGroup 30 min: '+fmtGBP(r.walk30)+' / 60 min: '+fmtGBP(r.walk60)+'\nAdditional pet \u2014 30 min: '+fmtGBP(r.walk30a)+' / 60 min: '+fmtGBP(r.walk60a)+'\n1:1 \u2014 30 min: '+fmtGBP(r.walk30_11)+' / 60 min: '+fmtGBP(r.walk60_11)+'\nHoliday rate: +15%';
+    if(svc==='dropin')return '\ud83d\udd11 Drop-in Visit\n30 min: '+fmtGBP(r.dropin30)+' / 60 min: '+fmtGBP(r.dropin60)+'\nAdditional pet \u2014 30 min: '+fmtGBP(r.dropin30a)+' / 60 min: '+fmtGBP(r.dropin60a)+'\nHoliday rate: +15%';
+    if(svc==='dogsit')return '\ud83d\udecb\ufe0f Dog Sit\nPer night: '+fmtGBP(r.board_std)+'\nHoliday rate: '+fmtGBP(r.board_hol)+'/night';
+    if(svc==='taxi')return '\ud83d\ude95 Pet Taxi\n15 min \u2014 single: '+fmtGBP(r.t15s)+' / return: '+fmtGBP(r.t15r)+'\n30 min \u2014 single: '+fmtGBP(r.t30s)+' / return: '+fmtGBP(r.t30r)+'\n60 min \u2014 single: '+fmtGBP(r.t60s)+' / return: '+fmtGBP(r.t60r)+'\nHoliday rate: +15%';
+    if(svc==='training')return '\ud83c\udfc5 Training\nPricing not available yet \u2014 please contact us for details';
     return '';
   }).filter(Boolean).join('\n\n');
 }
