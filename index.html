@@ -171,7 +171,7 @@ body{
 .htd{background:var(--gnl);color:var(--gn);}
 .hth{background:var(--rdl);color:var(--rd);}
 .hti{background:var(--orl);color:var(--cn);}
-.hta{background:var(--pul);color:var(--pu);}
+.hta{background:var(--pul);color:var(--pu);}.htmiss{background:var(--orl);color:var(--or);}
 .hsum{font-size:9px;color:var(--gr2);line-height:1.5;}
 .hi-acts{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;}
 .ebtn{font-size:8px;padding:2px 7px;border-radius:99px;border:1px solid var(--gr4);background:none;cursor:pointer;font-family:var(--fb);color:var(--gr2);}
@@ -549,11 +549,13 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <label style="font-size:10px;color:var(--gr3);display:block;margin-bottom:4px;">For final payment quote — actual prepay already received (£):</label>
         <input class="fi" type="number" id="q_actual_prepay" placeholder="Defaults to prepayment above" step="0.01" oninput="updateFinalShow()">
       </div>
-      <button class="cpbtn pu" data-qtype="quote" onclick="genQuote('quote')">Copy Quote</button>
+      <button class="cpbtn pu" data-qtype="quote" onclick="genQuote('quote')">Copy Get Quote</button>
       <div class="q-out" id="q_out_quote"></div>
-      <button class="cpbtn" data-qtype="prepay" onclick="genQuote('prepay')">Copy Prepayment Quote</button>
+      <button class="cpbtn" data-qtype="book" onclick="genQuote('book')">Copy Book with Us</button>
+      <div class="q-out" id="q_out_book"></div>
+      <button class="cpbtn bl" data-qtype="prepay" onclick="genQuote('prepay')">Copy Prepayment Received</button>
       <div class="q-out" id="q_out_prepay"></div>
-      <button class="cpbtn bl" data-qtype="final" onclick="genQuote('final')">Copy Final Payment Quote</button>
+      <button class="cpbtn gn" data-qtype="final" onclick="genQuote('final')">Copy Final Payment</button>
       <div class="q-out" id="q_out_final"></div>
       <button class="cpbtn gn" onclick="createBookingsFromQuote()">+ Create Booking(s) from Quote</button>
     </div>
@@ -596,15 +598,19 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="sp-panel">
         <div class="sp-hd"><div class="sp-ht">Quote Templates</div><span class="sp-tog" onclick="toggleSP('templates')">Edit</span></div>
         <div class="sp-bd" id="sp-templates">
-          <div class="f"><label>Quote template (no payment details)</label>
+          <div class="f"><label>Get Quote template (no payment details)</label>
             <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('quote')">Save</button><button class="tplb" onclick="redoTpl('quote')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('quote')">Restore default</button></div>
             <textarea class="fta" id="tpl_quote" style="min-height:130px;font-size:10px;"></textarea>
           </div>
-          <div class="f"><label>Prepayment quote template</label>
+          <div class="f"><label>Book with Us template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('book')">Save</button><button class="tplb" onclick="redoTpl('book')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('book')">Restore default</button></div>
+            <textarea class="fta" id="tpl_book" style="min-height:150px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Prepayment Received template</label>
             <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('prepay')">Save</button><button class="tplb" onclick="redoTpl('prepay')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('prepay')">Restore default</button></div>
             <textarea class="fta" id="tpl_prepay" style="min-height:150px;font-size:10px;"></textarea>
           </div>
-          <div class="f"><label>Final payment template</label>
+          <div class="f"><label>Final Payment template</label>
             <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('final')">Save</button><button class="tplb" onclick="redoTpl('final')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('final')">Restore default</button></div>
             <textarea class="fta" id="tpl_final" style="min-height:130px;font-size:10px;"></textarea>
           </div>
@@ -795,7 +801,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <div class="phe">📷</div>
         <input type="file" id="profPhotoInput" accept="image/*" style="display:none;" onchange="handlePh(event)">
       </div>
-      <button onclick="showEmojiPicker()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">😀 Emoji</button>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <button onclick="showEmojiPicker()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">😀 Emoji</button>
+        <button onclick="promptGdriveUrl('profile')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">🔗 Drive URL</button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
       <div class="pnm" id="profName"></div>
@@ -857,6 +866,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
         <span style="font-size:9px;color:var(--gr3);">Tap circle to add photo</span>
         <button class="sbtn2" onclick="showEmojiPicker('register')" style="font-size:11px;padding:4px 10px;">😀 Emoji</button>
+        <button class="sbtn2" onclick="promptGdriveUrl('register')" style="font-size:11px;padding:4px 10px;">🔗 Drive URL</button>
       </div>
     </div>
     <input type="hidden" id="reg_eid"><input type="hidden" id="reg_ridx">
