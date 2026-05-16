@@ -26,7 +26,7 @@ const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
-let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[];
+let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[];
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
 let _regEmoji='',_emojiCtx='profile';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
@@ -137,6 +137,8 @@ async function refreshBoard(){
     const br=await readSheet(TABS.BK,'A2:AC').catch(()=>[]);bookings=br.map((r,i)=>mapBk(r,i));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:F').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
+    // Sync dog photo URLs from Rates sheet so photos work across devices
+    readSheet(TABS.RATES,'A2:C').then(rr=>{rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1]&&!localStorage.getItem('dog_photo_'+cid))localStorage.setItem('dog_photo_'+cid,r[1]);});}).catch(()=>{});
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
@@ -188,6 +190,7 @@ function hasActiveBookingToday(dog){
   return bookings.some(b=>b.dog.toLowerCase()===dog.name.toLowerCase()&&b.sd<=today&&b.ed>=today&&b.status!=='Canceled');
 }
 function buildTodayLog(){
+  _logSelectedActs=[];
   const today=todayStr();const sv=JSON.parse(localStorage.getItem('log_'+(curDog&&curDog.cid)+'_'+today)||'{}');
   document.getElementById('logDateDisplay').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   if(!hasActiveBookingToday(curDog)){
@@ -208,7 +211,7 @@ function buildTodayLog(){
   document.getElementById('logsBody').innerHTML=
     '<div class="cat-sec"><div class="cat-t">Food &amp; Medicine</div><div class="tile-row">'+tile('breakfast','&#9728;','Breakfast')+tile('medAm','&#128138;','AM Med')+tile('dinner','&#127769;','Dinner')+tile('medPm','&#128138;','PM Med')+tile('snack','&#127999;','Snack')+'</div></div>'+
     '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('walkPm','&#128062;','PM Walk')+tile('garden','&#127807;','Garden Break')+'</div>'+
-    '<div style="margin-top:5px;"><label style="font-size:9px;font-weight:600;color:var(--gr2);">Activity from library</label><div style="position:relative;margin-top:3px;"><input class="fi" id="log_act_search" placeholder="Search activities..." oninput="filterLogActs()" style="font-size:10px;"><div id="log_act_results" style="position:absolute;z-index:50;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);max-height:120px;overflow-y:auto;width:100%;display:none;"></div></div></div></div>'+
+    '<div style="margin-top:5px;"><label style="font-size:9px;font-weight:600;color:var(--gr2);">Activities from library</label><div id="log_act_pills" style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;min-height:0;"></div><div style="position:relative;margin-top:3px;"><input class="fi" id="log_act_search" placeholder="Search to add activities..." oninput="filterLogActs()" style="font-size:10px;"><div id="log_act_results" style="position:absolute;z-index:50;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);max-height:120px;overflow-y:auto;width:100%;display:none;"></div></div></div></div>'+
     '<div class="cat-sec"><div class="cat-t">Hygiene</div><div class="tile-row">'+tile('bowl','&#129379;','Bowl')+tile('room','&#129524;','Room')+tile('garment','&#129507;','Garment')+'</div></div>'+
     '<div class="cat-sec"><div class="cat-t">Incidents</div>'+
     inc('health','Health','<div class="fr"><div class="f"><label>Category</label><select class="fs" id="ih_cat"><option>Injury</option><option>Illness</option><option>Allergic reaction</option><option>Digestive</option><option>Behavioural</option><option>Medication</option><option>Other</option></select></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'health\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'health\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'health\',\'High\',event)">High</button></div><input type="hidden" id="ih_imp"></div></div><div class="f"><label>Issue</label><input class="fi" id="ih_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ih_desc" style="min-height:48px;"></textarea></div><div class="f"><label>Root cause</label><input class="fi" id="ih_cause"></div><div class="f"><label>Next steps</label><input class="fi" id="ih_next"></div>')+
@@ -226,13 +229,12 @@ async function saveLog(){
   const st=document.getElementById('logStatus');st.style.display='block';st.style.color='var(--gr2)';st.textContent='Saving...';
   const g=k=>sv[k]?'[Y]':'[ ]';const priv=sv.priv?'Private':'';
   const saves=[appendRow(TABS.DAILY,[today,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv])];
-  const actSel=document.getElementById('log_act_search')?.value?.trim();
-  if(actSel)saves.push(appendRow(TABS.ACTLOG,[today,actSel,curDog.name,'',sv.notes||'','']));
+  _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[today,act,curDog.name,'',sv.notes||'',''])));
   if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[today,curDog.name,curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv]));
   if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[today,gv('if_time'),curDog.name,curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv]));}
   if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,[today,curDog.name,gv('it_name'),gv('it_vehicle'),gv('it_plate'),gv('it_type'),gv('it_time'),gv('it_notes'),priv]));
   if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,[today,curDog.name,oth2,gv('itr_obs'),gv('itr_suit'),priv]));}
-  try{await Promise.all(saves);st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
+  try{await Promise.all(saves);_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
 }
 function buildSummary(dog){
   const alerts=[],notes=[];
@@ -255,7 +257,8 @@ function buildProfInfo(dog){
     '<div class="isec"><div class="isec-t">Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+ir('Last vaccination',dog.vacc?fmtDateFull(dog.vacc):'')+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="isec"><div class="isec-t">Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates+(dog.updatesCustom?' - '+dog.updatesCustom:''))+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="isec"><div class="isec-t">Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
-    '<div class="isec"><div class="isec-t">Owner</div>'+ir('Owner',dog.owner)+ir('Phone/WhatsApp',dog.phone)+ir('Address',dog.addr)+ir('Postcode',dog.postcode)+ir('Emergency',dog.emergency)+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
+    (dog.remarks?'<div class="isec" style="border-left:3px solid var(--or);"><div class="isec-t" style="color:var(--or);">Staff Remarks</div>'+ir('Remarks',dog.remarks)+'</div>':'')+
+    '<div class="isec"><div class="isec-t">Owner</div>'+ir('Owner',dog.owner)+ir('Phone/WhatsApp',dog.phone)+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency',dog.emergency)+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
     '<div class="isec"><div class="isec-t">Identifiers</div>'+ir('Customer ID',dog.cid)+ir('Microchip',dog.chip)+'</div>';
 }
 async function filtHist(type,btn){
@@ -275,10 +278,10 @@ async function filtHist(type,btn){
     // Insert missing-log placeholders for booking days with no recorded log
     if(type==='all'||type==='daily'){
       const loggedDates=new Set(flt.filter(({tab})=>tab===TABS.DAILY).map(({row})=>row[0]));
-      const today=todayStr();const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+      const today=todayStr();const yD=new Date(today+'T12:00:00Z');yD.setUTCDate(yD.getUTCDate()-1);const yesterday=yD.toISOString().slice(0,10);
       const bks=bookings.filter(b=>b.dog.toLowerCase()===curDog.name.toLowerCase()&&b.status!=='Canceled'&&b.sd<today);
       const missingSet=new Set();
-      bks.forEach(bk=>{const endD=bk.ed<today?bk.ed:yesterday;let d=new Date(bk.sd+'T12:00:00');const end=new Date(endD+'T12:00:00');while(d<=end){const ds=d.toISOString().slice(0,10);if(!loggedDates.has(ds))missingSet.add(ds);d.setDate(d.getDate()+1);}});
+      bks.forEach(bk=>{const endD=bk.ed<today?bk.ed:yesterday;let d=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(!loggedDates.has(ds))missingSet.add(ds);d.setUTCDate(d.getUTCDate()+1);}});
       missingSet.forEach(ds=>flt.push({tab:'MISSING',row:[ds],ri:null}));
       flt.sort((a,b)=>(b.row[0]||'').localeCompare(a.row[0]||''));
     }
@@ -481,8 +484,11 @@ function compressPhoto(file,cb){const r=new FileReader();r.onload=ev=>{const img
 function trigPh(){document.getElementById('profPhotoInput').click();}
 function handlePh(e){const f=e.target.files[0];if(!f||!curDog)return;compressPhoto(f,data=>{try{localStorage.setItem('dog_photo_'+curDog.cid,data);}catch(err){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=data;img.style.display='block';});}
 function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,data=>{document.getElementById('regPhotoImg').src=data;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=data;});}
-function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://drive.google.com/uc?export=view&id='+m[1];}catch(e){}return url;}
-function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=direct;img.style.display='block';}else{document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
+function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w800';}catch(e){}return url;}
+function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=direct;img.style.display='block';
+  // Sync URL to Rates sheet so other devices can pick it up automatically
+  if(!direct.startsWith('data:')){const key='photo_'+curDog.cid;const ts=new Date().toISOString();readSheet(TABS.RATES,'A2:C').then(rr=>{const idx=rr.findIndex(r=>r[0]===key);if(idx>=0)updateRow(TABS.RATES,idx+2,[key,direct,ts]).catch(()=>{});else appendRow(TABS.RATES,[key,direct,ts]).catch(()=>{});}).catch(()=>{});}
+}else{document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
 function promptGdriveUrl(context){const url=prompt('Paste your Google Drive photo link:\n(File > Share > Copy link)');if(url)setPhotoFromUrl(url,context);}
 
 // ==================== QUOTE ====================
@@ -1144,13 +1150,23 @@ function filterLogActs(){
   if(!q){res.style.display='none';return;}
   const matches=activities.filter(a=>a.title.toLowerCase().includes(q)).slice(0,8);
   if(!matches.length){res.style.display='none';return;}
-  res.innerHTML=matches.map(a=>'<div style="padding:6px 9px;font-size:10px;cursor:pointer;border-bottom:1px solid var(--gr4);" onclick="selectLogAct(\''+a.title+'\')" onmousedown="event.preventDefault()">'+a.title+'</div>').join('');
+  // Exclude already selected activities from results
+  const available=matches.filter(a=>!_logSelectedActs.includes(a.title));
+  if(!available.length){res.style.display='none';return;}
+  res.innerHTML=available.map(a=>'<div style="padding:6px 9px;font-size:10px;cursor:pointer;border-bottom:1px solid var(--gr4);" onclick="selectLogAct(\''+a.title+'\')" onmousedown="event.preventDefault()">'+a.title+'</div>').join('');
   res.style.display='block';
 }
 function selectLogAct(title){
-  const inp=document.getElementById('log_act_search');if(inp)inp.value=title;
+  if(!_logSelectedActs.includes(title))_logSelectedActs.push(title);
+  const inp=document.getElementById('log_act_search');if(inp)inp.value='';
   const res=document.getElementById('log_act_results');if(res)res.style.display='none';
+  renderLogActPills();
 }
+function renderLogActPills(){
+  const el=document.getElementById('log_act_pills');if(!el)return;
+  el.innerHTML=_logSelectedActs.map((a,i)=>'<span style="background:var(--pul);color:var(--pu);font-size:8px;padding:3px 7px;border-radius:99px;display:inline-flex;align-items:center;gap:4px;">'+a+'<button onclick="removeLogAct('+i+')" onmousedown="event.preventDefault()" style="background:none;border:none;cursor:pointer;color:var(--pu);font-size:10px;padding:0;line-height:1;">&times;</button></span>').join('');
+}
+function removeLogAct(i){_logSelectedActs.splice(i,1);renderLogActPills();}
 function surpriseAct(){
   const pool=getFilteredActs();if(!pool.length){alert('No activities match these filters');return;}
   const a=pool[Math.floor(Math.random()*pool.length)];const w=document.getElementById('surpriseWrap');w.style.display='block';
