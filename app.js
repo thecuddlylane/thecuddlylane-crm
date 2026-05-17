@@ -133,8 +133,8 @@ async function refreshBoard(){
   const btn=document.getElementById('refreshBtn');btn.style.opacity='.5';btn.style.pointerEvents='none';
   document.getElementById('todayCards').innerHTML='<div class="empty"><p>Loading...</p></div>';
   try{
-    const rows=await readSheet(TABS.DOGS,'A2:BC');allDogs=rows.map((r,i)=>mapDog(r,i)).filter(d=>d.name.trim());
-    const br=await readSheet(TABS.BK,'A2:AC').catch(()=>[]);bookings=br.map((r,i)=>mapBk(r,i));
+    const rows=await readSheet(TABS.DOGS,'A2:BD');allDogs=rows.map((r,i)=>mapDog(r,i)).filter(d=>d.name.trim());
+    const br=await readSheet(TABS.BK,'A2:AD').catch(()=>[]);bookings=br.map((r,i)=>mapBk(r,i));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:F').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
     // Sync dog photo URLs from Rates sheet so photos work across devices
@@ -143,23 +143,27 @@ async function refreshBoard(){
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
-function mapDog(r,i){return{cid:r[0]||genId(r[1]||'Dog'),name:r[1]||'',breed:r[2]||'',gender:r[3]||'',birthday:r[4]||'',bdayType:r[5]||'exact',weight:r[6]||'',neut:r[7]||'',chip:r[8]||'',rescue:r[9]||'',nervous:r[10]||'',anxiety:r[11]||'',dogfriends:r[12]||'',food:r[13]||'',foodMeasure:r[14]||'',dietNotes:r[15]||'',allerg:r[16]||'',med:r[17]||'',medSchedule:r[18]||'',fears:r[19]||'',notouch:r[20]||'',vacc:r[21]||'',flea:r[22]||'',behav:r[23]||'',walk:r[24]||'',car:r[25]||'',sleep:r[26]||'',escape:r[27]||'',toilet:r[28]||'',alone:r[29]||'',commands:r[30]||'',sitters:r[31]||'',updates:r[32]||'',updatesCustom:r[33]||'',rel:r[34]||'',notes:r[35]||'',owner:r[36]||'',phone:r[37]||'',owner2:r[38]||'',phone2:r[39]||'',owner3:r[40]||'',phone3:r[41]||'',addr:r[42]||'',postcode:r[43]||'',emergency:r[44]||'',vet:r[45]||'',ins:r[46]||'',meetgreet:r[47]||'',referral:r[48]||'',refNotes:r[49]||'',svc:r[50]||'',status:r[51]||'',remarks:r[52]||'',emoji:r[53]||'',jog:r[54]||'',rowIdx:i+2};}
-function mapBk(r,i){return{id:r[0]||'',dog:r[1]||'',svc:r[2]||'',sd:r[3]||'',st:r[4]||'',ed:r[5]||'',et:r[6]||'',dropLoc:r[7]||'',pickLoc:r[8]||'',rev:parseFloat(r[9])||0,tips:parseFloat(r[10])||0,prepay:parseFloat(r[11])||0,finalPay:parseFloat(r[12])||0,unit:parseFloat(r[13])||0,discNotes:r[14]||'',roverPct:parseFloat(r[15])||0,roverAmt:parseFloat(r[16])||0,ch:r[17]||'TCL',pay:r[18]||'',status:r[19]||'',priv:r[20]==='Private',month:r[21]||'',rating:r[22]||'',feedback:r[23]||'',rem:[r[24]||'',r[25]||'',r[26]||'',r[27]||'',r[28]||''],ri:i+2};}
+function mapDog(r,i){return{cid:r[0]||genId(r[1]||'Dog'),name:r[1]||'',breed:r[2]||'',gender:r[3]||'',birthday:r[4]||'',bdayType:r[5]||'exact',weight:r[6]||'',neut:r[7]||'',chip:r[8]||'',rescue:r[9]||'',nervous:r[10]||'',anxiety:r[11]||'',dogfriends:r[12]||'',food:r[13]||'',foodMeasure:r[14]||'',dietNotes:r[15]||'',allerg:r[16]||'',med:r[17]||'',medSchedule:r[18]||'',fears:r[19]||'',notouch:r[20]||'',vacc:r[21]||'',flea:r[22]||'',behav:r[23]||'',walk:r[24]||'',car:r[25]||'',sleep:r[26]||'',escape:r[27]||'',toilet:r[28]||'',alone:r[29]||'',commands:r[30]||'',sitters:r[31]||'',updates:r[32]||'',updatesCustom:r[33]||'',rel:r[34]||'',notes:r[35]||'',owner:r[36]||'',phone:r[37]||'',owner2:r[38]||'',phone2:r[39]||'',owner3:r[40]||'',phone3:r[41]||'',addr:r[42]||'',postcode:r[43]||'',emergency:r[44]||'',vet:r[45]||'',ins:r[46]||'',meetgreet:r[47]||'',referral:r[48]||'',refNotes:r[49]||'',svc:r[50]||'',status:r[51]||'',remarks:r[52]||'',emoji:r[53]||'',jog:r[54]||'',vaccUrl:r[55]||'',rowIdx:i+2};}
+function mapBk(r,i){return{id:r[0]||'',dog:r[1]||'',customerId:r[2]||'',svc:r[3]||'',sd:r[4]||'',st:r[5]||'',ed:r[6]||'',et:r[7]||'',dropLoc:r[8]||'',pickLoc:r[9]||'',rev:parseFloat(r[10])||0,tips:parseFloat(r[11])||0,prepay:parseFloat(r[12])||0,finalPay:parseFloat(r[13])||0,unit:parseFloat(r[14])||0,discNotes:r[15]||'',roverPct:parseFloat(r[16])||0,roverAmt:parseFloat(r[17])||0,ch:r[18]||'TCL',pay:r[19]||'',status:r[20]||'',priv:r[21]==='Private',month:r[22]||'',rating:r[23]||'',feedback:r[24]||'',rem:[r[25]||'',r[26]||'',r[27]||'',r[28]||'',r[29]||''],ri:i+2};}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
   const in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().split('T')[0];
   const bm={};bookings.filter(b=>b.status!=='Canceled').forEach(b=>{const n=b.dog.toLowerCase();if(!bm[n]||b.sd>bm[n].sd)bm[n]=b;});
+  // Also build customerId-keyed map for accurate matching
+  const bmById={};bookings.filter(b=>b.status!=='Canceled'&&b.customerId).forEach(b=>{if(!bmById[b.customerId]||b.sd>bmById[b.customerId].sd)bmById[b.customerId]=b;});
+
   let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)):allDogs;
   const active=[],week=[],upcoming=[],other=[];
-  dogs.forEach(d=>{const bk=bm[d.name.toLowerCase()];if(bk&&bk.sd<=today&&bk.ed>=today)active.push(d);else if(bk&&bk.sd>today&&bk.sd<=in7s)week.push(d);else if(bk&&bk.sd>in7s)upcoming.push(d);else other.push(d);});
+  dogs.forEach(d=>{const bk=bmById[d.cid]||bm[d.name.toLowerCase()];if(bk&&bk.sd<=today&&bk.ed>=today)active.push(d);else if(bk&&bk.sd>today&&bk.sd<=in7s)week.push(d);else if(bk&&bk.sd>in7s)upcoming.push(d);else other.push(d);});
   renderCards(active,document.getElementById('todayCards'),'on');renderCards(week,document.getElementById('weekCards'),'wk');renderCards(upcoming,document.getElementById('upcomingCards'),'up');renderCards(other,document.getElementById('otherCards'),'');
 }
 function renderCards(dogs,c,cls){
   if(!dogs.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
   dogs.forEach(dog=>{
     const photo=localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
+    const vaccExpired=dog.vacc?(()=>{try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);return vd<cutoff;}catch(e){return false;}})():false;
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div><div class="dcb-ch">'+(td.breakfast?'<span class="chip cg">Fed</span>':'')+(td.walkAm?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(cls==='wk'?'<span class="chip cb">This week</span>':'')+(cls==='up'?'<span class="chip cp">Upcoming</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div><div class="dcb-ch">'+(td.breakfast?'<span class="chip cg">Fed</span>':'')+(td.walkAm?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+(cls==='wk'?'<span class="chip cb">This week</span>':'')+(cls==='up'?'<span class="chip cp">Upcoming</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
@@ -188,7 +192,7 @@ function openProfile(dog){
 
 function hasActiveBookingToday(dog){
   const today=todayStr();
-  return bookings.some(b=>b.dog.toLowerCase()===dog.name.toLowerCase()&&b.sd<=today&&b.ed>=today&&b.status!=='Canceled');
+  return bookings.some(b=>(b.customerId&&b.customerId===dog.cid||b.dog.toLowerCase()===dog.name.toLowerCase())&&b.sd<=today&&b.ed>=today&&b.status!=='Canceled');
 }
 function buildTodayLog(){
   _logSelectedActs=[];
@@ -253,9 +257,14 @@ function buildSummary(dog){
 function buildProfInfo(dog){
   const nbar=(n,col)=>{const l=parseInt(n)||0;return'<div class="nb-bar" style="flex:1;">'+Array.from({length:5},(_,i)=>'<div class="nb-seg" style="background:'+(i<l?col:'var(--gr4)')+'"></div>').join('')+'</div><span style="font-size:9px;font-weight:700;color:var(--gr2);margin-left:3px;">'+l+'/5</span>';};
   const nc=v=>parseInt(v)>=4?'var(--rd)':parseInt(v)>=3?'var(--hn)':'var(--or)';
+  let vaccExpired=false;if(dog.vacc){try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);vaccExpired=vd<cutoff;}catch(e){}}
+  const vaccRow=dog.vacc?'<div class="irow"><span class="ikey">Last vaccination</span><span class="ival" style="'+(vaccExpired?'color:var(--rd);font-weight:700;':'')+'">'+fmtDateFull(dog.vacc)+(vaccExpired?' ⚠️ Expired':' ✅')+'</span></div>':'';
+  const vaccUrlRow=dog.vaccUrl?'<div class="irow"><span class="ikey">Vaccination record</span><span class="ival"><a href="'+gdriveDirect(dog.vaccUrl)+'" target="_blank" style="color:var(--bl);text-decoration:none;">View document 📄</a></span></div>':'';
+  const vaccBanner=vaccExpired?'<div style="background:var(--rdl,#fff0f0);border:1px solid var(--rd);border-radius:8px;padding:10px 14px;margin-bottom:10px;color:var(--rd);font-weight:600;font-size:13px;">⚠️ Vaccination expired — please ask owners to update records before the next visit.</div>':'';
   document.getElementById('profInfoBody').innerHTML=
+    vaccBanner+
     '<div class="isec"><div class="isec-t">Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender',dog.gender)+ir('Neutered',dog.neut)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival">'+dog.jog+'/5</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
-    '<div class="isec"><div class="isec-t">Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+ir('Last vaccination',dog.vacc?fmtDateFull(dog.vacc):'')+ir('Flea/tick',dog.flea)+'</div>'+
+    '<div class="isec"><div class="isec-t">Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="isec"><div class="isec-t">Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates+(dog.updatesCustom?' - '+dog.updatesCustom:''))+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="isec"><div class="isec-t">Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
     (dog.remarks?'<div class="isec" style="border-left:3px solid var(--or);"><div class="isec-t" style="color:var(--or);">Staff Remarks</div>'+ir('Remarks',dog.remarks)+'</div>':'')+
@@ -280,7 +289,7 @@ async function filtHist(type,btn){
     if(type==='all'||type==='daily'){
       const loggedDates=new Set(flt.filter(({tab})=>tab===TABS.DAILY).map(({row})=>row[0]));
       const today=todayStr();const yD=new Date(today+'T12:00:00Z');yD.setUTCDate(yD.getUTCDate()-1);const yesterday=yD.toISOString().slice(0,10);
-      const bks=bookings.filter(b=>b.dog.toLowerCase()===curDog.name.toLowerCase()&&b.status!=='Canceled'&&b.sd<today);
+      const bks=bookings.filter(b=>(b.customerId&&b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.status!=='Canceled'&&b.sd<today);
       const missingSet=new Set();
       bks.forEach(bk=>{const endD=bk.ed<today?bk.ed:yesterday;let d=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(!loggedDates.has(ds))missingSet.add(ds);d.setUTCDate(d.getUTCDate()+1);}});
       missingSet.forEach(ds=>flt.push({tab:'MISSING',row:[ds],ri:null}));
@@ -384,7 +393,7 @@ function buildConsent(dog){
 function setConsent(k,v,btn){if(!curDog)return;const already=(curDog[k]||'')=== v;curDog[k]=already?'':v;btn.closest('.cfld').querySelectorAll('.ctb').forEach(b=>b.className='ctb');if(!already)btn.classList.add(v==='Yes'?'yes':'no');}
 async function saveConsent(){const st=document.getElementById('consentStatus');if(!curDog)return;const vals=[todayStr(),curDog.cid,curDog.name,...CF.map(f=>curDog[f.k]||'')];try{await appendRow(TABS.CONSENT,vals);st.textContent='Consent saved!';st.className='smsg ok';setTimeout(()=>st.className='smsg',3000);}catch(e){st.textContent=e.message;st.className='smsg err';}}
 function buildServices(dog){
-  const el=document.getElementById('servicesList');const recs=bookings.filter(r=>r.dog.toLowerCase()===dog.name.toLowerCase()).sort((a,b)=>b.sd.localeCompare(a.sd));
+  const el=document.getElementById('servicesList');const recs=bookings.filter(r=>(r.customerId&&r.customerId===dog.cid||r.dog.toLowerCase()===dog.name.toLowerCase())).sort((a,b)=>b.sd.localeCompare(a.sd));
   if(!recs.length){el.innerHTML='<div class="hload">No bookings yet</div>';return;}
   const sc={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
   el.innerHTML=recs.map(r=>{
@@ -427,7 +436,7 @@ function useCustomEmoji(){
   if(!v){alert('Type an emoji first');return;}
   selectEmoji(v);
 }
-function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.owner2||'',d.phone2||'',d.owner3||'',d.phone3||'',d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||'',d.jog||''];}
+function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.owner2||'',d.phone2||'',d.owner3||'',d.phone3||'',d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||'',d.jog||'',d.vaccUrl||''];}
 function openEditProf(){
   if(!curDog)return;const d=curDog;
   document.getElementById('reg_eid').value=d.cid;document.getElementById('reg_ridx').value=d.rowIdx||'';
@@ -438,7 +447,7 @@ function openEditProf(){
   if(bt==='approx'){const pts=d.birthday?d.birthday.split('-'):[];s('reg_bday_m',pts[1]||'');s('reg_bday_y',pts[0]||'');}else s('reg_bday',d.birthday);
   s('reg_weight',d.weight);s('reg_neut',d.neut);s('reg_chip',d.chip);s('reg_rescue',d.rescue);
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();
-  s('reg_dogfriends',d.dogfriends);s('reg_food',d.food);s('reg_food_measure',d.foodMeasure);s('reg_diet',d.dietNotes);s('reg_allergies',d.allerg);s('reg_medical',d.med);s('reg_med_schedule',d.medSchedule);s('reg_fears',d.fears);s('reg_touch',d.notouch);s('reg_vacc',d.vacc);s('reg_flea',d.flea);
+  s('reg_dogfriends',d.dogfriends);s('reg_food',d.food);s('reg_food_measure',d.foodMeasure);s('reg_diet',d.dietNotes);s('reg_allergies',d.allerg);s('reg_medical',d.med);s('reg_med_schedule',d.medSchedule);s('reg_fears',d.fears);s('reg_touch',d.notouch);s('reg_vacc',d.vacc);s('reg_vacc_url',d.vaccUrl||'');s('reg_flea',d.flea);
   s('reg_behaviour',d.behav);s('reg_walk',d.walk);s('reg_car',d.car);s('reg_sleep',d.sleep);s('reg_escape',d.escape);s('reg_toilet',d.toilet);s('reg_alone',d.alone);s('reg_commands',d.commands);s('reg_sitters',d.sitters);s('reg_updates',d.updates);s('reg_updates_custom',d.updatesCustom);s('reg_rel',d.rel);s('reg_notes',d.notes);
   s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_owner2',d.owner2||'');s('reg_phone2',d.phone2||'');s('reg_owner3',d.owner3||'');s('reg_phone3',d.phone3||'');s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
@@ -472,7 +481,7 @@ async function registerDog(){
   const btn=document.getElementById('regBtn');const st=document.getElementById('regStatus');btn.disabled=true;btn.textContent='Saving...';
   const bt=gv('reg_bday_type');let bday='';if(bt==='approx'){const m=gv('reg_bday_m'),y=gv('reg_bday_y');bday=y&&m?y+'-'+m+'-01':'';}else bday=gv('reg_bday');
   const cid=eid||genId(name);
-  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog')];
+  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog'),gv('reg_vacc_url')];
   try{
     if(eid&&ri)await updateRow(TABS.DOGS,ri,vals);else await appendRow(TABS.DOGS,vals);
     const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);}catch(e){}
@@ -873,7 +882,8 @@ async function createBookingsFromQuote(){
       const rev=revenueMap[dogName]||0;
       const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
-      const vals=[id,dogName,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
+      const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
+      const vals=[id,dogName,customerId,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
       try{await appendRow(TABS.BK,vals);bookings.push(mapBk(vals,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
@@ -945,7 +955,8 @@ async function saveBk(){
   const ch=document.getElementById('bm_channel').value;const rPct=ch==='Rover'?(parseFloat(document.getElementById('bm_rpct').value)||0):0;const rAmt=ch==='Rover'?(parseFloat(document.getElementById('bm_ramt').value)||0):0;
   const priv=document.getElementById('bm_priv').checked;const id=eid||('BK-'+Date.now().toString(36).toUpperCase());const rems=getReminderVals();
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
-  const vals=[id,dog,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems];
+  const dogData=allDogs.find(d=>d.name===dog);const customerId=dogData?dogData.cid:'';
+  const vals=[id,dog,customerId,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems];
   try{
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
     const bkObj=mapBk(vals,eid?ri-2:bookings.length);if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
