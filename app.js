@@ -136,7 +136,7 @@ async function refreshBoard(){
     const rows=await readSheet(TABS.DOGS,'A2:BD');allDogs=rows.map((r,i)=>mapDog(r,i)).filter(d=>d.name.trim());
     const br=await readSheet(TABS.BK,'A2:AD').catch(()=>[]);bookings=br.map((r,i)=>mapBk(r,i));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
-    const al=await readSheet(TABS.ACTLOG,'A2:F').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
+    const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
     // Sync dog photo URLs from Rates sheet so photos work across devices
     readSheet(TABS.RATES,'A2:C').then(rr=>{rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1]&&!localStorage.getItem('dog_photo_'+cid))localStorage.setItem('dog_photo_'+cid,r[1]);});}).catch(()=>{});
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();
@@ -234,11 +234,11 @@ async function saveLog(){
   const st=document.getElementById('logStatus');st.style.display='block';st.style.color='var(--gr2)';st.textContent='Saving...';
   const g=k=>sv[k]?'[Y]':'[ ]';const priv=sv.priv?'Private':'';
   const saves=[appendRow(TABS.DAILY,[today,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv])];
-  _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[today,act,curDog.name,'',sv.notes||'',''])));
-  if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[today,curDog.name,curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv]));
-  if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[today,gv('if_time'),curDog.name,curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv]));}
-  if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,[today,curDog.name,gv('it_name'),gv('it_vehicle'),gv('it_plate'),gv('it_type'),gv('it_time'),gv('it_notes'),priv]));
-  if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,[today,curDog.name,oth2,gv('itr_obs'),gv('itr_suit'),priv]));}
+  _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[today,act,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '','',sv.notes||'',curDog.cid])));
+  if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[today,'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv,curDog.cid]));
+  if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[today,gv('if_time'),'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv,curDog.cid]));}
+  if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,[today,'=IFERROR(VLOOKUP(INDIRECT("J"&ROW()),Dogs!$A:$B,2,FALSE),"")',gv('it_name'),gv('it_vehicle'),gv('it_plate'),gv('it_type'),gv('it_time'),gv('it_notes'),priv,curDog.cid]));
+  if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,[today,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")',oth2,gv('itr_obs'),gv('itr_suit'),priv,curDog.cid]));}
   try{await Promise.all(saves);_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
 }
 function buildSummary(dog){
@@ -275,13 +275,13 @@ async function filtHist(type,btn){
   document.querySelectorAll('.hfb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(!curDog)return;
   const list=document.getElementById('histList');list.innerHTML='<div class="hload">Loading...</div>';
   try{
-    let all=[];const TAB_RANGE={[TABS.ACTLOG]:'A2:F'};const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rng=TAB_RANGE[tab]||'A2:R';const rows=await readSheet(tab,rng).catch(()=>[]);histCache[tab]=rows.map((r,i)=>({tab,row:r,ri:i+2}));return histCache[tab];};
+    let all=[];const TAB_RANGE={[TABS.ACTLOG]:'A2:G'};const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rng=TAB_RANGE[tab]||'A2:R';const rows=await readSheet(tab,rng).catch(()=>[]);histCache[tab]=rows.map((r,i)=>({tab,row:r,ri:i+2}));return histCache[tab];};
     if(type==='all'){for(const t of[TABS.DAILY,TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL,TABS.ACTLOG])all=all.concat(await ft(t));}
     else if(type==='incidents'){for(const t of[TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL])all=all.concat(await ft(t));}
     else if(type==='daily')all=await ft(TABS.DAILY);
     else if(type==='health')all=await ft(TABS.HEALTH);
     else if(type==='activities')all=await ft(TABS.ACTLOG);
-    const nm=curDog.name.toLowerCase();let flt=all.filter(({row})=>row.join(' ').toLowerCase().includes(nm));
+    const nm=curDog.name.toLowerCase();const cid=curDog.cid;let flt=all.filter(({row})=>row.includes(cid)||(row.join(' ').toLowerCase().includes(nm)));
     flt.sort((a,b)=>(b.row[0]||'').localeCompare(a.row[0]||''));
     // Deduplicate Daily logs — keep only latest entry per day
     const seenDaily=new Set();flt=flt.filter(({tab,row})=>{if(tab!==TABS.DAILY)return true;const key=row[0]||'';if(seenDaily.has(key))return false;seenDaily.add(key);return true;});
@@ -346,12 +346,12 @@ function buildEditFlds(tab,date,lr,ri){
 }
 async function doEdit(riStr,tabStr,type){
   const st=document.getElementById('editStatus');const priv=document.getElementById('ef_priv')?.checked?'Private':'';const date=gv('ef_date');let vals=[];
-  if(type==='daily')vals=[date,curDog.name,'','','','','','','','','','','','','',curDog.cid,gv('ef_notes'),priv];
-  else if(type==='health')vals=[date,curDog.name,curDog.owner||'',gv('ef_issue'),gv('ef_cat'),'','',gv('ef_desc'),'',gv('ef_next'),priv];
-  else if(type==='fight')vals=[date,gv('ef_time'),curDog.name,curDog.owner||'','',gv('ef_issue'),'','','',gv('ef_prev'),priv];
-  else if(type==='transport')vals=[date,curDog.name,gv('ef_trn'),gv('ef_trv'),'','','',gv('ef_notes'),priv];
-  else if(type==='trial')vals=[date,curDog.name,'',gv('ef_obs'),gv('ef_suit'),priv];
-  else if(type==='actlog')vals=[date,'',curDog.name,'',gv('ef_dur'),gv('ef_notes')];
+  if(type==='daily')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("P"&ROW()),Dogs!$A:$B,2,FALSE),"")', '','','','','','','','','','','','','',curDog.cid,gv('ef_notes'),priv];
+  else if(type==='health')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',gv('ef_issue'),gv('ef_cat'),'','',gv('ef_desc'),'',gv('ef_next'),priv,curDog.cid];
+  else if(type==='fight')vals=[date,gv('ef_time'),'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'','',gv('ef_issue'),'','','',gv('ef_prev'),priv,curDog.cid];
+  else if(type==='transport')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("J"&ROW()),Dogs!$A:$B,2,FALSE),"")',gv('ef_trn'),gv('ef_trv'),'','','',gv('ef_notes'),priv,curDog.cid];
+  else if(type==='trial')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '',gv('ef_obs'),gv('ef_suit'),priv,curDog.cid];
+  else if(type==='actlog')vals=[date,'','=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '',gv('ef_dur'),gv('ef_notes'),curDog.cid];
   st.textContent='Saving...';const tm={daily:TABS.DAILY,health:TABS.HEALTH,fight:TABS.FIGHT,transport:TABS.TRANSPORT,trial:TABS.TRIAL,actlog:TABS.ACTLOG};
   try{await updateRow(tm[type]||tabStr,parseInt(riStr),vals);histCache={};st.textContent='Updated!';st.className='smsg ok';setTimeout(()=>document.getElementById('editModal').classList.remove('open'),1600);}
   catch(e){st.textContent=e.message;st.className='smsg err';}
@@ -883,7 +883,7 @@ async function createBookingsFromQuote(){
       const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
       const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
-      const vals=[id,dogName,customerId,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
+      const vals=[id,'=IFERROR(VLOOKUP(INDIRECT("C"&ROW()),Dogs!$A:$B,2,FALSE),"")',customerId,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
       try{await appendRow(TABS.BK,vals);bookings.push(mapBk(vals,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
@@ -956,7 +956,7 @@ async function saveBk(){
   const priv=document.getElementById('bm_priv').checked;const id=eid||('BK-'+Date.now().toString(36).toUpperCase());const rems=getReminderVals();
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
   const dogData=allDogs.find(d=>d.name===dog);const customerId=dogData?dogData.cid:'';
-  const vals=[id,dog,customerId,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems];
+  const vals=[id,'=IFERROR(VLOOKUP(INDIRECT("C"&ROW()),Dogs!$A:$B,2,FALSE),"")',customerId,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems];
   try{
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
     const bkObj=mapBk(vals,eid?ri-2:bookings.length);if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
