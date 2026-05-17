@@ -137,6 +137,8 @@ async function refreshBoard(){
     const br=await readSheet(TABS.BK,'A2:AD').catch(()=>[]);bookings=br.map((r,i)=>mapBk(r,i));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
+    // Sync targets from sheet into localStorage
+    syncTargetsFromSheet().catch(()=>{});
     // Sync dog photo URLs from Rates sheet so photos work across devices
     readSheet(TABS.RATES,'A2:C').then(rr=>{rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1]&&!localStorage.getItem('dog_photo_'+cid))localStorage.setItem('dog_photo_'+cid,r[1]);});}).catch(()=>{});
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();
@@ -1029,6 +1031,13 @@ async function saveCosts(){const st=document.getElementById('costStatus');st.tex
 
 // ==================== P&L ====================
 function getTargets(yr){const s=JSON.parse(localStorage.getItem('tcl_tgts_'+yr)||'{}');const res={};MOS.forEach(m=>{res[m]={rev:s[m+'_r']||0,cost:s[m+'_c']||0};});return res;}
+async function syncTargetsFromSheet(){
+  const rows=await readSheet(TABS.TARGETS,'A2:C').catch(()=>[]);
+  if(!rows.length)return;
+  const byYear={};
+  rows.forEach(r=>{if(!r[0])return;const parts=r[0].trim().split(' ');const mo=parts[0];const yr=parts[1]||'2026';if(!MOS.includes(mo))return;if(!byYear[yr])byYear[yr]={};byYear[yr][mo+'_r']=parseFloat(r[1])||0;byYear[yr][mo+'_c']=parseFloat(r[2])||0;});
+  Object.entries(byYear).forEach(([yr,data])=>{localStorage.setItem('tcl_tgts_'+yr,JSON.stringify(data));});
+}
 function buildPLTable(yr){
   const tgts=getTargets(yr);const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0,rover:0};});
   const active=['Prepaid','Fully Paid','Credit'];
@@ -1038,7 +1047,21 @@ function buildPLTable(yr){
     return'<tr><td style="font-weight:700;">'+m+'</td><td><input class="pl-inp" type="number" id="tr_'+m+'" value="'+tgt.rev+'"></td><td><input class="pl-inp" type="number" id="tc_'+m+'" value="'+tgt.cost+'"></td><td style="color:var(--gn);font-weight:700;">'+fmtGBP(act.rev)+'</td><td style="color:var(--rd);">'+fmtGBP(totalCost)+(act.rover>0?'<br><span style="font-size:7px;color:var(--gr3);">incl '+fmtGBP(act.rover)+' Rover</span>':'')+'</td><td style="font-weight:700;'+(net>=0?'color:var(--gn)':'color:var(--rd)')+';">'+fmtGBP(net)+'</td></tr>';
   }).join('');
 }
-function saveTargets(){const yr=document.getElementById('plYear').value;const data={};MOS.forEach(m=>{data[m+'_r']=parseFloat(document.getElementById('tr_'+m)?.value)||0;data[m+'_c']=parseFloat(document.getElementById('tc_'+m)?.value)||0;});localStorage.setItem('tcl_tgts_'+yr,JSON.stringify(data));document.getElementById('tgtStatus').textContent='Targets saved!';document.getElementById('tgtStatus').className='smsg ok';updatePL();setTimeout(()=>document.getElementById('tgtStatus').className='smsg',3000);}
+async function saveTargets(){
+  const yr=document.getElementById('plYear').value;const data={};
+  MOS.forEach(m=>{data[m+'_r']=parseFloat(document.getElementById('tr_'+m)?.value)||0;data[m+'_c']=parseFloat(document.getElementById('tc_'+m)?.value)||0;});
+  localStorage.setItem('tcl_tgts_'+yr,JSON.stringify(data));
+  const st=document.getElementById('tgtStatus');st.textContent='Saving...';st.className='smsg';
+  try{
+    const rows=await readSheet(TABS.TARGETS,'A2:C').catch(()=>[]);
+    const updates=[];const newRows=[];
+    MOS.forEach(m=>{const label=m+' '+yr;const rev=data[m+'_r'];const cost=data[m+'_c'];const idx=rows.findIndex(r=>r[0]===label);if(idx>=0)updates.push({ri:idx+2,vals:[label,rev,cost]});else newRows.push([label,rev,cost]);});
+    if(updates.length)await batchUpd(TABS.TARGETS,updates);
+    for(const r of newRows)await appendRow(TABS.TARGETS,r);
+    st.textContent='Targets saved & synced!';st.className='smsg ok';
+  }catch(e){st.textContent='Saved locally (sheet sync failed)';st.className='smsg err';}
+  updatePL();setTimeout(()=>st.className='smsg',3000);
+}
 function updatePL(){
   const yr=document.getElementById('plYear')?.value||'2026';const tgts=getTargets(yr);const revTgt=Object.values(tgts).reduce((s,t)=>s+t.rev,0);const costTgt=Object.values(tgts).reduce((s,t)=>s+t.cost,0);
   const active=['Prepaid','Fully Paid','Credit'];const yRec=bookings.filter(r=>r.sd&&r.sd.startsWith(yr));
