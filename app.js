@@ -689,7 +689,7 @@ function calcMultiQ(){
   else if(discType==='gbp'&&discVal>0){total-=discVal;discLine='Discount: -'+fmtGBP(discVal);lines.push(['Discount',-discVal]);}
   const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
   const prepayAmt=total*(prepayPct/100);const finalAmt=total-prepayAmt;
-  _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts};
+  _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts,dogRevMap:_computeDogRevMap()};
   document.getElementById('q_total').textContent=fmtGBP(total);
   document.getElementById('q_breakdown').innerHTML=lines.map((l,i)=>'<div class="q-ln"'+(i===lines.length-1?' style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:4px;"':'')+'>'+
     '<span>'+l[0]+'</span><span>'+(l[1]<0?'-':'')+fmtGBP(Math.abs(l[1]))+'</span></div>').join('');
@@ -743,9 +743,42 @@ function buildQDogMS(){
   const visible=allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q));
   c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);return'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
 }
-function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';buildQDogMS();buildMainDogBtns();calcMultiQ();}
+function _syncDogsToLines(){const ordered=_mainDog?[_mainDog,..._selDogs.filter(n=>n!==_mainDog)]:[..._selDogs];_svcLines.forEach(l=>{if(l.svc!=='extra'&&l.svc!=='taxi')l.dogs=[...ordered];});}
+function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';_syncDogsToLines();buildQDogMS();buildMainDogBtns();calcMultiQ();}
 function buildMainDogBtns(){const w=document.getElementById('q_main_dog_wrap');const c=document.getElementById('q_main_dog_btns');if(!w||!c)return;if(_selDogs.length<=1){w.style.display='none';_mainDog=_selDogs[0]||'';return;}w.style.display='block';c.innerHTML=_selDogs.map((n,i)=>'<button class="main-dog-pill'+(_mainDog===n?' active':'')+'" onclick="setMainDog('+i+')">* '+n+'</button>').join('');}
-function setMainDog(i){_mainDog=_selDogs[i];buildMainDogBtns();calcMultiQ();}
+function setMainDog(i){_mainDog=_selDogs[i];_syncDogsToLines();buildMainDogBtns();calcMultiQ();}
+function _computeDogRevMap(){
+  const r=getRates();const map={};
+  const add=(name,a)=>{if(name&&a>0)map[name]=Math.round(((map[name]||0)+a)*100)/100;};
+  _svcLines.forEach(l=>{
+    if(l.svc==='extra'||l.svc==='taxi')return;
+    const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||''];
+    const main=dogs[0];const addDogs=dogs.slice(1);
+    if(l.svc==='boarding'&&l.sd&&l.ed){
+      const drop=new Date(l.sd+'T'+(l.st2||'09:00')),pick=new Date(l.ed+'T'+(l.et||'18:00'));
+      const hrs=(pick-drop)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
+      const hd=getHolDates(l.sd,l.ed);let hN=0,sN=0;
+      let d=new Date(l.sd+'T12:00:00');const eD=new Date(l.ed+'T12:00:00');
+      while(d<eD){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
+      let mAmt=(sN*r.board_std)+(hN*r.board_hol);
+      if(exHrs>0){const bn=sN>0?r.board_std:r.board_hol;mAmt+=exHrs<8?Math.round(bn*0.5*100)/100:bn;}
+      add(main,mAmt);addDogs.forEach(dog=>add(dog,(sN*r.board_add)+(hN*r.board_addh)));
+    }else if(l.svc==='daycare'&&l.sd){
+      const hol=isHol(l.sd);add(main,hol?r.day_hol:r.day_std);
+      addDogs.forEach(dog=>add(dog,hol?r.day_addh:r.day_add));
+    }else if((l.svc==='walk'||l.svc==='dropin')&&l.rate){
+      const hm=l.sd&&isHol(l.sd)?1.15:1;const mr=Math.round(l.rate*hm*100)/100;
+      const ar=l.rka?Math.round((r[l.rka]||0)*hm*100)/100:0;
+      add(main,mr);addDogs.forEach(dog=>add(dog,ar));
+    }else if(l.svc==='dogsit'&&l.sd&&l.ed){
+      const hd2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
+      let d2=new Date(l.sd+'T12:00:00');const eD2=new Date(l.ed+'T12:00:00');
+      while(d2<eD2){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
+      add(main,(sN2*r.board_std)+(hN2*r.board_hol));
+    }else if(l.rate){const qty=l.qty||1;add(main,(l.rate||0)*qty);}
+  });
+  return map;
+}
 function onQSvc(){}
 function calcQ(){
   const svc=document.getElementById('q_svc')?.value;if(!svc)return;const r=getRates();const addDogs=Math.max(0,_selDogs.length-1);
@@ -867,20 +900,22 @@ async function createBookingsFromQuote(){
   if(!_svcLines.length){alert('Complete the quote first');return;}
   calcMultiQ();
   const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training',extra:'Extra'};
-  // build per-dog revenue map from _cr.lines
-  const revenueMap={};
-  _cr.lines.forEach(l=>{const m=l[0].match(/—\s*(.+?)(?:\s*\(|$)/);if(m&&m[1]&&l[1]>0)revenueMap[m[1].trim()]=l[1];});
+  const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
+  // Proportional revenue: each dog's share = (their service rev / total service rev) * full quote total
+  const dogRevMap=_cr.dogRevMap||{};
+  const svcRevTotal=Object.values(dogRevMap).reduce((s,v)=>s+v,0)||1;
+  const revenueMap={};Object.entries(dogRevMap).forEach(([dog,rev])=>{revenueMap[dog]=Math.round(rev/svcRevTotal*_cr.total*100)/100;});
   let created=0;
   for(const line of _svcLines){
     if(line.svc==='extra')continue;
-    const dogs=line.dogs&&line.dogs.length?line.dogs:(_selDogs.length?_selDogs:['']);
+    // Taxi: flat rate per trip — one booking for main dog only
+    const dogs=line.svc==='taxi'?[_mainDog||_selDogs[0]||'']:(line.dogs&&line.dogs.length?line.dogs:(_selDogs.length?_selDogs:['']));
     const sd=line.sd||'';const ed=line.ed||sd;const st=line.st2||'09:00';const et=line.et||'18:00';
     const svcLabel=svcN[line.svc]||line.svc;
     for(const dogName of dogs){
       const id='BK-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
       const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
-      const rev=revenueMap[dogName]||0;
-      const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
+      const rev=line.svc==='taxi'?(_cr.lines.find(l=>l[0].includes('Taxi'))?.[1]||0):revenueMap[dogName]||0;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
       const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
       const vals=[id,'=IFERROR(VLOOKUP(INDIRECT("C"&ROW()),Dogs!$A:$B,2,FALSE),"")',customerId,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
