@@ -139,8 +139,10 @@ async function refreshBoard(){
     const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
     // Sync targets from sheet into localStorage
     syncTargetsFromSheet().catch(()=>{});
+    // Sync activities library from sheet so sheet edits show in app
+    syncActsFromSheet(true).catch(()=>{});
     // Sync dog photo URLs from Rates sheet so photos work across devices
-    readSheet(TABS.RATES,'A2:C').then(rr=>{rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1]&&!localStorage.getItem('dog_photo_'+cid))localStorage.setItem('dog_photo_'+cid,r[1]);});}).catch(()=>{});
+    readSheet(TABS.RATES,'A2:C').then(rr=>{rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1])localStorage.setItem('dog_photo_'+cid,r[1]);});}).catch(()=>{});
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
@@ -486,7 +488,7 @@ async function registerDog(){
   const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog'),gv('reg_vacc_url')];
   try{
     if(eid&&ri)await updateRow(TABS.DOGS,ri,vals);else await appendRow(TABS.DOGS,vals);
-    const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);}catch(e){}
+    const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);syncPhotoToSheet(cid,pd);}catch(e){}
     if(!eid){allDogs.push(mapDog(vals,allDogs.length));refreshDogDropdowns();}else if(curDog){const idx=allDogs.findIndex(d=>d.cid===eid);if(idx>=0){allDogs[idx]=mapDog(vals,idx);curDog=allDogs[idx];}}
     st.textContent=eid?'Profile updated!':'Registered! ID: '+cid;st.className='smsg ok';
     setTimeout(()=>{goBack();renderBoard();if(eid&&curDog){buildProfInfo(curDog);buildSummary(curDog);}},1800);
@@ -494,12 +496,12 @@ async function registerDog(){
 }
 function compressPhoto(file,cb){const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const MAX=300;let w=img.width,h=img.height;if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.7));};img.src=ev.target.result;};r.readAsDataURL(file);}
 function trigPh(){document.getElementById('profPhotoInput').click();}
-function handlePh(e){const f=e.target.files[0];if(!f||!curDog)return;compressPhoto(f,data=>{try{localStorage.setItem('dog_photo_'+curDog.cid,data);}catch(err){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=data;img.style.display='block';});}
+function handlePh(e){const f=e.target.files[0];if(!f||!curDog)return;compressPhoto(f,data=>{try{localStorage.setItem('dog_photo_'+curDog.cid,data);}catch(err){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=data;img.style.display='block';syncPhotoToSheet(curDog.cid,data);});}
 function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,data=>{document.getElementById('regPhotoImg').src=data;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=data;});}
 function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w800';}catch(e){}return url;}
+function syncPhotoToSheet(cid,url){if(!cid||!url)return;const key='photo_'+cid;const ts=new Date().toISOString();readSheet(TABS.RATES,'A2:C').then(rr=>{const idx=rr.findIndex(r=>r[0]===key);if(idx>=0)updateRow(TABS.RATES,idx+2,[key,url,ts]).catch(()=>{});else appendRow(TABS.RATES,[key,url,ts]).catch(()=>{});}).catch(()=>{});}
 function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=direct;img.style.display='block';
-  // Sync URL to Rates sheet so other devices can pick it up automatically
-  if(!direct.startsWith('data:')){const key='photo_'+curDog.cid;const ts=new Date().toISOString();readSheet(TABS.RATES,'A2:C').then(rr=>{const idx=rr.findIndex(r=>r[0]===key);if(idx>=0)updateRow(TABS.RATES,idx+2,[key,direct,ts]).catch(()=>{});else appendRow(TABS.RATES,[key,direct,ts]).catch(()=>{});}).catch(()=>{});}
+  syncPhotoToSheet(curDog.cid,direct);
 }else{document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
 function promptGdriveUrl(context){const url=prompt('Paste your Google Drive photo link:\n(File > Share > Copy link)');if(url)setPhotoFromUrl(url,context);}
 
@@ -1266,14 +1268,14 @@ async function saveAct(){
   }catch(e){st.textContent='Saved locally (sheet: '+e.message+')';st.className='smsg err';}
   setTimeout(()=>{st.className='smsg';document.getElementById('actModal').classList.remove('open');renderActs();},1600);
 }
-async function syncActsFromSheet(){
+async function syncActsFromSheet(silent=false){
   try{
     const rows=await readSheet(TABS.ACTS,'A2:K');
     if(rows.length){
       activities=rows.filter(r=>r[0]).map(r=>({title:r[0]||'',cat:r[1]||'',io:r[2]||'',energy:r[3]||'',weather:r[4]||'',location:r[5]||'',mapsUrl:r[6]||'',dur:r[7]||'',dist:r[8]||'',cost:r[9]||'',notes:r[10]||''}));
-      saveActivities();renderActs();alert('Activities synced from sheet!');
-    }else alert('No activities found in sheet.');
-  }catch(e){alert('Sync failed: '+e.message);}
+      saveActivities();renderActs();if(!silent)alert('Activities synced from sheet!');
+    }else if(!silent)alert('No activities found in sheet.');
+  }catch(e){if(!silent)alert('Sync failed: '+e.message);}
 }
 
 // ==================== EXPORT ====================
