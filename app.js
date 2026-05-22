@@ -28,7 +28,7 @@ const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\
 // STATE
 let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[];
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
-let _regEmoji='',_emojiCtx='profile';
+let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
 
 // ==================== PIN ====================
@@ -93,7 +93,7 @@ async function doCreateSheet(){
   const s=document.getElementById('cfgStatus');s.textContent='Creating structure...';
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
-    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Emoji','Jogging']},
+    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Emoji','Jogging','VaccinationURL','PhotoURL']},
     {n:TABS.BK,h:['ID','DogName','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5']},
     {n:TABS.DAILY,h:['Date','Dog','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','Game','BeforeSleep','Bowl','Room','Garment','CustomerID','Notes','Private']},
     {n:TABS.HEALTH,h:['Date','Dog','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
@@ -124,7 +124,7 @@ function showScreen(id,push=true){
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs')renderCostTable();if(id==='sc-templates')renderTplHub();if(id==='sc-activities')renderActs();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs')renderCostTable();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -147,7 +147,7 @@ async function refreshBoard(){
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
-function mapDog(r,i){return{cid:r[0]||genId(r[1]||'Dog'),name:r[1]||'',breed:r[2]||'',gender:r[3]||'',birthday:r[4]||'',bdayType:r[5]||'exact',weight:r[6]||'',neut:r[7]||'',chip:r[8]||'',rescue:r[9]||'',nervous:r[10]||'',anxiety:r[11]||'',dogfriends:r[12]||'',food:r[13]||'',foodMeasure:r[14]||'',dietNotes:r[15]||'',allerg:r[16]||'',med:r[17]||'',medSchedule:r[18]||'',fears:r[19]||'',notouch:r[20]||'',vacc:r[21]||'',flea:r[22]||'',behav:r[23]||'',walk:r[24]||'',car:r[25]||'',sleep:r[26]||'',escape:r[27]||'',toilet:r[28]||'',alone:r[29]||'',commands:r[30]||'',sitters:r[31]||'',updates:r[32]||'',updatesCustom:r[33]||'',rel:r[34]||'',notes:r[35]||'',owner:r[36]||'',phone:r[37]||'',owner2:r[38]||'',phone2:r[39]||'',owner3:r[40]||'',phone3:r[41]||'',addr:r[42]||'',postcode:r[43]||'',emergency:r[44]||'',vet:r[45]||'',ins:r[46]||'',meetgreet:r[47]||'',referral:r[48]||'',refNotes:r[49]||'',svc:r[50]||'',status:r[51]||'',remarks:r[52]||'',emoji:r[53]||'',jog:r[54]||'',vaccUrl:r[55]||'',rowIdx:i+2};}
+function mapDog(r,i){return{cid:r[0]||genId(r[1]||'Dog'),name:r[1]||'',breed:r[2]||'',gender:r[3]||'',birthday:r[4]||'',bdayType:r[5]||'exact',weight:r[6]||'',neut:r[7]||'',chip:r[8]||'',rescue:r[9]||'',nervous:r[10]||'',anxiety:r[11]||'',dogfriends:r[12]||'',food:r[13]||'',foodMeasure:r[14]||'',dietNotes:r[15]||'',allerg:r[16]||'',med:r[17]||'',medSchedule:r[18]||'',fears:r[19]||'',notouch:r[20]||'',vacc:r[21]||'',flea:r[22]||'',behav:r[23]||'',walk:r[24]||'',car:r[25]||'',sleep:r[26]||'',escape:r[27]||'',toilet:r[28]||'',alone:r[29]||'',commands:r[30]||'',sitters:r[31]||'',updates:r[32]||'',updatesCustom:r[33]||'',rel:r[34]||'',notes:r[35]||'',owner:r[36]||'',phone:r[37]||'',owner2:r[38]||'',phone2:r[39]||'',owner3:r[40]||'',phone3:r[41]||'',addr:r[42]||'',postcode:r[43]||'',emergency:r[44]||'',vet:r[45]||'',ins:r[46]||'',meetgreet:r[47]||'',referral:r[48]||'',refNotes:r[49]||'',svc:r[50]||'',status:r[51]||'',remarks:r[52]||'',emoji:r[53]||'',jog:r[54]||'',vaccUrl:r[55]||'',photoUrl:r[56]||'',rowIdx:i+2};}
 function mapBk(r,i){return{id:r[0]||'',dog:r[1]||'',customerId:r[2]||'',svc:r[3]||'',sd:r[4]||'',st:r[5]||'',ed:r[6]||'',et:r[7]||'',dropLoc:r[8]||'',pickLoc:r[9]||'',rev:parseFloat(r[10])||0,tips:parseFloat(r[11])||0,prepay:parseFloat(r[12])||0,finalPay:parseFloat(r[13])||0,unit:parseFloat(r[14])||0,discNotes:r[15]||'',roverPct:parseFloat(r[16])||0,roverAmt:parseFloat(r[17])||0,ch:r[18]||'TCL',pay:r[19]||'',status:r[20]||'',priv:r[21]==='Private',month:r[22]||'',rating:r[23]||'',feedback:r[24]||'',rem:[r[25]||'',r[26]||'',r[27]||'',r[28]||'',r[29]||''],ri:i+2};}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
@@ -164,7 +164,7 @@ function renderBoard(){
 function renderCards(dogs,c,cls){
   if(!dogs.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
   dogs.forEach(dog=>{
-    const photo=localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
+    const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
     const vaccExpired=dog.vacc?(()=>{try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);return vd<cutoff;}catch(e){return false;}})():false;
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
     card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div><div class="dcb-ch">'+(td.breakfast?'<span class="chip cg">Fed</span>':'')+(td.walkAm?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+(cls==='wk'?'<span class="chip cb">This week</span>':'')+(cls==='up'?'<span class="chip cp">Upcoming</span>':'')+'</div></div>';
@@ -179,7 +179,7 @@ function waLink(ph){if(!ph)return'';const n=ph.replace(/[^0-9]/g,'');return'<a h
 // ==================== PROFILE ====================
 function openProfile(dog){
   curDog=dog;histCache={};
-  const photo=localStorage.getItem('dog_photo_'+dog.cid);
+  const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);
   document.getElementById('profName').textContent=dog.name;document.getElementById('profMeta').textContent=[dog.breed,dog.weight?dog.weight+'kg':'',calcAge(dog.birthday)].filter(Boolean).join(' - ');document.getElementById('profId').textContent=dog.cid;document.getElementById('profEmoji').textContent=dog.emoji||defEmoji(dog);
   const wrap=document.getElementById('profPhotoWrap');let img=wrap.querySelector('img.pl');
   if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';wrap.appendChild(img);}
@@ -440,7 +440,7 @@ function useCustomEmoji(){
   if(!v){alert('Type an emoji first');return;}
   selectEmoji(v);
 }
-function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.owner2||'',d.phone2||'',d.owner3||'',d.phone3||'',d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||'',d.jog||'',d.vaccUrl||''];}
+function mapDogToRow(d){return[d.cid,d.name,d.breed,d.gender,d.birthday,d.bdayType,d.weight,d.neut,d.chip,d.rescue,d.nervous,d.anxiety,d.dogfriends,d.food,d.foodMeasure,d.dietNotes,d.allerg,d.med,d.medSchedule,d.fears,d.notouch,d.vacc,d.flea,d.behav,d.walk,d.car,d.sleep,d.escape,d.toilet,d.alone,d.commands,d.sitters,d.updates,d.updatesCustom,d.rel,d.notes,d.owner,d.phone,d.owner2||'',d.phone2||'',d.owner3||'',d.phone3||'',d.addr,d.postcode,d.emergency,d.vet,d.ins,d.meetgreet,d.referral,d.refNotes,d.svc,d.status,d.remarks,d.emoji||'',d.jog||'',d.vaccUrl||'',d.photoUrl||''];}
 function openEditProf(){
   if(!curDog)return;const d=curDog;
   document.getElementById('reg_eid').value=d.cid;document.getElementById('reg_ridx').value=d.rowIdx||'';
@@ -457,7 +457,7 @@ function openEditProf(){
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
   document.getElementById('reg_updates_custom_wrap').style.display=d.updates==='Custom'?'flex':'none';
   _regEmoji=d.emoji||'';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent=d.emoji||defEmoji(d);re.style.display='block';}
-  const p=localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';}
+  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl||localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';}
   showScreen('sc-register');
 }
 function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').value)||3;if(document.getElementById(pfx+'_nval'))document.getElementById(pfx+'_nval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--or)';for(let i=0;i<5;i++){const s=document.getElementById('rns'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
@@ -469,7 +469,7 @@ function startReg(){
   ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_owner2','reg_phone2','reg_owner3','reg_phone3','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates_custom','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['reg_gender','reg_neut','reg_rescue','reg_car','reg_food','reg_svc','reg_updates','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setSvcChips('');
   document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();document.getElementById('reg_jog').value=3;updJogBar();
-  _regEmoji='';initBdayType();document.getElementById('regPhotoImg').style.display='none';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent='🐶';re.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
+  _regEmoji='';_regPhotoUrl='';initBdayType();document.getElementById('regPhotoImg').style.display='none';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent='🐶';re.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
 }
 function duplicateDog(){
   if(!curDog)return;const d=curDog;startReg();
@@ -485,7 +485,9 @@ async function registerDog(){
   const btn=document.getElementById('regBtn');const st=document.getElementById('regStatus');btn.disabled=true;btn.textContent='Saving...';
   const bt=gv('reg_bday_type');let bday='';if(bt==='approx'){const m=gv('reg_bday_m'),y=gv('reg_bday_y');bday=y&&m?y+'-'+m+'-01':'';}else bday=gv('reg_bday');
   const cid=eid||genId(name);
-  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog'),gv('reg_vacc_url')];
+  // photoUrl: prefer new URL from Drive link; for edit fall back to existing; for new reg start empty
+  const photoUrlVal=_regPhotoUrl||(eid?curDog?.photoUrl||'':'');
+  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog'),gv('reg_vacc_url'),photoUrlVal];
   try{
     if(eid&&ri)await updateRow(TABS.DOGS,ri,vals);else await appendRow(TABS.DOGS,vals);
     const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);syncPhotoToSheet(cid,pd);}catch(e){}
@@ -501,8 +503,11 @@ function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,d
 function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w800';}catch(e){}return url;}
 function syncPhotoToSheet(cid,url){if(!cid||!url)return;const key='photo_'+cid;const ts=new Date().toISOString();readSheet(TABS.RATES,'A2:C').then(rr=>{const idx=rr.findIndex(r=>r[0]===key);if(idx>=0)updateRow(TABS.RATES,idx+2,[key,url,ts]).catch(()=>{});else appendRow(TABS.RATES,[key,url,ts]).catch(()=>{});}).catch(()=>{});}
 function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=direct;img.style.display='block';
+  // Save URL to dog record in Dogs sheet so it's visible on all devices
+  curDog.photoUrl=direct;
+  if(curDog.rowIdx){updateRow(TABS.DOGS,curDog.rowIdx,Object.values(mapDogToRow(curDog))).catch(()=>{});}
   syncPhotoToSheet(curDog.cid,direct);
-}else{document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
+}else{_regPhotoUrl=direct;document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
 function promptGdriveUrl(context){const url=prompt('Paste your Google Drive photo link:\n(File > Share > Copy link)');if(url)setPhotoFromUrl(url,context);}
 
 // ==================== QUOTE ====================
@@ -1128,18 +1133,22 @@ function exportTraining(){const recs=trainRecords.length?trainRecords:[{date:'',
 // ==================== MESSAGE TEMPLATES ====================
 function saveMsgTpls(){localStorage.setItem('tcl_msg_tpls',JSON.stringify(msgTpls));}
 function renderTplHub(){
-  const el=document.getElementById('tplHubList');if(!msgTpls.length){el.innerHTML='<div class="hload">No templates - tap Sync or + New</div>';return;}
+  const el=document.getElementById('tplHubList');if(!msgTpls.length){el.innerHTML='<div class="hload">No templates - tap + New or wait for sync</div>';return;}
+  const filterCat=(document.getElementById('tpl_fcat')?.value||'').toLowerCase();
+  const filtered=filterCat?msgTpls.filter(t=>(t.cat||'').toLowerCase()===filterCat):msgTpls;
+  if(!filtered.length){el.innerHTML='<div class="hload">No templates in this category</div>';return;}
   el.innerHTML='';
-  msgTpls.forEach((tpl,i)=>{
+  filtered.forEach((tpl,i)=>{
+    const realIdx=msgTpls.indexOf(tpl);
     const item=document.createElement('div');item.className='tpl-item';item.draggable=true;
     item.innerHTML='<span class="tpl-drag">::::</span><div class="tpl-info"><div class="tpl-nm">'+tpl.name+'</div>'+(tpl.cat?'<div style="font-size:8px;color:var(--or);margin-bottom:2px;">'+tpl.cat+'</div>':'')+'<div class="tpl-pv">'+(tpl.content||'').slice(0,80)+'</div></div><button style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;flex-shrink:0;">x</button>';
-    item.querySelector('button').onclick=(e)=>{e.stopPropagation();if(!confirm('Delete this template?'))return;msgTpls.splice(i,1);saveMsgTpls();renderTplHub();};
-    item.onclick=(e)=>{if(!e.target.closest('button')&&!e.target.classList.contains('tpl-drag'))openTplHub(i);};
-    item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',i);item.style.opacity='.5';});
+    item.querySelector('button').onclick=(e)=>{e.stopPropagation();if(!confirm('Delete this template?'))return;msgTpls.splice(realIdx,1);saveMsgTpls();renderTplHub();};
+    item.onclick=(e)=>{if(!e.target.closest('button')&&!e.target.classList.contains('tpl-drag'))openTplHub(realIdx);};
+    item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',realIdx);item.style.opacity='.5';});
     item.addEventListener('dragend',()=>item.style.opacity='1');
     item.addEventListener('dragover',e=>{e.preventDefault();item.style.borderColor='var(--or)';});
     item.addEventListener('dragleave',()=>item.style.borderColor='');
-    item.addEventListener('drop',e=>{e.preventDefault();item.style.borderColor='';const from=parseInt(e.dataTransfer.getData('text/plain'));if(from===i)return;const moved=msgTpls.splice(from,1)[0];msgTpls.splice(i,0,moved);saveMsgTpls();renderTplHub();});
+    item.addEventListener('drop',e=>{e.preventDefault();item.style.borderColor='';const fromReal=parseInt(e.dataTransfer.getData('text/plain'));if(fromReal===realIdx)return;const moved=msgTpls.splice(fromReal,1)[0];msgTpls.splice(realIdx,0,moved);saveMsgTpls();renderTplHub();});
     el.appendChild(item);
   });
 }
@@ -1166,8 +1175,18 @@ async function saveTplHub(){
 function redoTplHub(){const idx=document.getElementById('tpl_eidx').value;if(idx!==''){const t=msgTpls[parseInt(idx)];if(t._prev){document.getElementById('tpl_name').value=t._prev.name;document.getElementById('tpl_content').value=t._prev.content;document.getElementById('tpl_cat').value=t._prev.cat||'';alert('Reverted.');}else alert('No previous version.');}else alert('Save first.');}
 async function syncTplsFromSheet(){
   const el=document.getElementById('tplHubList');el.innerHTML='<div class="hload">Syncing...</div>';
-  try{const rows=await readSheet(TABS.TPLS,'A2:D');if(rows.length){msgTpls=rows.map(r=>({name:r[0]||'',cat:r[1]||'',content:r[2]||'',_updated:r[3]||''})).filter(t=>t.name);saveMsgTpls();}renderTplHub();}
-  catch(e){el.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
+  try{
+    const rows=await readSheet(TABS.TPLS,'A2:D');
+    const sheetTpls=rows.map(r=>({name:r[0]||'',cat:r[1]||'',content:r[2]||'',_updated:r[3]||''})).filter(t=>t.name);
+    // Push any local-only templates up to the sheet first (one-time migration).
+    // This prevents templates that were never synced from being wiped on read-back.
+    const localOnly=msgTpls.filter(t=>t.name&&!sheetTpls.some(s=>s.name===t.name));
+    for(const t of localOnly){await appendRow(TABS.TPLS,[t.name,t.cat||'',t.content||'',new Date().toISOString()]).catch(()=>{});}
+    // Sheet is now the single source of truth — full replace from sheet.
+    const allSheetTpls=localOnly.length?[...sheetTpls,...localOnly]:sheetTpls;
+    if(allSheetTpls.length){msgTpls=allSheetTpls;saveMsgTpls();}
+    renderTplHub();
+  }catch(e){el.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
 }
 
 // ==================== ACTIVITIES ====================

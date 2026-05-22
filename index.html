@@ -422,7 +422,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v22 · Build 21</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v23 · Build 22</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -741,7 +741,19 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <button class="sbtn2" style="font-size:11px;padding:6px 11px;" onclick="openTplHub(null)">+ New</button>
       </div>
     </div>
-    <div id="tplHubList"><div class="hload">Tap Sync to load latest from sheet</div></div>
+    <select id="tpl_fcat" onchange="renderTplHub()" style="width:100%;font-size:11px;padding:6px 9px;border:1px solid var(--gr4);border-radius:var(--r);background:var(--wh);color:var(--bk);margin-bottom:10px;">
+      <option value="">All Categories</option>
+      <option>Payment</option>
+      <option>Review</option>
+      <option>Arrival</option>
+      <option>Departure</option>
+      <option>Meet &amp; Greet</option>
+      <option>First Touch</option>
+      <option>Require Info</option>
+      <option>Reject</option>
+      <option>Others</option>
+    </select>
+    <div id="tplHubList"><div class="hload">Loading templates from sheet...</div></div>
     <div style="height:18px;"></div>
   </div>
 </div>
