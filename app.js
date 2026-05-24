@@ -133,7 +133,7 @@ async function refreshBoard(){
   const btn=document.getElementById('refreshBtn');btn.style.opacity='.5';btn.style.pointerEvents='none';
   document.getElementById('todayCards').innerHTML='<div class="empty"><p>Loading...</p></div>';
   try{
-    const rows=await readSheet(TABS.DOGS,'A2:BD');allDogs=rows.map((r,i)=>mapDog(r,i)).filter(d=>d.name.trim());
+    const rows=await readSheet(TABS.DOGS,'A2:BE');allDogs=rows.map((r,i)=>mapDog(r,i)).filter(d=>d.name.trim());
     const br=await readSheet(TABS.BK,'A2:AD').catch(()=>[]);bookings=br.map((r,i)=>mapBk(r,i));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[0]||'',activity:r[1]||'',dogs:r[2]||'',staff:r[3]||'',dur:r[4]||'',notes:r[5]||''}));
@@ -152,13 +152,21 @@ function mapBk(r,i){return{id:r[0]||'',dog:r[1]||'',customerId:r[2]||'',svc:r[3]
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
   const in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().split('T')[0];
-  const bm={};bookings.filter(b=>b.status!=='Canceled').forEach(b=>{const n=b.dog.toLowerCase();if(!bm[n]||b.sd>bm[n].sd)bm[n]=b;});
-  // Also build customerId-keyed map for accurate matching
-  const bmById={};bookings.filter(b=>b.status!=='Canceled'&&b.customerId).forEach(b=>{if(!bmById[b.customerId]||b.sd>bmById[b.customerId].sd)bmById[b.customerId]=b;});
-
+  const validBks=bookings.filter(b=>b.status!=='Canceled');
   let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)):allDogs;
   const active=[],week=[],upcoming=[],other=[];
-  dogs.forEach(d=>{const bk=bmById[d.cid]||bm[d.name.toLowerCase()];if(bk&&bk.sd<=today&&bk.ed>=today)active.push(d);else if(bk&&bk.sd>today&&bk.sd<=in7s)week.push(d);else if(bk&&bk.sd>in7s)upcoming.push(d);else other.push(d);});
+  dogs.forEach(d=>{
+    // Get all bookings for this dog, matched by customerId or name
+    const dogBks=validBks.filter(b=>(b.customerId&&b.customerId===d.cid)||b.dog.toLowerCase()===d.name.toLowerCase());
+    // Priority 1: any booking active today
+    const activeBk=dogBks.find(b=>b.sd<=today&&b.ed>=today);
+    if(activeBk){active.push(d);return;}
+    // Priority 2: soonest upcoming booking
+    const futureBks=dogBks.filter(b=>b.sd>today).sort((a,b)=>a.sd.localeCompare(b.sd));
+    const nextBk=futureBks[0];
+    if(nextBk){if(nextBk.sd<=in7s)week.push(d);else upcoming.push(d);}
+    else other.push(d);
+  });
   renderCards(active,document.getElementById('todayCards'),'on');renderCards(week,document.getElementById('weekCards'),'wk');renderCards(upcoming,document.getElementById('upcomingCards'),'up');renderCards(other,document.getElementById('otherCards'),'');
 }
 function renderCards(dogs,c,cls){
