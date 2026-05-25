@@ -427,7 +427,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v26 · Build 25</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v27 · Build 28</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -716,7 +716,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <select class="fs" id="plYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="updatePL()"><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
     </div>
     <div class="kpi-g">
-      <div class="kpi"><div class="kpi-l">Total Revenue</div><div class="kpi-v" id="kpi_rev">£0</div><div class="kpi-s" id="kpi_rev_s"></div></div>
+      <div class="kpi"><div class="kpi-l">Cash Received</div><div class="kpi-v" id="kpi_rev">£0</div><div class="kpi-s" id="kpi_rev_s"></div></div>
       <div class="kpi"><div class="kpi-l">Achievement</div><div class="kpi-v" id="kpi_pct">0%</div><div class="kpi-s">vs target</div></div>
       <div class="kpi"><div class="kpi-l">Total Costs</div><div class="kpi-v" id="kpi_cost">£0</div><div class="kpi-s" id="kpi_cost_s"></div></div>
       <div class="kpi"><div class="kpi-l">Net Profit</div><div class="kpi-v" id="kpi_net">£0</div><div class="kpi-s">After all costs</div></div>
@@ -732,7 +732,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       </div>
     </div>
     <div class="fsec">Monthly Targets &amp; Actuals</div>
-    <div class="tw" style="margin-bottom:11px;"><table><thead><tr><th>Month</th><th>Rev Target</th><th>Cost Target</th><th>Actual Rev</th><th>Actual Cost</th><th>Net</th></tr></thead><tbody id="plTbl"></tbody></table></div>
+    <div class="tw" style="margin-bottom:11px;"><table><thead><tr><th>Month</th><th>Rev Target</th><th>Cost Target</th><th>Cash In</th><th>Actual Cost</th><th>Net</th></tr></thead><tbody id="plTbl"></tbody></table></div>
     <div class="srow"><button class="sbtn2" onclick="saveTargets()">Save Targets</button><span class="smsg" id="tgtStatus"></span></div>
     <div style="height:18px;"></div>
   </div>
@@ -838,7 +838,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <input type="file" id="profPhotoInput" accept="image/*" style="display:none;" onchange="handlePh(event)">
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
-        <button onclick="showEmojiPicker()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">😀 Emoji</button>
         <button onclick="promptGdriveUrl('profile')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">🔗 Drive URL</button>
       </div>
     </div>
@@ -870,6 +869,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="hfb" onclick="filtHist('daily',this)">Daily</button>
       <button class="hfb" onclick="filtHist('health',this)">Health</button>
       <button class="hfb" onclick="filtHist('incidents',this)">Incidents</button>
+      <button class="hfb" onclick="filtHist('transport',this)">Transport</button>
+      <button class="hfb" onclick="filtHist('activities',this)">Activities</button>
+      <button class="hfb" onclick="filtHist('trial',this)">Trial</button>
     </div>
     <div class="hlist" id="histList"><div class="hload">Tap a filter to load</div></div>
   </div>
@@ -901,7 +903,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <input type="file" id="regPhotoInput" accept="image/*" style="display:none;" onchange="handleRegPh(event)">
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
         <span style="font-size:9px;color:var(--gr3);">Tap circle to add photo</span>
-        <button class="sbtn2" onclick="showEmojiPicker('register')" style="font-size:11px;padding:4px 10px;">😀 Emoji</button>
         <button class="sbtn2" onclick="promptGdriveUrl('register')" style="font-size:11px;padding:4px 10px;">🔗 Drive URL</button>
       </div>
     </div>
@@ -1085,23 +1086,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="f"><label>Cost (£) if any</label><input class="fi" type="number" id="act_cost" placeholder="0" step="0.01"></div>
       <div class="f"><label>Notes</label><textarea class="fta" id="act_notes"></textarea></div>
       <div class="srow"><button class="sbtn2" onclick="saveAct()">Save Activity</button><span class="smsg" id="actStatus"></span></div>
-    </div>
-  </div>
-</div>
-<!-- EMOJI PICKER MODAL -->
-<div class="modal" id="emojiModal" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
-    <div class="mhdr"><div class="mttl">Pick Emoji</div><button class="mcl" onclick="document.getElementById('emojiModal').classList.remove('open')">&#x2715;</button></div>
-    <div class="mbdy">
-      <div style="margin-bottom:10px;">
-        <label style="font-size:10px;color:var(--gr2);display:block;margin-bottom:4px;">Type or paste any emoji:</label>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <input class="fi" id="emojiCustomInput" placeholder="e.g. 🐕" style="font-size:20px;max-width:80px;text-align:center;" oninput="previewCustomEmoji()">
-          <button class="sbtn2" onclick="useCustomEmoji()" style="font-size:11px;">Use this</button>
-        </div>
-      </div>
-      <div style="font-size:10px;color:var(--gr3);margin-bottom:6px;">Or choose from presets:</div>
-      <div id="emojiGrid" class="emoji-grid"></div>
     </div>
   </div>
 </div>

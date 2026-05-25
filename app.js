@@ -10,6 +10,8 @@ function defEmoji(d){const b=(d.breed||'').toLowerCase();if(b.includes('retrieve
 function genId(n){return 'TCL-'+n.substring(0,2).toUpperCase()+String(Date.now()).slice(-4);}
 // Normalise cost dates — handles both YYYY-MM-DD (from date input) and DD/MM/YYYY (manual sheet entry)
 function normDate(d){if(!d)return'';if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;if(/^\d{2}\/\d{2}\/\d{4}$/.test(d)){const p=d.split('/');return p[2]+'-'+p[1]+'-'+p[0];}return d;}
+// Cash actually received: Prepaid → deposit only; Fully Paid/Credit → full settlement; Quoted/Booked/Canceled → 0
+function actualRev(r){if(r.status==='Prepaid')return(r.prepay||0);if(r.status==='Fully Paid'||r.status==='Credit')return(r.prepay||0)+(r.finalPay||0)+(r.tips||0);return 0;}
 function ir(k,v){if(!v||!v.toString().trim())return'';const lv=v.toString().toLowerCase().trim();if(lv==='n/a'||lv==='na'||lv==='none'||lv==='-')return'';return '<div class="irow"><span class="ikey">'+k+'</span><span class="ival">'+v+'</span></div>';}
 function fmtGBP(n){return '\u00a3'+(parseFloat(n)||0).toFixed(2);}
 function copyText(msg){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(msg).catch(()=>{});}else{const ta=document.createElement('textarea');ta.value=msg;ta.style.cssText='position:fixed;top:-9999px;opacity:0;';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}}
@@ -100,7 +102,7 @@ async function doCreateSheet(){
     {n:TABS.DAILY,h:['Date','Dog','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','Game','BeforeSleep','Bowl','Room','Garment','CustomerID','Notes','Private']},
     {n:TABS.HEALTH,h:['Date','Dog','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
     {n:TABS.FIGHT,h:['Date','Time','Dog','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
-    {n:TABS.TRANSPORT,h:['Date','Dog','Transporter','Vehicle','Plate','JourneyType','Time','Notes','Private']},
+    {n:TABS.TRANSPORT,h:['Date','Dog','Transporter','Vehicle','Plate','JourneyType','Time','Notes','Private','CustomerID','From','To']},
     {n:TABS.TRIAL,h:['Date','Dog','MixedWith','Observations','Suitable','Private']},
     {n:TABS.COSTS,h:['Date','Category','Amount','Notes']},
     {n:TABS.TARGETS,h:['Month','RevTarget','CostTarget']},
@@ -159,13 +161,16 @@ function renderBoard(){
   const active=[],week=[],upcoming=[],other=[];
   dogs.forEach(d=>{
     const dogBks=validBks.filter(b=>(b.customerId&&b.customerId===d.cid)||b.dog.toLowerCase()===d.name.toLowerCase());
-    const activeBk=dogBks.find(b=>b.sd<=today&&b.ed>=today);
+    const activeBks=dogBks.filter(b=>b.sd<=today&&b.ed>=today);
+    const activeBk=activeBks.length?activeBks.sort((a,b)=>a.sd.localeCompare(b.sd))[0]:null;
     if(activeBk){active.push({dog:d,bk:activeBk});return;}
     const futureBks=dogBks.filter(b=>b.sd>today).sort((a,b)=>a.sd.localeCompare(b.sd));
     const nextBk=futureBks[0];
     if(nextBk){if(nextBk.sd<=in7s)week.push({dog:d,bk:nextBk});else upcoming.push({dog:d,bk:nextBk});}
     else other.push({dog:d,bk:null});
   });
+  week.sort((a,b)=>a.bk.sd.localeCompare(b.bk.sd));
+  upcoming.sort((a,b)=>a.bk.sd.localeCompare(b.bk.sd));
   renderCards(active,document.getElementById('todayCards'),'on');renderCards(week,document.getElementById('weekCards'),'wk');renderCards(upcoming,document.getElementById('upcomingCards'),'up');renderCards(other,document.getElementById('otherCards'),'');
 }
 function renderCards(entries,c,cls){
@@ -174,14 +179,16 @@ function renderCards(entries,c,cls){
   entries.forEach(({dog,bk})=>{
     const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
     const vaccExpired=dog.vacc?(()=>{try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);return vd<cutoff;}catch(e){return false;}})():false;
+    // Birthday month celebration
+    const bdMonth=dog.birthday?parseInt(dog.birthday.split('-')[1]):0;const isBdayMo=bdMonth&&bdMonth===(new Date().getMonth()+1);
     // Booking info strip
     const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+bk.svc+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
-function dogOptLabel(d){return(d.emoji||defEmoji(d))+' '+d.name+' - '+d.cid;}
+function dogOptLabel(d){return d.name+' - '+d.cid;}
 function refreshDogDropdowns(){const sel=document.getElementById('bm_dog');if(sel){const cur=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(cur)sel.value=cur;}buildQDogMS();}
 function filterBmDog(){const q=(document.getElementById('bm_dog_search')?.value||'').toLowerCase();const sel=document.getElementById('bm_dog');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(prev)sel.value=prev;}
 
@@ -190,7 +197,7 @@ function waLink(ph){if(!ph)return'';const n=ph.replace(/[^0-9]/g,'');return'<a h
 function openProfile(dog){
   curDog=dog;histCache={};
   const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);
-  document.getElementById('profName').textContent=dog.name;document.getElementById('profMeta').textContent=[dog.breed,dog.weight?dog.weight+'kg':'',calcAge(dog.birthday)].filter(Boolean).join(' - ');document.getElementById('profId').textContent=dog.cid;document.getElementById('profEmoji').textContent=dog.emoji||defEmoji(dog);
+  document.getElementById('profName').textContent=dog.name;document.getElementById('profMeta').textContent=[dog.breed,dog.weight?dog.weight+'kg':'',calcAge(dog.birthday)].filter(Boolean).join(' - ');document.getElementById('profId').textContent=dog.cid;document.getElementById('profEmoji').textContent='';
   const wrap=document.getElementById('profPhotoWrap');let img=wrap.querySelector('img.pl');
   if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';wrap.appendChild(img);}
   img.style.display=photo?'block':'none';if(photo)img.src=photo;
@@ -239,7 +246,7 @@ function buildTodayLog(){
     '<div class="cat-sec"><div class="cat-t">Incidents</div>'+
     inc('health','Health','<div class="fr"><div class="f"><label>Category</label><select class="fs" id="ih_cat"><option>Injury</option><option>Illness</option><option>Allergic reaction</option><option>Digestive</option><option>Behavioural</option><option>Medication</option><option>Other</option></select></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'health\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'health\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'health\',\'High\',event)">High</button></div><input type="hidden" id="ih_imp"></div></div><div class="f"><label>Issue</label><input class="fi" id="ih_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ih_desc" style="min-height:48px;"></textarea></div><div class="f"><label>Root cause</label><input class="fi" id="ih_cause"></div><div class="f"><label>Next steps</label><input class="fi" id="ih_next"></div>')+
     inc('fight','Dog Fight','<div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="if_time"></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'fight\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'fight\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'fight\',\'High\',event)">High</button></div><input type="hidden" id="if_imp"></div></div><div class="f"><label>Other dogs</label><select class="fs" id="if_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>What happened</label><textarea class="fta" id="if_issue" style="min-height:48px;"></textarea></div><div class="f"><label>Injuries</label><input class="fi" id="if_inj"></div><div class="f"><label>Treatment</label><input class="fi" id="if_treat"></div><div class="f"><label>Prevention</label><input class="fi" id="if_prev"></div>')+
-    inc('transport','Transport','<div class="fr"><div class="f"><label>Transporter</label><input class="fi" id="it_name"></div><div class="f"><label>Vehicle</label><input class="fi" id="it_vehicle"></div></div><div class="fr"><div class="f"><label>Plate</label><input class="fi" id="it_plate"></div><div class="f"><label>Journey</label><select class="fs" id="it_type"><option>Drop-off</option><option>Pick-up</option><option>Both</option></select></div></div><div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="it_time"></div><div class="f"><label>Notes</label><input class="fi" id="it_notes"></div></div>')+
+    inc('transport','Transport','<div class="fr"><div class="f"><label>Transporter</label><input class="fi" id="it_name"></div><div class="f"><label>Vehicle</label><input class="fi" id="it_vehicle"></div></div><div class="fr"><div class="f"><label>Plate</label><input class="fi" id="it_plate"></div><div class="f"><label>Journey</label><select class="fs" id="it_type"><option>Drop-off</option><option>Pick-up</option><option>Both</option></select></div></div><div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="it_time"></div><div class="f"><label>Notes</label><input class="fi" id="it_notes"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="it_from" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="it_to" placeholder="Drop-off location"></div></div>')+
     inc('trial','Dog Trial','<div class="f"><label>Dogs mixed with</label><select class="fs" id="itr_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>Observations</label><textarea class="fta" id="itr_obs" style="min-height:55px;"></textarea></div><div class="f"><label>Suitable?</label><select class="fs" id="itr_suit"><option>Suitable</option><option>With supervision</option><option>Not suitable</option><option>Further trial needed</option></select></div>')+
     '</div>';
 }
@@ -260,7 +267,7 @@ async function saveLog(){
   _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[today,act,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '','',sv.notes||'',curDog.cid])));
   if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[today,'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv,curDog.cid]));
   if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[today,gv('if_time'),'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv,curDog.cid]));}
-  if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,[today,'=IFERROR(VLOOKUP(INDIRECT("J"&ROW()),Dogs!$A:$B,2,FALSE),"")',gv('it_name'),gv('it_vehicle'),gv('it_plate'),gv('it_type'),gv('it_time'),gv('it_notes'),priv,curDog.cid]));
+  if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,[today,'=IFERROR(VLOOKUP(INDIRECT("J"&ROW()),Dogs!$A:$B,2,FALSE),"")',gv('it_name'),gv('it_vehicle'),gv('it_plate'),gv('it_type'),gv('it_time'),gv('it_notes'),priv,curDog.cid,gv('it_from'),gv('it_to')]));
   if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,[today,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")',oth2,gv('itr_obs'),gv('itr_suit'),priv,curDog.cid]));}
   try{await Promise.all(saves);_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
 }
@@ -304,6 +311,8 @@ async function filtHist(type,btn){
     else if(type==='daily')all=await ft(TABS.DAILY);
     else if(type==='health')all=await ft(TABS.HEALTH);
     else if(type==='activities')all=await ft(TABS.ACTLOG);
+    else if(type==='transport')all=await ft(TABS.TRANSPORT);
+    else if(type==='trial')all=await ft(TABS.TRIAL);
     const nm=curDog.name.toLowerCase();const cid=curDog.cid;let flt=all.filter(({row})=>row.includes(cid)||(row.join(' ').toLowerCase().includes(nm)));
     flt.sort((a,b)=>(b.row[0]||'').localeCompare(a.row[0]||''));
     // Deduplicate Daily logs — keep only latest entry per day
@@ -335,7 +344,7 @@ async function filtHist(type,btn){
       }
       else if(tab===TABS.HEALTH)summary=(row[3]||'-')+' '+(row[4]||'');
       else if(tab===TABS.FIGHT)summary='Fight: '+(row[5]||'-');
-      else if(tab===TABS.TRANSPORT)summary=(row[2]||'-')+' '+(row[5]||'-');
+      else if(tab===TABS.TRANSPORT){const trn=row[2]||'';const jtype=row[5]||'';const time=row[6]||'';const from=row[10]||'';const to=row[11]||'';const route=(from||to)?(from||'?')+' → '+(to||'?'):'';summary=[trn,jtype,time,route].filter(Boolean).join(' · ');}
       else if(tab===TABS.TRIAL)summary='Mixed: '+(row[2]||'-')+' - '+(row[4]||'-');
       else if(tab===TABS.ACTLOG)summary=(row[1]||'-')+(row[4]?' - '+row[4]+' mins':'')+(row[3]?' - '+row[3]:'');
       const item=document.createElement('div');item.className='hi';
@@ -353,7 +362,7 @@ function buildEditFlds(tab,date,lr,ri){
   if(tab===TABS.DAILY){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(16)+'"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(17)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','daily')";}
   else if(tab===TABS.HEALTH){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Category</label><input class="fi" id="ef_cat" value="'+g(4)+'"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue" value="'+g(3)+'"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc">'+g(7)+'</textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next" value="'+g(9)+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(10)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','health')";}
   else if(tab===TABS.FIGHT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_time" value="'+g(1)+'"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue">'+g(5)+'</textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev" value="'+g(9)+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(10)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','fight')";}
-  else if(tab===TABS.TRANSPORT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g(2)+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g(3)+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(7)+'"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(8)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
+  else if(tab===TABS.TRANSPORT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g(2)+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g(3)+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(7)+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g(10)+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g(11)+'" placeholder="Drop-off location"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(8)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
   else if(tab===TABS.TRIAL){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><input class="fi" id="ef_suit" value="'+g(4)+'"></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g(3)+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(5)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
   else if(tab===TABS.ACTLOG){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Duration (mins)</label><input class="fi" id="ef_dur" value="'+g(4)+'"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(5)+'"></div>';fn="doEdit('"+ri+"','"+tab+"','actlog')";}
   return info+flds+'<div class="srow"><button class="sbtn2" onclick="'+fn+'">Save Changes</button><span class="smsg" id="editStatus"></span></div>';
@@ -363,7 +372,7 @@ async function doEdit(riStr,tabStr,type){
   if(type==='daily')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("P"&ROW()),Dogs!$A:$B,2,FALSE),"")', '','','','','','','','','','','','','',curDog.cid,gv('ef_notes'),priv];
   else if(type==='health')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',gv('ef_issue'),gv('ef_cat'),'','',gv('ef_desc'),'',gv('ef_next'),priv,curDog.cid];
   else if(type==='fight')vals=[date,gv('ef_time'),'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'','',gv('ef_issue'),'','','',gv('ef_prev'),priv,curDog.cid];
-  else if(type==='transport')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("J"&ROW()),Dogs!$A:$B,2,FALSE),"")',gv('ef_trn'),gv('ef_trv'),'','','',gv('ef_notes'),priv,curDog.cid];
+  else if(type==='transport')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("J"&ROW()),Dogs!$A:$B,2,FALSE),"")',gv('ef_trn'),gv('ef_trv'),'','','',gv('ef_notes'),priv,curDog.cid,gv('ef_from'),gv('ef_to')];
   else if(type==='trial')vals=[date,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '',gv('ef_obs'),gv('ef_suit'),priv,curDog.cid];
   else if(type==='actlog')vals=[date,'','=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '',gv('ef_dur'),gv('ef_notes'),curDog.cid];
   st.textContent='Saving...';const tm={daily:TABS.DAILY,health:TABS.HEALTH,fight:TABS.FIGHT,transport:TABS.TRANSPORT,trial:TABS.TRIAL,actlog:TABS.ACTLOG};
@@ -496,8 +505,8 @@ function openEditProf(){
   s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_owner2',d.owner2||'');s('reg_phone2',d.phone2||'');s('reg_owner3',d.owner3||'');s('reg_phone3',d.phone3||'');s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
   document.getElementById('reg_updates_custom_wrap').style.display=d.updates==='Custom'?'flex':'none';
-  _regEmoji=d.emoji||'';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent=d.emoji||defEmoji(d);re.style.display='block';}
-  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl||localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';}
+  _regEmoji='';
+  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl||localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';const re=document.getElementById('regPhotoEmoji');if(re)re.style.display='none';}
   showScreen('sc-register');
 }
 function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').value)||3;if(document.getElementById(pfx+'_nval'))document.getElementById(pfx+'_nval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--or)';for(let i=0;i<5;i++){const s=document.getElementById('rns'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
@@ -509,7 +518,7 @@ function startReg(){
   ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_owner2','reg_phone2','reg_owner3','reg_phone3','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates_custom','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['reg_gender','reg_neut','reg_rescue','reg_car','reg_food','reg_svc','reg_updates','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setSvcChips('');
   document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();document.getElementById('reg_jog').value=3;updJogBar();
-  _regEmoji='';_regPhotoUrl='';initBdayType();document.getElementById('regPhotoImg').style.display='none';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent='🐶';re.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
+  _regEmoji='';_regPhotoUrl='';initBdayType();document.getElementById('regPhotoImg').style.display='none';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent='+';re.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
 }
 function duplicateDog(){
   if(!curDog)return;const d=curDog;startReg();
@@ -1065,8 +1074,7 @@ function renderBk(){
   document.getElementById('bkBody').innerHTML=recs.map(r=>{
     const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);const bal=paid-owed;
     const oc="openBkModal('"+r.id+"')";
-    const dg=allDogs.find(d=>d.name===r.dog);const em=dg?(dg.emoji||defEmoji(dg)):'🐶';
-    return'<tr onclick="'+oc+'"><td>'+(r.priv?'🔒 ':'')+em+' '+r.dog+'</td><td style="font-size:8px;">'+r.svc+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
+    return'<tr onclick="'+oc+'"><td>'+(r.priv?'🔒 ':'')+r.dog+'</td><td style="font-size:8px;">'+r.svc+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
   }).join('');
 }
 
@@ -1118,7 +1126,7 @@ async function syncTargetsFromSheet(){
 function buildPLTable(yr){
   const tgts=getTargets(yr);const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0,rover:0};});
   const active=['Prepaid','Fully Paid','Credit'];
-  bookings.forEach(r=>{if(!r.ed||!r.ed.startsWith(yr))return;const mo=new Date(r.ed+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=(r.rev||0);if(active.includes(r.status))monthly[mo].rover+=(r.roverAmt||0);}});
+  bookings.forEach(r=>{const ned=normDate(r.ed);if(!ned||!ned.startsWith(yr))return;const mo=new Date(ned+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=actualRev(r);if(active.includes(r.status))monthly[mo].rover+=(r.roverAmt||0);}});
   costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   document.getElementById('plTbl').innerHTML=MOS.map(m=>{const tgt=tgts[m];const act=monthly[m];const totalCost=act.cost+act.rover;const net=act.rev-totalCost;
     return'<tr><td style="font-weight:700;">'+m+'</td><td><input class="pl-inp" type="number" id="tr_'+m+'" value="'+tgt.rev+'"></td><td><input class="pl-inp" type="number" id="tc_'+m+'" value="'+tgt.cost+'"></td><td style="color:var(--gn);font-weight:700;">'+fmtGBP(act.rev)+'</td><td style="color:var(--rd);">'+fmtGBP(totalCost)+(act.rover>0?'<br><span style="font-size:7px;color:var(--gr3);">incl '+fmtGBP(act.rover)+' Rover</span>':'')+'</td><td style="font-weight:700;'+(net>=0?'color:var(--gn)':'color:var(--rd)')+';">'+fmtGBP(net)+'</td></tr>';
@@ -1141,8 +1149,8 @@ async function saveTargets(){
 }
 function updatePL(){
   const yr=document.getElementById('plYear')?.value||'2026';const tgts=getTargets(yr);const revTgt=Object.values(tgts).reduce((s,t)=>s+t.rev,0);const costTgt=Object.values(tgts).reduce((s,t)=>s+t.cost,0);
-  const active=['Prepaid','Fully Paid','Credit'];const yRec=bookings.filter(r=>r.ed&&r.ed.startsWith(yr));const normCosts=costs.map(c=>({...c,_nd:normDate(c.date)}));
-  const totalRev=yRec.reduce((s,r)=>s+(r.rev||0),0);const totalRover=yRec.filter(r=>active.includes(r.status)).reduce((s,r)=>s+(r.roverAmt||0),0);
+  const active=['Prepaid','Fully Paid','Credit'];const yRec=bookings.filter(r=>r.ed&&normDate(r.ed).startsWith(yr));const normCosts=costs.map(c=>({...c,_nd:normDate(c.date)}));
+  const totalRev=yRec.reduce((s,r)=>s+actualRev(r),0);const totalRover=yRec.filter(r=>active.includes(r.status)).reduce((s,r)=>s+(r.roverAmt||0),0);
   const totalCost=normCosts.filter(c=>c._nd&&c._nd.startsWith(yr)).reduce((s,c)=>s+(c.amount||0),0)+totalRover;const net=totalRev-totalCost;const pct=revTgt>0?(totalRev/revTgt*100):0;
   document.getElementById('kpi_rev').textContent=fmtGBP(totalRev);document.getElementById('kpi_rev_s').textContent='vs '+fmtGBP(revTgt)+' target';
   document.getElementById('kpi_pct').textContent=pct.toFixed(1)+'%';document.getElementById('kpi_cost').textContent=fmtGBP(totalCost);
@@ -1151,7 +1159,7 @@ function updatePL(){
 }
 function drawChart(yr,tgts){
   const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0};});const active=['Prepaid','Fully Paid','Credit'];
-  bookings.forEach(r=>{if(!r.ed||!r.ed.startsWith(yr))return;const mo=new Date(r.ed+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=(r.rev||0);if(active.includes(r.status))monthly[mo].cost+=(r.roverAmt||0);}});
+  bookings.forEach(r=>{const ned=normDate(r.ed);if(!ned||!ned.startsWith(yr))return;const mo=new Date(ned+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=actualRev(r);if(active.includes(r.status))monthly[mo].cost+=(r.roverAmt||0);}});
   costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   const rd=MOS.map(m=>monthly[m].rev);const cd=MOS.map(m=>monthly[m].cost);const rt=MOS.map(m=>tgts[m].rev);const ct=MOS.map(m=>tgts[m].cost);
   const maxV=Math.max(...rd,...cd,...rt,...ct,100);const W=560,H=190,PL=40,PR=14,PT=14,PB=26;const cW=W-PL-PR,cH=H-PT-PB;
