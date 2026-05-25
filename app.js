@@ -8,6 +8,8 @@ function gv(id){const el=document.getElementById(id);return el?el.value||'':(con
 function calcAge(b){if(!b)return'';try{const dob=new Date(b+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<1?Math.floor((now-dob)/2592000000)+'mo':y+'yr';}catch(e){return'';}}
 function defEmoji(d){const b=(d.breed||'').toLowerCase();if(b.includes('retriever')||b.includes('golden'))return'\u{1F9AE}';if(b.includes('husky'))return'\u{1F43A}';if(b.includes('collie'))return'\u{1F429}';if(b.includes('bulldog')||b.includes('pug')||b.includes('french'))return'\u{1F43E}';if(b.includes('shiba'))return'\u{1F98A}';if(b.includes('lab'))return'\u{1F415}';return'\u{1F436}';}
 function genId(n){return 'TCL-'+n.substring(0,2).toUpperCase()+String(Date.now()).slice(-4);}
+// Normalise cost dates — handles both YYYY-MM-DD (from date input) and DD/MM/YYYY (manual sheet entry)
+function normDate(d){if(!d)return'';if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;if(/^\d{2}\/\d{2}\/\d{4}$/.test(d)){const p=d.split('/');return p[2]+'-'+p[1]+'-'+p[0];}return d;}
 function ir(k,v){if(!v||!v.toString().trim())return'';const lv=v.toString().toLowerCase().trim();if(lv==='n/a'||lv==='na'||lv==='none'||lv==='-')return'';return '<div class="irow"><span class="ikey">'+k+'</span><span class="ival">'+v+'</span></div>';}
 function fmtGBP(n){return '\u00a3'+(parseFloat(n)||0).toFixed(2);}
 function copyText(msg){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(msg).catch(()=>{});}else{const ta=document.createElement('textarea');ta.value=msg;ta.style.cssText='position:fixed;top:-9999px;opacity:0;';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}}
@@ -124,7 +126,7 @@ function showScreen(id,push=true){
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs')renderCostTable();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -156,26 +158,26 @@ function renderBoard(){
   let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)):allDogs;
   const active=[],week=[],upcoming=[],other=[];
   dogs.forEach(d=>{
-    // Get all bookings for this dog, matched by customerId or name
     const dogBks=validBks.filter(b=>(b.customerId&&b.customerId===d.cid)||b.dog.toLowerCase()===d.name.toLowerCase());
-    // Priority 1: any booking active today
     const activeBk=dogBks.find(b=>b.sd<=today&&b.ed>=today);
-    if(activeBk){active.push(d);return;}
-    // Priority 2: soonest upcoming booking
+    if(activeBk){active.push({dog:d,bk:activeBk});return;}
     const futureBks=dogBks.filter(b=>b.sd>today).sort((a,b)=>a.sd.localeCompare(b.sd));
     const nextBk=futureBks[0];
-    if(nextBk){if(nextBk.sd<=in7s)week.push(d);else upcoming.push(d);}
-    else other.push(d);
+    if(nextBk){if(nextBk.sd<=in7s)week.push({dog:d,bk:nextBk});else upcoming.push({dog:d,bk:nextBk});}
+    else other.push({dog:d,bk:null});
   });
   renderCards(active,document.getElementById('todayCards'),'on');renderCards(week,document.getElementById('weekCards'),'wk');renderCards(upcoming,document.getElementById('upcomingCards'),'up');renderCards(other,document.getElementById('otherCards'),'');
 }
-function renderCards(dogs,c,cls){
-  if(!dogs.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
-  dogs.forEach(dog=>{
+function renderCards(entries,c,cls){
+  if(!entries.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
+  const scMap={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
+  entries.forEach(({dog,bk})=>{
     const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
     const vaccExpired=dog.vacc?(()=>{try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);return vd<cutoff;}catch(e){return false;}})():false;
+    // Booking info strip
+    const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+bk.svc+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div><div class="dcb-ch">'+(td.breakfast?'<span class="chip cg">Fed</span>':'')+(td.walkAm?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+(cls==='wk'?'<span class="chip cb">This week</span>':'')+(cls==='up'?'<span class="chip cp">Upcoming</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt=""><span class="dc-em-badge">'+(dog.emoji||defEmoji(dog))+'</span>':'<span style="font-size:30px;">'+(dog.emoji||defEmoji(dog))+'</span>')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
@@ -220,8 +222,12 @@ function buildTodayLog(){
   document.getElementById('logNotes').style.display='';
   const privLabel=document.querySelector('label[for="logPrivate"]');if(privLabel)privLabel.style.display='';
   const saveBtn=document.querySelector('.slb[onclick="saveLog()"]');if(saveBtn)saveBtn.style.display='';
+  // Default all unset tiles to 'To-do' when there is an active booking
+  const _TILE_KEYS=['breakfast','medAm','dinner','medPm','snack','walkAm','garden','walkPm','game','beforeSleep','bowl','room','garment'];
+  const _anySet=_TILE_KEYS.some(k=>sv[k]);
+  if(!_anySet){_TILE_KEYS.forEach(k=>{sv[k]='todo';});localStorage.setItem('log_'+curDog.cid+'_'+todayStr(),JSON.stringify(sv));}
   document.getElementById('logNotes').value=sv.notes||'';document.getElementById('logPrivate').checked=!!sv.priv;
-  function tile(k,ico,lbl){return '<div class="tile'+(sv[k]?' done':'')+'" id="tl_'+k+'" onclick="togTile(\''+k+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+'</span></div>';}
+  function tile(k,ico,lbl){const s=sv[k]||'';const sc=s?'done-'+s:'';const si=s==='yes'?' ✓':s==='refused'?' ✗':s==='todo'?' ○':s==='na'?' —':'';return'<div class="tile'+(sc?' '+sc:'')+'" id="tl_'+k+'" data-lbl="'+lbl+'" onclick="togTile(\''+k+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+si+'</span></div>';}
   function inc(k,lbl,body){return '<div class="inc-tog" onclick="togInc(\''+k+'\')"><span>'+lbl+'</span><span style="font-size:10px;color:var(--gr3);">'+(sv['inc_'+k]?'&#9652;':'&#9660;')+'</span></div><div class="inc-fld'+(sv['inc_'+k]?' open':'')+'" id="inc_'+k+'">'+body+'</div>';}
   const dogOpts=allDogs.filter(d=>d.cid!==curDog.cid).map(d=>'<option>'+d.name+' - '+d.cid+'</option>').join('');
   const actOpts='<option value="">No specific activity</option>'+activities.filter(a=>a.cat==='Walk'||a.cat==='Game').map(a=>'<option>'+a.title+'</option>').join('');
@@ -237,15 +243,20 @@ function buildTodayLog(){
     inc('trial','Dog Trial','<div class="f"><label>Dogs mixed with</label><select class="fs" id="itr_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>Observations</label><textarea class="fta" id="itr_obs" style="min-height:55px;"></textarea></div><div class="f"><label>Suitable?</label><select class="fs" id="itr_suit"><option>Suitable</option><option>With supervision</option><option>Not suitable</option><option>Further trial needed</option></select></div>')+
     '</div>';
 }
-function togTile(k){if(!curDog)return;const lk='log_'+curDog.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');sv[k]=!sv[k];localStorage.setItem(lk,JSON.stringify(sv));const t=document.getElementById('tl_'+k);if(t)t.classList.toggle('done',sv[k]);}
+function parseState(v){return v==='[Y]'?'yes':v==='[Refused]'?'refused':v==='[To-do]'?'todo':v==='[N/A]'?'na':'';}
+function togTile(k){if(!curDog)return;const lk='log_'+curDog.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');const cycle=['','todo','yes','refused','na'];sv[k]=cycle[(cycle.indexOf(sv[k]||'')+1)%cycle.length];localStorage.setItem(lk,JSON.stringify(sv));const t=document.getElementById('tl_'+k);if(t){['done-yes','done-refused','done-todo','done-na'].forEach(c=>t.classList.remove(c));if(sv[k])t.classList.add('done-'+sv[k]);const lblEl=t.querySelector('.t-lbl');if(lblEl){const si=sv[k]==='yes'?' ✓':sv[k]==='refused'?' ✗':sv[k]==='todo'?' ○':sv[k]==='na'?' —':'';lblEl.textContent=(t.dataset.lbl||'')+si;}}}
 function togInc(k){const el=document.getElementById('inc_'+k);if(!el)return;el.classList.toggle('open');const lk='log_'+curDog.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');sv['inc_'+k]=el.classList.contains('open');localStorage.setItem(lk,JSON.stringify(sv));}
 function setImp(p,val,e){e.stopPropagation();const pfx=p==='health'?'ih':'if';document.querySelectorAll('#inc_'+p+' .ib').forEach(b=>{b.className='ib';if(b.textContent===val)b.classList.add(val==='Low'?'il':val==='Med'?'im':'ih');});const el=document.getElementById(pfx+'_imp');if(el)el.value=val;}
 async function saveLog(){
   if(!curDog)return;const today=todayStr();const lk='log_'+curDog.cid+'_'+today;
   const sv=JSON.parse(localStorage.getItem(lk)||'{}');sv.notes=document.getElementById('logNotes').value;sv.priv=document.getElementById('logPrivate').checked;localStorage.setItem(lk,JSON.stringify(sv));
   const st=document.getElementById('logStatus');st.style.display='block';st.style.color='var(--gr2)';st.textContent='Saving...';
-  const g=k=>sv[k]?'[Y]':'[ ]';const priv=sv.priv?'Private':'';
-  const saves=[appendRow(TABS.DAILY,[today,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv])];
+  const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
+  const row=[today,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv];
+  // Update today's row if it already exists, otherwise append
+  const allDaily=await readSheet(TABS.DAILY,'A2:R').catch(()=>[]);
+  const existIdx=allDaily.findIndex(r=>r[0]===today&&r[15]===curDog.cid);
+  const saves=[existIdx>=0?updateRow(TABS.DAILY,existIdx+2,row):appendRow(TABS.DAILY,row)];
   _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[today,act,'=IFERROR(VLOOKUP(INDIRECT("G"&ROW()),Dogs!$A:$B,2,FALSE),"")', '','',sv.notes||'',curDog.cid])));
   if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[today,'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv,curDog.cid]));
   if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[today,gv('if_time'),'=IFERROR(VLOOKUP(INDIRECT("L"&ROW()),Dogs!$A:$B,2,FALSE),"")',curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv,curDog.cid]));}
@@ -315,17 +326,8 @@ async function filtHist(type,btn){
       const iP=row.includes('Private');
       let summary='';
       if(tab===TABS.DAILY){
-        const done=[];
-        if(row[2]==='[Y]')done.push('🍽️ Breakfast');
-        if(row[3]==='[Y]')done.push('💊 Med AM');
-        if(row[4]==='[Y]')done.push('🥘 Dinner');
-        if(row[5]==='[Y]')done.push('💊 Med PM');
-        if(row[6]==='[Y]')done.push('🍪 Snack');
-        if(row[7]==='[Y]')done.push('🐾 AM Walk');
-        if(row[8]==='[Y]')done.push('🌿 Garden');
-        if(row[9]==='[Y]')done.push('🐾 PM Walk');
-        if(row[10]==='[Y]')done.push('🎮 Play');
-        if(row[11]==='[Y]')done.push('🌙 Before Sleep');
+        const stLbl=(v,ico,n)=>{if(!v||v==='[ ]')return null;if(v==='[Y]')return ico+' '+n+' ✓';if(v==='[Refused]')return ico+' '+n+' ✗';if(v==='[To-do]')return ico+' '+n+' ○';if(v==='[N/A]')return ico+' '+n+' —';return null;};
+        const done=[stLbl(row[2],'🍽️','Breakfast'),stLbl(row[3],'💊','Med AM'),stLbl(row[4],'🥘','Dinner'),stLbl(row[5],'💊','Med PM'),stLbl(row[6],'🍪','Snack'),stLbl(row[7],'🐾','AM Walk'),stLbl(row[8],'🌿','Garden'),stLbl(row[9],'🐾','PM Walk'),stLbl(row[10],'🎮','Play'),stLbl(row[11],'🌙','Before Sleep')].filter(Boolean);
         const clean=v=>(!v||v.includes('[')||v==='Private')?'':v.trim();
         const bowl=clean(row[12]);const room=clean(row[13]);const notes=clean(row[16]);
         const meta=[bowl?bowl+' bowl':'',room].filter(Boolean).join(' · ');
@@ -343,7 +345,7 @@ async function filtHist(type,btn){
     });
   }catch(e){list.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
 }
-function openLiveEditDirect(tab,ri,row){document.getElementById('editModalBody').innerHTML=buildEditFlds(tab,row[0],row,ri);document.getElementById('editModal').classList.add('open');}
+function openLiveEditDirect(tab,ri,row){if(tab===TABS.DAILY){openAddPastLog(row[0]);return;}document.getElementById('editModalBody').innerHTML=buildEditFlds(tab,row[0],row,ri);document.getElementById('editModal').classList.add('open');}
 function buildEditFlds(tab,date,lr,ri){
   const g=li=>lr?lr[li]||'':'';
   const info='<div style="background:var(--hnxl);border:1px solid var(--hnl);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--cn);margin-bottom:10px;">Changes overwrite the original row in Google Sheets</div>';
@@ -368,9 +370,24 @@ async function doEdit(riStr,tabStr,type){
   try{await updateRow(tm[type]||tabStr,parseInt(riStr),vals);histCache={};st.textContent='Updated!';st.className='smsg ok';setTimeout(()=>document.getElementById('editModal').classList.remove('open'),1600);}
   catch(e){st.textContent=e.message;st.className='smsg err';}
 }
-function openAddPastLog(date){
-  if(!curDog)return;const lk='log_'+curDog.cid+'_'+date;const sv=JSON.parse(localStorage.getItem(lk)||'{}');
-  function tile(k,ico,lbl){return '<div class="tile'+(sv[k]?' done':'')+'" id="ptl_'+k+'" onclick="togPastTile(\''+k+'\',\''+date+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+'</span></div>';}
+async function openAddPastLog(date){
+  if(!curDog)return;
+  document.getElementById('editModalBody').innerHTML='<div class="hload">Loading…</div>';
+  document.getElementById('editModal').classList.add('open');
+  const lk='log_'+curDog.cid+'_'+date;
+  let sv=JSON.parse(localStorage.getItem(lk)||'{}');
+  // Pre-populate from Google Sheet so edits work across devices
+  try{
+    const rows=await readSheet(TABS.DAILY,'A2:R');
+    const keys=['breakfast','medAm','dinner','medPm','snack','walkAm','garden','walkPm','game','beforeSleep','bowl','room','garment'];
+    const row=rows.find(r=>r[0]===date&&r[15]===curDog.cid);
+    if(row){keys.forEach((k,i)=>{sv[k]=parseState(row[i+2]||'');});sv.notes=row[16]||'';sv.priv=row[17]==='Private';localStorage.setItem(lk,JSON.stringify(sv));}
+    else{// No existing log — if there was a booking for this date, default tiles to 'todo'
+      const hadBooking=bookings.some(b=>(b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.sd<=date&&b.ed>=date&&b.status!=='Canceled');
+      if(hadBooking&&!keys.some(k=>sv[k])){keys.forEach(k=>{sv[k]='todo';});localStorage.setItem(lk,JSON.stringify(sv));}}
+  }catch(e){}
+  function tile(k,ico,lbl){const s=sv[k]||'';const sc=s?'done-'+s:'';const si=s==='yes'?' ✓':s==='refused'?' ✗':s==='todo'?' ○':s==='na'?' —':'';return'<div class="tile'+(sc?' '+sc:'')+'" id="ptl_'+k+'" data-lbl="'+lbl+'" onclick="togPastTile(\''+k+'\',\''+date+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+si+'</span></div>';}
+  const legend='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:8px;">'+['✓ Yes','✗ Refused','○ To-do','— N/A'].map(l=>'<span style="color:var(--gr3);">'+l+'</span>').join('')+' <span style="color:var(--gr3);">(tap to cycle)</span></div>';
   const flds=
     '<div class="cat-sec"><div class="cat-t">Food &amp; Medicine</div><div class="tile-row">'+tile('breakfast','&#9728;','Breakfast')+tile('medAm','&#128138;','AM Med')+tile('dinner','&#127769;','Dinner')+tile('medPm','&#128138;','PM Med')+tile('snack','&#127999;','Snack')+'</div></div>'+
     '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('walkPm','&#128062;','PM Walk')+tile('garden','&#127807;','Garden Break')+'</div></div>'+
@@ -378,29 +395,44 @@ function openAddPastLog(date){
     '<div class="f"><label>Notes</label><textarea class="fta" id="ef_notes" style="min-height:48px;">'+(sv.notes||'')+'</textarea></div>'+
     '<label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(sv.priv?'checked':'')+'>Private</label>';
   document.getElementById('editModalBody').innerHTML=
-    '<div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--or);margin-bottom:10px;">Adding past daily log for <strong>'+fmtDateFull(date)+'</strong></div>'+
-    flds+'<div class="srow"><button class="sbtn2" onclick="saveAddPastLog(\''+date+'\')">Save Log</button><span class="smsg" id="editStatus"></span></div>';
-  document.getElementById('editModal').classList.add('open');
+    '<div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--or);margin-bottom:10px;">Daily log for <strong>'+fmtDateFull(date)+'</strong></div>'+
+    legend+flds+'<div class="srow"><button class="sbtn2" onclick="saveAddPastLog(\''+date+'\')">Save Log</button><span class="smsg" id="editStatus"></span></div>';
 }
-function togPastTile(k,date){if(!curDog)return;const lk='log_'+curDog.cid+'_'+date;const sv=JSON.parse(localStorage.getItem(lk)||'{}');sv[k]=!sv[k];localStorage.setItem(lk,JSON.stringify(sv));const t=document.getElementById('ptl_'+k);if(t)t.classList.toggle('done',sv[k]);}
+function togPastTile(k,date){if(!curDog)return;const lk='log_'+curDog.cid+'_'+date;const sv=JSON.parse(localStorage.getItem(lk)||'{}');const cycle=['','todo','yes','refused','na'];sv[k]=cycle[(cycle.indexOf(sv[k]||'')+1)%cycle.length];localStorage.setItem(lk,JSON.stringify(sv));const t=document.getElementById('ptl_'+k);if(t){['done-yes','done-refused','done-todo','done-na'].forEach(c=>t.classList.remove(c));if(sv[k])t.classList.add('done-'+sv[k]);const lblEl=t.querySelector('.t-lbl');if(lblEl){const si=sv[k]==='yes'?' ✓':sv[k]==='refused'?' ✗':sv[k]==='todo'?' ○':sv[k]==='na'?' —':'';lblEl.textContent=(t.dataset.lbl||'')+si;}}}
 async function saveAddPastLog(date){
   if(!curDog)return;const lk='log_'+curDog.cid+'_'+date;const sv=JSON.parse(localStorage.getItem(lk)||'{}');
   sv.notes=document.getElementById('ef_notes')?.value||'';sv.priv=document.getElementById('ef_priv')?.checked||false;localStorage.setItem(lk,JSON.stringify(sv));
   const st=document.getElementById('editStatus');st.textContent='Saving...';st.className='smsg';
-  const g=k=>sv[k]?'[Y]':'[ ]';const priv=sv.priv?'Private':'';
-  try{await appendRow(TABS.DAILY,[date,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv]);histCache={};st.textContent='Log saved!';st.className='smsg ok';setTimeout(()=>document.getElementById('editModal').classList.remove('open'),1600);}
-  catch(e){st.textContent=e.message;st.className='smsg err';}
+  const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
+  const row=[date,curDog.name,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),curDog.cid,sv.notes||'',priv];
+  try{
+    const rows=await readSheet(TABS.DAILY,'A2:R').catch(()=>[]);
+    const existIdx=rows.findIndex(r=>r[0]===date&&r[15]===curDog.cid);
+    if(existIdx>=0)await updateRow(TABS.DAILY,existIdx+2,row);else await appendRow(TABS.DAILY,row);
+    histCache={};st.textContent='Log saved!';st.className='smsg ok';setTimeout(()=>document.getElementById('editModal').classList.remove('open'),1600);
+  }catch(e){st.textContent=e.message;st.className='smsg err';}
 }
 function swPTab(name,btn){document.querySelectorAll('.ptc').forEach(c=>c.classList.remove('active'));document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));document.getElementById('ptab-'+name).classList.add('active');if(btn)btn.classList.add('active');}
 
 // CONSENT
 const CF=[{k:'photo',l:'Photo & video for marketing'},{k:'offleash',l:'Off-lead consent'},{k:'mixing',l:'Mixing with other households'},{k:'walkout',l:'Walking outside home/garden'},{k:'groupwalk',l:'Group walk (max 6 dogs)'},{k:'feedtog',l:'Fed alongside other households'},{k:'crate',l:'Crate consent'},{k:'sameroom',l:'Same room as family dog'},{k:'medcost',l:'Owner covers all vet costs'},{k:'vetconsent',l:'Vet consent incl. euthanasia'},{k:'tcsigned',l:'Signed T&Cs (THE CUDDLY LANE)'}];
-function buildConsent(dog){
+function _renderConsentUI(dog){
   document.getElementById('consentBody').innerHTML=CF.map(f=>{
     const v=(dog[f.k]||'').toLowerCase();const iy=v.includes('yes')||v.includes('signed');const inn=v.includes('no');
     const yoc="setConsent('"+f.k+"','Yes',this)";const noc="setConsent('"+f.k+"','No',this)";
     return'<div class="cfld"><label>'+f.l+'</label><div class="ctog"><button class="ctb'+(iy?' yes':'')+'" onclick="'+yoc+'">Yes</button><button class="ctb'+(inn?' no':'')+'" onclick="'+noc+'">No</button></div></div>';
   }).join('');
+}
+function buildConsent(dog){
+  _renderConsentUI(dog);
+  // Async: fetch latest consent record from sheet and refresh UI
+  readSheet(TABS.CONSENT,'A2:N').then(rows=>{
+    const dogRows=rows.filter(r=>r[1]===dog.cid||r[2]===dog.name).sort((a,b)=>(b[0]||'').localeCompare(a[0]||''));
+    if(!dogRows.length)return;
+    const latest=dogRows[0];
+    CF.forEach((f,i)=>{curDog[f.k]=latest[i+3]||'';});
+    _renderConsentUI(curDog);
+  }).catch(()=>{});
 }
 function setConsent(k,v,btn){if(!curDog)return;const already=(curDog[k]||'')=== v;curDog[k]=already?'':v;btn.closest('.cfld').querySelectorAll('.ctb').forEach(b=>b.className='ctb');if(!already)btn.classList.add(v==='Yes'?'yes':'no');}
 async function saveConsent(){const st=document.getElementById('consentStatus');if(!curDog)return;const vals=[todayStr(),curDog.cid,curDog.name,...CF.map(f=>curDog[f.k]||'')];try{await appendRow(TABS.CONSENT,vals);st.textContent='Consent saved!';st.className='smsg ok';setTimeout(()=>st.className='smsg',3000);}catch(e){st.textContent=e.message;st.className='smsg err';}}
@@ -1040,8 +1072,38 @@ function renderBk(){
 
 // ==================== COSTS ====================
 const COST_CATS=['Boarding License','Pet Insurance','PACT CTI Course','Business Phone','Tractive Subscription','Dog Field Booking','Poo Bags','Marketing','Rover Commission','Other'];
-function renderCostTable(){document.getElementById('costBody').innerHTML=costs.map((c,i)=>'<tr><td><input type="date" value="'+(c.date||'')+'" oninput="costs['+i+'].date=this.value" style="border:none;background:transparent;font-size:9px;font-family:var(--fb);color:var(--gr);width:96px;outline:none;"></td><td><select onchange="costs['+i+'].cat=this.value" style="border:none;background:transparent;font-size:9px;font-family:var(--fb);color:var(--gr);outline:none;">'+COST_CATS.map(o=>'<option'+(o===c.cat?' selected':'')+'>'+o+'</option>').join('')+'</select></td><td><input type="number" value="'+(c.amount||0)+'" oninput="costs['+i+'].amount=parseFloat(this.value)||0" style="border:none;background:transparent;font-size:9px;font-family:var(--fb);color:var(--gr);width:56px;outline:none;"></td><td><input type="text" value="'+(c.notes||'')+'" oninput="costs['+i+'].notes=this.value" style="border:none;background:transparent;font-size:9px;font-family:var(--fb);color:var(--gr);width:120px;outline:none;"></td><td><button onclick="costs.splice('+i+',1);renderCostTable()" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;">x</button></td></tr>').join('');}
-function addCostRow(){costs.push({date:todayStr(),cat:'Other',amount:0,notes:'',ri:null});renderCostTable();}
+function initCostFilters(){
+  // Populate category filter
+  const fc=document.getElementById('cost_fCat');if(!fc)return;fc.innerHTML='<option value="">All Categories</option>'+COST_CATS.map(c=>'<option>'+c+'</option>').join('');
+  // Default to current year + current month
+  const now=new Date();const yr=String(now.getFullYear());const mo=String(now.getMonth()+1).padStart(2,'0');
+  const fy=document.getElementById('cost_fYear');const fm=document.getElementById('cost_fMonth');
+  if(fy)fy.value=yr;if(fm)fm.value=mo;
+}
+function getFilteredCosts(){
+  const fy=document.getElementById('cost_fYear')?.value||'';const fm=document.getElementById('cost_fMonth')?.value||'';const fc=document.getElementById('cost_fCat')?.value||'';
+  return costs.filter(c=>{const nd=normDate(c.date);if(fy&&!nd.startsWith(fy))return false;if(fm&&nd.slice(5,7)!==fm)return false;if(fc&&c.cat!==fc)return false;return true;});
+}
+function drawCostPie(filtered){
+  const bycat={};filtered.forEach(c=>{bycat[c.cat]=(bycat[c.cat]||0)+(c.amount||0);});
+  const total=Object.values(bycat).reduce((s,v)=>s+v,0);
+  const svgEl=document.getElementById('costPieSvg');const legEl=document.getElementById('costPieLegend');if(!svgEl||!legEl)return;
+  if(!total){svgEl.innerHTML='<text x="100" y="105" text-anchor="middle" font-size="11" fill="#A8A29E">No data</text>';legEl.innerHTML='';return;}
+  const cols=['#F97316','#3B82F6','#22C55E','#EF4444','#A855F7','#EAB308','#14B8A6','#F43F5E','#6366F1','#64748B'];
+  const entries=Object.entries(bycat).sort((a,b)=>b[1]-a[1]);
+  let angle=-Math.PI/2;let paths='';let legend='';
+  entries.forEach(([cat,amt],i)=>{const pct=amt/total;const sweep=pct*2*Math.PI;const x1=100+80*Math.cos(angle),y1=100+80*Math.sin(angle),x2=100+80*Math.cos(angle+sweep),y2=100+80*Math.sin(angle+sweep);const large=sweep>Math.PI?1:0;const col=cols[i%cols.length];paths+='<path d="M100,100 L'+x1.toFixed(1)+','+y1.toFixed(1)+' A80,80 0 '+large+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+col+'" opacity="0.85"/>';legend+='<div style="display:flex;align-items:center;gap:5px;font-size:8px;color:var(--gr);"><div style="width:8px;height:8px;border-radius:2px;background:'+col+';flex-shrink:0;"></div><span>'+cat+'</span><span style="color:var(--gr3);margin-left:auto;">'+fmtGBP(amt)+' ('+Math.round(pct*100)+'%)</span></div>';angle+=sweep;});
+  paths+='<circle cx="100" cy="100" r="42" fill="white"/><text x="100" y="97" text-anchor="middle" font-size="10" font-weight="700" fill="#44403C">'+fmtGBP(total)+'</text><text x="100" y="110" text-anchor="middle" font-size="8" fill="#A8A29E">Total</text>';
+  svgEl.innerHTML=paths;legEl.innerHTML=legend;
+}
+function renderCostTable(){
+  if(!document.getElementById('cost_fYear')?.value&&!document.getElementById('cost_fMonth')?.value)initCostFilters();
+  const filtered=getFilteredCosts();drawCostPie(filtered);
+  const inStyle='border:none;background:transparent;font-size:9px;font-family:var(--fb);color:var(--gr);outline:none;';
+  document.getElementById('costBody').innerHTML=filtered.map(c=>{const i=costs.indexOf(c);return'<tr><td><input type="date" value="'+(normDate(c.date)||'')+'" oninput="costs['+i+'].date=this.value" style="'+inStyle+'width:100px;"></td><td><select onchange="costs['+i+'].cat=this.value" style="'+inStyle+'">'+COST_CATS.map(o=>'<option'+(o===c.cat?' selected':'')+'>'+o+'</option>').join('')+'</select></td><td><input type="number" value="'+(c.amount||0)+'" oninput="costs['+i+'].amount=parseFloat(this.value)||0" style="'+inStyle+'width:56px;"></td><td><input type="text" value="'+(c.notes||'')+'" oninput="costs['+i+'].notes=this.value" style="'+inStyle+'width:100px;"></td><td style="white-space:nowrap;"><button onclick="dupCostRow('+i+')" title="Duplicate" style="background:none;border:none;cursor:pointer;color:var(--or);font-size:13px;padding:0 3px;">⧉</button><button onclick="costs.splice('+i+',1);renderCostTable()" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;padding:0;">✕</button></td></tr>';}).join('');
+}
+function dupCostRow(i){const o=costs[i];costs.push({date:o.date,cat:o.cat,amount:o.amount,notes:o.notes,ri:null});renderCostTable();document.getElementById('costBody').lastElementChild?.scrollIntoView({behavior:'smooth'});}
+function addCostRow(){costs.push({date:todayStr(),cat:'Other',amount:0,notes:'',ri:null});renderCostTable();document.getElementById('costBody').lastElementChild?.scrollIntoView({behavior:'smooth'});}
 async function saveCosts(){const st=document.getElementById('costStatus');st.textContent='Saving...';st.className='smsg';try{const upd=costs.filter(c=>c.ri).map(c=>({ri:c.ri,vals:[c.date,c.cat,c.amount,c.notes]}));const newc=costs.filter(c=>!c.ri);if(upd.length)await batchUpd(TABS.COSTS,upd);for(const c of newc)await appendRow(TABS.COSTS,[c.date,c.cat,c.amount,c.notes]);st.textContent='All costs saved!';st.className='smsg ok';setTimeout(()=>st.className='smsg',3000);updatePL();}catch(e){st.textContent=e.message;st.className='smsg err';}}
 
 // ==================== P&L ====================
@@ -1056,8 +1118,8 @@ async function syncTargetsFromSheet(){
 function buildPLTable(yr){
   const tgts=getTargets(yr);const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0,rover:0};});
   const active=['Prepaid','Fully Paid','Credit'];
-  bookings.forEach(r=>{if(!r.sd||!r.sd.startsWith(yr))return;const mo=new Date(r.sd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=(r.rev||0);if(active.includes(r.status))monthly[mo].rover+=(r.roverAmt||0);}});
-  costs.forEach(c=>{if(!c.date||!c.date.startsWith(yr))return;const mo=new Date(c.date+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
+  bookings.forEach(r=>{if(!r.ed||!r.ed.startsWith(yr))return;const mo=new Date(r.ed+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=(r.rev||0);if(active.includes(r.status))monthly[mo].rover+=(r.roverAmt||0);}});
+  costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   document.getElementById('plTbl').innerHTML=MOS.map(m=>{const tgt=tgts[m];const act=monthly[m];const totalCost=act.cost+act.rover;const net=act.rev-totalCost;
     return'<tr><td style="font-weight:700;">'+m+'</td><td><input class="pl-inp" type="number" id="tr_'+m+'" value="'+tgt.rev+'"></td><td><input class="pl-inp" type="number" id="tc_'+m+'" value="'+tgt.cost+'"></td><td style="color:var(--gn);font-weight:700;">'+fmtGBP(act.rev)+'</td><td style="color:var(--rd);">'+fmtGBP(totalCost)+(act.rover>0?'<br><span style="font-size:7px;color:var(--gr3);">incl '+fmtGBP(act.rover)+' Rover</span>':'')+'</td><td style="font-weight:700;'+(net>=0?'color:var(--gn)':'color:var(--rd)')+';">'+fmtGBP(net)+'</td></tr>';
   }).join('');
@@ -1079,9 +1141,9 @@ async function saveTargets(){
 }
 function updatePL(){
   const yr=document.getElementById('plYear')?.value||'2026';const tgts=getTargets(yr);const revTgt=Object.values(tgts).reduce((s,t)=>s+t.rev,0);const costTgt=Object.values(tgts).reduce((s,t)=>s+t.cost,0);
-  const active=['Prepaid','Fully Paid','Credit'];const yRec=bookings.filter(r=>r.sd&&r.sd.startsWith(yr));
+  const active=['Prepaid','Fully Paid','Credit'];const yRec=bookings.filter(r=>r.ed&&r.ed.startsWith(yr));const normCosts=costs.map(c=>({...c,_nd:normDate(c.date)}));
   const totalRev=yRec.reduce((s,r)=>s+(r.rev||0),0);const totalRover=yRec.filter(r=>active.includes(r.status)).reduce((s,r)=>s+(r.roverAmt||0),0);
-  const totalCost=costs.filter(c=>c.date&&c.date.startsWith(yr)).reduce((s,c)=>s+(c.amount||0),0)+totalRover;const net=totalRev-totalCost;const pct=revTgt>0?(totalRev/revTgt*100):0;
+  const totalCost=normCosts.filter(c=>c._nd&&c._nd.startsWith(yr)).reduce((s,c)=>s+(c.amount||0),0)+totalRover;const net=totalRev-totalCost;const pct=revTgt>0?(totalRev/revTgt*100):0;
   document.getElementById('kpi_rev').textContent=fmtGBP(totalRev);document.getElementById('kpi_rev_s').textContent='vs '+fmtGBP(revTgt)+' target';
   document.getElementById('kpi_pct').textContent=pct.toFixed(1)+'%';document.getElementById('kpi_cost').textContent=fmtGBP(totalCost);
   document.getElementById('kpi_cost_s').textContent='vs '+fmtGBP(costTgt)+' target'+(totalRover>0?' (incl '+fmtGBP(totalRover)+' Rover)':'');
@@ -1089,8 +1151,8 @@ function updatePL(){
 }
 function drawChart(yr,tgts){
   const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0};});const active=['Prepaid','Fully Paid','Credit'];
-  bookings.forEach(r=>{if(!r.sd||!r.sd.startsWith(yr))return;const mo=new Date(r.sd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=(r.rev||0);if(active.includes(r.status))monthly[mo].cost+=(r.roverAmt||0);}});
-  costs.forEach(c=>{if(!c.date||!c.date.startsWith(yr))return;const mo=new Date(c.date+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
+  bookings.forEach(r=>{if(!r.ed||!r.ed.startsWith(yr))return;const mo=new Date(r.ed+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=(r.rev||0);if(active.includes(r.status))monthly[mo].cost+=(r.roverAmt||0);}});
+  costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   const rd=MOS.map(m=>monthly[m].rev);const cd=MOS.map(m=>monthly[m].cost);const rt=MOS.map(m=>tgts[m].rev);const ct=MOS.map(m=>tgts[m].cost);
   const maxV=Math.max(...rd,...cd,...rt,...ct,100);const W=560,H=190,PL=40,PR=14,PT=14,PB=26;const cW=W-PL-PR,cH=H-PT-PB;
   const xi=i=>PL+i*(cW/(MOS.length-1));const yi=v=>PT+cH-(v/maxV*cH);

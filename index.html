@@ -149,10 +149,16 @@ body{
 .tile-row{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
 .tile{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:5px 4px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;user-select:none;}
 .tile:hover{border-color:var(--orl);}
-.tile.done{background:var(--gnl)!important;border-color:var(--gn);}
+.tile.done,.tile.done-yes{background:var(--gnl)!important;border-color:var(--gn);}
 .t-ico{font-size:11px;flex-shrink:0;}
 .t-lbl{font-size:9px;font-weight:600;color:var(--gr);}
-.tile.done .t-lbl{color:var(--gn);}
+.tile.done .t-lbl,.tile.done-yes .t-lbl{color:var(--gn);}
+.tile.done-refused{background:#fff0f0!important;border-color:var(--rd);}
+.tile.done-refused .t-lbl{color:var(--rd);}
+.tile.done-todo{background:var(--orl)!important;border-color:var(--or);}
+.tile.done-todo .t-lbl{color:var(--or);}
+.tile.done-na{background:var(--gr5,#f5f5f4)!important;border-color:var(--gr3);}
+.tile.done-na .t-lbl{color:var(--gr3);}
 .inc-tog{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);cursor:pointer;margin-bottom:3px;font-size:10px;font-weight:600;color:var(--gr);}
 .inc-tog:hover{border-color:var(--orl);}
 .inc-fld{background:var(--gr5)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:10px;margin-bottom:3px;display:none;}
@@ -421,7 +427,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v24 · Build 23</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v26 · Build 25</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -678,6 +684,24 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="screen" id="sc-costs">
   <div class="pg">
     <div class="pg-t">Cost Records</div><div class="pg-s">Expenses, licenses &amp; marketing</div>
+    <!-- Filter bar -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+      <select class="fs" id="cost_fYear" style="font-size:10px;padding:4px 8px;width:auto;" onchange="renderCostTable()">
+        <option value="">All Years</option><option>2024</option><option>2025</option><option>2026</option><option>2027</option><option>2028</option>
+      </select>
+      <select class="fs" id="cost_fMonth" style="font-size:10px;padding:4px 8px;width:auto;" onchange="renderCostTable()">
+        <option value="">All Months</option><option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+      </select>
+      <select class="fs" id="cost_fCat" style="font-size:10px;padding:4px 8px;flex:1;min-width:100px;" onchange="renderCostTable()">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+    <!-- Pie chart -->
+    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;">
+      <svg id="costPieSvg" width="200" height="200" viewBox="0 0 200 200" style="flex-shrink:0;"></svg>
+      <div id="costPieLegend" style="flex:1;min-width:120px;display:flex;flex-direction:column;gap:4px;padding-top:10px;"></div>
+    </div>
+    <!-- Table -->
     <div class="tw" style="margin-bottom:9px;"><table><thead><tr><th>Date</th><th>Category</th><th>Amount (£)</th><th>Notes</th><th></th></tr></thead><tbody id="costBody"></tbody></table></div>
     <button class="sbtn2 grey" style="font-size:11px;padding:6px 13px;width:100%;" onclick="addCostRow()">+ Add row</button>
     <div class="srow"><button class="sbtn2" onclick="saveCosts()">Save all costs</button><span class="smsg" id="costStatus"></span></div>
