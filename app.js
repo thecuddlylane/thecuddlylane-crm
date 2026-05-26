@@ -101,7 +101,7 @@ async function doCreateSheet(){
   const sheets=[
     {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Emoji','Jogging','VaccinationURL','PhotoURL']},
     {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5']},
-    {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','Game','BeforeSleep','Bowl','Room','Garment','Notes','Private']},
+    {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','Activity','BeforeSleep','Bowl','Room','Garment','Notes','Private']},
     {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
     {n:TABS.FIGHT,h:['CustomerID','DogName','Date','Time','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
     {n:TABS.TRANSPORT,h:['CustomerID','DogName','Date','Transporter','Vehicle','Plate','JourneyType','Time','Notes','Private','From','To']},
@@ -265,14 +265,15 @@ async function saveLog(){
   const row=[curDog.cid,VL_A,today,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),sv.notes||'',priv];
   // Update today's row if it already exists, otherwise append
   const allDaily=await readSheet(TABS.DAILY,'A2:R').catch(()=>[]);
-  const existIdx=allDaily.findIndex(r=>r[2]===today&&r[0]===curDog.cid);
+  // Check both new format (CID at [0], date at [2]) and old v27 format (date at [0], CID at [15])
+  const existIdx=allDaily.findIndex(r=>(r[2]===today&&r[0]===curDog.cid)||(r[0]===today&&r[15]===curDog.cid));
   const saves=[existIdx>=0?updateRow(TABS.DAILY,existIdx+2,row):appendRow(TABS.DAILY,row)];
   _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[curDog.cid,VL_A,today,act,'','',sv.notes||''])));
   if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[curDog.cid,VL_A,today,curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv]));
   if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,[curDog.cid,VL_A,today,gv('if_time'),curDog.owner||'',oth,gv('if_issue'),gv('if_imp'),gv('if_inj'),gv('if_treat'),gv('if_prev'),priv]));}
   if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,[curDog.cid,VL_A,today,gv('it_name'),gv('it_vehicle'),gv('it_plate'),gv('it_type'),gv('it_time'),gv('it_notes'),priv,gv('it_from'),gv('it_to')]));
   if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,[curDog.cid,VL_A,today,oth2,gv('itr_obs'),gv('itr_suit'),priv]));}
-  try{await Promise.all(saves);_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
+  try{await Promise.all(saves);histCache={};_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
 }
 function buildSummary(dog){
   const alerts=[],notes=[];
@@ -296,7 +297,7 @@ function buildProfInfo(dog){
   const vaccBanner=vaccExpired?'<div style="background:var(--rdl,#fff0f0);border:1px solid var(--rd);border-radius:8px;padding:10px 14px;margin-bottom:10px;color:var(--rd);font-weight:600;font-size:13px;">⚠️ Vaccination expired — please ask owners to update records before the next visit.</div>':'';
   document.getElementById('profInfoBody').innerHTML=
     vaccBanner+
-    '<div class="isec"><div class="isec-t">Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender',dog.gender)+ir('Neutered',dog.neut)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival">'+dog.jog+'/5</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
+    '<div class="isec"><div class="isec-t">Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender',dog.gender)+ir('Neutered',dog.neut)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
     '<div class="isec"><div class="isec-t">Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="isec"><div class="isec-t">Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates+(dog.updatesCustom?' - '+dog.updatesCustom:''))+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="isec"><div class="isec-t">Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
@@ -339,7 +340,7 @@ async function filtHist(type,btn){
       let summary='';
       if(tab===TABS.DAILY){
         const stLbl=(v,ico,n)=>{if(!v||v==='[ ]')return null;if(v==='[Y]')return ico+' '+n+' ✓';if(v==='[Refused]')return ico+' '+n+' ✗';if(v==='[To-do]')return ico+' '+n+' ○';if(v==='[N/A]')return ico+' '+n+' —';return null;};
-        const done=[stLbl(row[3],'🍽️','Breakfast'),stLbl(row[4],'💊','Med AM'),stLbl(row[5],'🥘','Dinner'),stLbl(row[6],'💊','Med PM'),stLbl(row[7],'🍪','Snack'),stLbl(row[8],'🐾','AM Walk'),stLbl(row[9],'🌿','Garden'),stLbl(row[10],'🐾','PM Walk'),stLbl(row[11],'🎮','Play'),stLbl(row[12],'🌙','Before Sleep')].filter(Boolean);
+        const done=[stLbl(row[3],'🍽️','Breakfast'),stLbl(row[4],'💊','Med AM'),stLbl(row[5],'🥘','Dinner'),stLbl(row[6],'💊','Med PM'),stLbl(row[7],'🍪','Snack'),stLbl(row[8],'🐾','AM Walk'),stLbl(row[9],'🌿','Garden'),stLbl(row[10],'🐾','PM Walk'),stLbl(row[11],'🎮','Activity'),stLbl(row[12],'🌙','Before Sleep')].filter(Boolean);
         const clean=v=>(!v||v.includes('[')||v==='Private')?'':v.trim();
         const bowl=clean(row[13]);const room=clean(row[14]);const notes=clean(row[16]);
         const meta=[bowl?bowl+' bowl':'',room].filter(Boolean).join(' · ');
@@ -392,7 +393,7 @@ async function openAddPastLog(date){
   try{
     const rows=await readSheet(TABS.DAILY,'A2:R');
     const keys=['breakfast','medAm','dinner','medPm','snack','walkAm','garden','walkPm','game','beforeSleep','bowl','room','garment'];
-    const row=rows.find(r=>r[2]===date&&r[0]===curDog.cid);
+    const row=rows.find(r=>(r[2]===date&&r[0]===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
     if(row){keys.forEach((k,i)=>{sv[k]=parseState(row[i+3]||'');});sv.notes=row[16]||'';sv.priv=row[17]==='Private';localStorage.setItem(lk,JSON.stringify(sv));}
     else{// No existing log — if there was a booking for this date, default tiles to 'todo'
       const hadBooking=bookings.some(b=>(b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.sd<=date&&b.ed>=date&&b.status!=='Canceled');
@@ -419,7 +420,8 @@ async function saveAddPastLog(date){
   const row=[curDog.cid,VL_A,date,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),sv.notes||'',priv];
   try{
     const rows=await readSheet(TABS.DAILY,'A2:R').catch(()=>[]);
-    const existIdx=rows.findIndex(r=>r[2]===date&&r[0]===curDog.cid);
+    // Check both new format (CID at [0], date at [2]) and old v27 format (date at [0], CID at [15])
+    const existIdx=rows.findIndex(r=>(r[2]===date&&r[0]===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
     if(existIdx>=0)await updateRow(TABS.DAILY,existIdx+2,row);else await appendRow(TABS.DAILY,row);
     histCache={};st.textContent='Log saved!';st.className='smsg ok';setTimeout(()=>document.getElementById('editModal').classList.remove('open'),1600);
   }catch(e){st.textContent=e.message;st.className='smsg err';}
@@ -541,7 +543,14 @@ async function registerDog(){
   const photoUrlVal=_regPhotoUrl||(eid?curDog?.photoUrl||'':'');
   const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog'),gv('reg_vacc_url'),photoUrlVal];
   try{
-    if(eid&&ri)await updateRow(TABS.DOGS,ri,vals);else await appendRow(TABS.DOGS,vals);
+    if(eid){
+      // Search column A of Dogs sheet for the actual row with matching CID
+      // Using cached ri as fallback only — avoids cell-shift bug when rows are deleted/reordered
+      const cidCol=await readSheet(TABS.DOGS,'A2:A').catch(()=>[]);
+      const foundIdx=cidCol.findIndex(r=>r[0]===eid);
+      const targetRi=foundIdx>=0?foundIdx+2:ri;
+      if(targetRi)await updateRow(TABS.DOGS,targetRi,vals);else await appendRow(TABS.DOGS,vals);
+    }else await appendRow(TABS.DOGS,vals);
     const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);syncPhotoToSheet(cid,pd);}catch(e){}
     if(!eid){allDogs.push(mapDog(vals,allDogs.length));refreshDogDropdowns();}else if(curDog){const idx=allDogs.findIndex(d=>d.cid===eid);if(idx>=0){allDogs[idx]=mapDog(vals,idx);curDog=allDogs[idx];}}
     st.textContent=eid?'Profile updated!':'Registered! ID: '+cid;st.className='smsg ok';
