@@ -99,9 +99,9 @@ async function doCreateSheet(){
   const s=document.getElementById('cfgStatus');s.textContent='Creating structure...';
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
-    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Emoji','Jogging','VaccinationURL','PhotoURL']},
+    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Jogging','VaccinationURL','PhotoURL']},
     {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5']},
-    {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','Activity','BeforeSleep','Bowl','Room','Garment','Notes','Private']},
+    {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','BeforeSleep','Activity','Bowl','Room','Garment','Notes','Private']},
     {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
     {n:TABS.FIGHT,h:['CustomerID','DogName','Date','Time','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
     {n:TABS.TRANSPORT,h:['CustomerID','DogName','Date','Transporter','Vehicle','Plate','JourneyType','Time','Notes','Private','From','To']},
@@ -153,7 +153,7 @@ async function refreshBoard(){
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
-function mapDog(r,i,h){const g=n=>r[h&&h[n]!==undefined?h[n]:(n==='CustomerID'?0:n==='Name'?1:n==='Breed'?2:n==='Gender'?3:n==='Birthday'?4:n==='BirthdayType'?5:n==='Weight'?6:n==='Neutered'?7:n==='ChipID'?8:n==='Rescue'?9:n==='Nervous'?10:n==='SepAnxiety'?11:n==='DogFriends'?12:n==='FoodType'?13:n==='FoodMeasure'?14:n==='DietNotes'?15:n==='Allergies'?16:n==='Medical'?17:n==='MedSchedule'?18:n==='Fears'?19:n==='Untouchable'?20:n==='Vaccination'?21:n==='Flea'?22:n==='Behaviour'?23:n==='WalkSchedule'?24:n==='CarSeat'?25:n==='SleepLocation'?26:n==='EscapeAttempts'?27:n==='ToiletTrained'?28:n==='AloneHours'?29:n==='TrainingCommands'?30:n==='PrevSitters'?31:n==='UpdateFrequency'?32:n==='UpdateCustom'?33:n==='Relationships'?34:n==='AdditionalNotes'?35:n==='Owner1'?36:n==='Phone1'?37:n==='Owner2'?38:n==='Phone2'?39:n==='Owner3'?40:n==='Phone3'?41:n==='Address'?42:n==='Postcode'?43:n==='Emergency'?44:n==='Vet'?45:n==='Insurance'?46:n==='MeetGreetDate'?47:n==='Referral'?48:n==='ReferralNotes'?49:n==='Service'?50:n==='Status'?51:n==='Remarks'?52:n==='Emoji'?53:n==='Jogging'?54:n==='VaccinationURL'?55:56)]||'';
+function mapDog(r,i,h){const g=n=>r[h&&h[n]!==undefined?h[n]:(n==='CustomerID'?0:n==='Name'?1:n==='Breed'?2:n==='Gender'?3:n==='Birthday'?4:n==='BirthdayType'?5:n==='Weight'?6:n==='Neutered'?7:n==='ChipID'?8:n==='Rescue'?9:n==='Nervous'?10:n==='SepAnxiety'?11:n==='DogFriends'?12:n==='FoodType'?13:n==='FoodMeasure'?14:n==='DietNotes'?15:n==='Allergies'?16:n==='Medical'?17:n==='MedSchedule'?18:n==='Fears'?19:n==='Untouchable'?20:n==='Vaccination'?21:n==='Flea'?22:n==='Behaviour'?23:n==='WalkSchedule'?24:n==='CarSeat'?25:n==='SleepLocation'?26:n==='EscapeAttempts'?27:n==='ToiletTrained'?28:n==='AloneHours'?29:n==='TrainingCommands'?30:n==='PrevSitters'?31:n==='UpdateFrequency'?32:n==='UpdateCustom'?33:n==='Relationships'?34:n==='AdditionalNotes'?35:n==='Owner1'?36:n==='Phone1'?37:n==='Owner2'?38:n==='Phone2'?39:n==='Owner3'?40:n==='Phone3'?41:n==='Address'?42:n==='Postcode'?43:n==='Emergency'?44:n==='Vet'?45:n==='Insurance'?46:n==='MeetGreetDate'?47:n==='Referral'?48:n==='ReferralNotes'?49:n==='Service'?50:n==='Status'?51:n==='Remarks'?52:n==='Emoji'?99:n==='Jogging'?53:n==='VaccinationURL'?54:55)]||'';
   return{cid:g('CustomerID')||genId(g('Name')||'Dog'),name:g('Name'),breed:g('Breed'),gender:g('Gender'),birthday:g('Birthday'),bdayType:g('BirthdayType')||'exact',weight:g('Weight'),neut:g('Neutered'),chip:g('ChipID'),rescue:g('Rescue'),nervous:g('Nervous'),anxiety:g('SepAnxiety'),dogfriends:g('DogFriends'),food:g('FoodType'),foodMeasure:g('FoodMeasure'),dietNotes:g('DietNotes'),allerg:g('Allergies'),med:g('Medical'),medSchedule:g('MedSchedule'),fears:g('Fears'),notouch:g('Untouchable'),vacc:g('Vaccination'),flea:g('Flea'),behav:g('Behaviour'),walk:g('WalkSchedule'),car:g('CarSeat'),sleep:g('SleepLocation'),escape:g('EscapeAttempts'),toilet:g('ToiletTrained'),alone:g('AloneHours'),commands:g('TrainingCommands'),sitters:g('PrevSitters'),updates:g('UpdateFrequency'),updatesCustom:g('UpdateCustom'),rel:g('Relationships'),notes:g('AdditionalNotes'),owner:g('Owner1'),phone:g('Phone1'),owner2:g('Owner2'),phone2:g('Phone2'),owner3:g('Owner3'),phone3:g('Phone3'),addr:g('Address'),postcode:g('Postcode'),emergency:g('Emergency'),vet:g('Vet'),ins:g('Insurance'),meetgreet:g('MeetGreetDate'),referral:g('Referral'),refNotes:g('ReferralNotes'),svc:g('Service'),status:g('Status'),remarks:g('Remarks'),emoji:g('Emoji'),jog:g('Jogging'),vaccUrl:g('VaccinationURL'),photoUrl:g('PhotoURL'),rowIdx:i+2};}
 function mapBk(r,i,h){const gi=(n,fb)=>h&&h[n]!==undefined?h[n]:fb;return{id:r[gi('ID',2)]||'',dog:r[gi('DogName',1)]||'',customerId:r[gi('CustomerID',0)]||'',svc:r[gi('ServiceType',3)]||'',sd:r[gi('StartDate',4)]||'',st:r[gi('StartTime',5)]||'',ed:r[gi('EndDate',6)]||'',et:r[gi('EndTime',7)]||'',dropLoc:r[gi('DropoffLocation',8)]||'',pickLoc:r[gi('PickupLocation',9)]||'',rev:parseFloat(r[gi('Revenue',10)])||0,tips:parseFloat(r[gi('Tips',11)])||0,prepay:parseFloat(r[gi('Prepayment',12)])||0,finalPay:parseFloat(r[gi('FinalPayment',13)])||0,unit:parseFloat(r[gi('UnitCost',14)])||0,discNotes:r[gi('DiscountNotes',15)]||'',roverPct:parseFloat(r[gi('RoverCommissionPct',16)])||0,roverAmt:parseFloat(r[gi('RoverCommissionGBP',17)])||0,ch:r[gi('Channel',18)]||'TCL',pay:r[gi('Payment',19)]||'',status:r[gi('Status',20)]||'',priv:r[gi('Private',21)]==='Private',month:r[gi('Month',22)]||'',rating:r[gi('Rating',23)]||'',feedback:r[gi('Feedback',24)]||'',rem:[r[gi('Rem1',25)]||'',r[gi('Rem2',26)]||'',r[gi('Rem3',27)]||'',r[gi('Rem4',28)]||'',r[gi('Rem5',29)]||''],ri:i+2};}
 function renderBoard(){
@@ -262,11 +262,10 @@ async function saveLog(){
   const sv=JSON.parse(localStorage.getItem(lk)||'{}');sv.notes=document.getElementById('logNotes').value;sv.priv=document.getElementById('logPrivate').checked;localStorage.setItem(lk,JSON.stringify(sv));
   const st=document.getElementById('logStatus');st.style.display='block';st.style.color='var(--gr2)';st.textContent='Saving...';
   const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
-  const row=[curDog.cid,VL_A,today,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),sv.notes||'',priv];
+  const row=[curDog.cid,VL_A,today,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('beforeSleep'),g('game'),g('bowl'),g('room'),g('garment'),sv.notes||'',priv];
   // Update today's row if it already exists, otherwise append
-  const allDaily=await readSheet(TABS.DAILY,'A2:R').catch(()=>[]);
-  // Check both new format (CID at [0], date at [2]) and old v27 format (date at [0], CID at [15])
-  const existIdx=allDaily.findIndex(r=>(r[2]===today&&r[0]===curDog.cid)||(r[0]===today&&r[15]===curDog.cid));
+  const rawDaily=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dh_sl=mkHdr(rawDaily[0]||[]);const allDaily=rawDaily.slice(1);
+  const existIdx=allDaily.findIndex(r=>(r[dh_sl['Date']??2]===today&&r[dh_sl['CustomerID']??0]===curDog.cid)||(r[0]===today&&r[15]===curDog.cid));
   const saves=[existIdx>=0?updateRow(TABS.DAILY,existIdx+2,row):appendRow(TABS.DAILY,row)];
   _logSelectedActs.forEach(act=>saves.push(appendRow(TABS.ACTLOG,[curDog.cid,VL_A,today,act,'','',sv.notes||''])));
   if(document.getElementById('inc_health')?.classList.contains('open'))saves.push(appendRow(TABS.HEALTH,[curDog.cid,VL_A,today,curDog.owner||'',gv('ih_issue'),gv('ih_cat'),'',gv('ih_imp'),gv('ih_desc'),gv('ih_cause'),gv('ih_next'),priv]));
@@ -309,14 +308,14 @@ async function filtHist(type,btn){
   document.querySelectorAll('.hfb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(!curDog)return;
   const list=document.getElementById('histList');list.innerHTML='<div class="hload">Loading...</div>';
   try{
-    let all=[];const TAB_RANGE={[TABS.ACTLOG]:'A2:G'};const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rng=TAB_RANGE[tab]||'A2:R';const rows=await readSheet(tab,rng).catch(()=>[]);histCache[tab]=rows.map((r,i)=>({tab,row:r,ri:i+2}));return histCache[tab];};
-    if(type==='all'){for(const t of[TABS.DAILY,TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL,TABS.ACTLOG])all=all.concat(await ft(t));}
-    else if(type==='incidents'){for(const t of[TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL])all=all.concat(await ft(t));}
-    else if(type==='daily')all=await ft(TABS.DAILY);
-    else if(type==='health')all=await ft(TABS.HEALTH);
-    else if(type==='activities')all=await ft(TABS.ACTLOG);
-    else if(type==='transport')all=await ft(TABS.TRANSPORT);
-    else if(type==='trial')all=await ft(TABS.TRIAL);
+    let all=[];const TAB_RANGE={[TABS.ACTLOG]:'A1:G'};const ft=async(tab)=>{if(histCache[tab])return histCache[tab];const rng=TAB_RANGE[tab]||'A1:R';const rows=await readSheet(tab,rng).catch(()=>[]);const h=mkHdr(rows[0]||[]);if(h['Activity']===undefined&&h['Game']!==undefined)h['Activity']=h['Game'];const items=rows.slice(1).map((r,i)=>({tab,row:r,ri:i+2,h}));histCache[tab]={items,h};return histCache[tab];};
+    if(type==='all'){for(const t of[TABS.DAILY,TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL,TABS.ACTLOG])all=all.concat((await ft(t)).items);}
+    else if(type==='incidents'){for(const t of[TABS.HEALTH,TABS.FIGHT,TABS.TRANSPORT,TABS.TRIAL])all=all.concat((await ft(t)).items);}
+    else if(type==='daily')all=(await ft(TABS.DAILY)).items;
+    else if(type==='health')all=(await ft(TABS.HEALTH)).items;
+    else if(type==='activities')all=(await ft(TABS.ACTLOG)).items;
+    else if(type==='transport')all=(await ft(TABS.TRANSPORT)).items;
+    else if(type==='trial')all=(await ft(TABS.TRIAL)).items;
     const nm=curDog.name.toLowerCase();const cid=curDog.cid;let flt=all.filter(({row})=>row.includes(cid)||(row.join(' ').toLowerCase().includes(nm)));
     flt.sort((a,b)=>(b.row[2]||'').localeCompare(a.row[2]||''));
     // Deduplicate Daily logs — keep only latest entry per day
@@ -332,7 +331,8 @@ async function filtHist(type,btn){
       flt.sort((a,b)=>(b.row[2]||'').localeCompare(a.row[2]||''));
     }
     list.innerHTML='';if(!flt.length){list.innerHTML='<div class="hload">No records found</div>';return;}
-    flt.slice(0,100).forEach(({tab,row,ri})=>{
+    flt.slice(0,100).forEach(({tab,row,ri,h={}})=>{
+      const g=col=>row[h[col]!==undefined?h[col]:-1]||'';
       if(tab==='MISSING'){const item=document.createElement('div');item.className='hi';item.innerHTML='<div class="hi-h"><span class="hi-d">'+fmtDate(row[2])+'</span><span class="htype htmiss">Missing</span></div><div class="hsum" style="color:var(--or);font-style:italic;">No log recorded for this booking day</div><div class="hi-acts"><button class="ebtn" style="background:var(--or);color:#fff;border-color:var(--or);">+ Add Log</button></div>';item.querySelector('.ebtn').onclick=()=>openAddPastLog(row[2]);list.appendChild(item);return;}
       const lbl={};lbl[TABS.DAILY]='Daily';lbl[TABS.HEALTH]='Health';lbl[TABS.FIGHT]='Fight';lbl[TABS.TRANSPORT]='Transport';lbl[TABS.TRIAL]='Trial';lbl[TABS.ACTLOG]='Activity';
       const cls={};cls[TABS.DAILY]='htd';cls[TABS.HEALTH]='hth';cls[TABS.FIGHT]='hti';cls[TABS.TRANSPORT]='hti';cls[TABS.TRIAL]='hti';cls[TABS.ACTLOG]='hta';
@@ -340,35 +340,35 @@ async function filtHist(type,btn){
       let summary='';
       if(tab===TABS.DAILY){
         const stLbl=(v,ico,n)=>{if(!v||v==='[ ]')return null;if(v==='[Y]')return ico+' '+n+' ✓';if(v==='[Refused]')return ico+' '+n+' ✗';if(v==='[To-do]')return ico+' '+n+' ○';if(v==='[N/A]')return ico+' '+n+' —';return null;};
-        const done=[stLbl(row[3],'🍽️','Breakfast'),stLbl(row[4],'💊','Med AM'),stLbl(row[5],'🥘','Dinner'),stLbl(row[6],'💊','Med PM'),stLbl(row[7],'🍪','Snack'),stLbl(row[8],'🐾','AM Walk'),stLbl(row[9],'🌿','Garden'),stLbl(row[10],'🐾','PM Walk'),stLbl(row[11],'🎮','Activity'),stLbl(row[12],'🌙','Before Sleep')].filter(Boolean);
+        const done=[stLbl(g('Breakfast'),'🍽️','Breakfast'),stLbl(g('MedAM'),'💊','Med AM'),stLbl(g('Dinner'),'🥘','Dinner'),stLbl(g('MedPM'),'💊','Med PM'),stLbl(g('Snack'),'🍪','Snack'),stLbl(g('WalkAM'),'🐾','AM Walk'),stLbl(g('Garden'),'🌿','Garden'),stLbl(g('WalkPM'),'🐾','PM Walk'),stLbl(g('BeforeSleep'),'🌙','Before Sleep'),stLbl(g('Activity'),'🎮','Activity')].filter(Boolean);
         const clean=v=>(!v||v.includes('[')||v==='Private')?'':v.trim();
-        const bowl=clean(row[13]);const room=clean(row[14]);const notes=clean(row[16]);
+        const bowl=clean(g('Bowl'));const room=clean(g('Room'));const notes=clean(g('Notes'));
         const meta=[bowl?bowl+' bowl':'',room].filter(Boolean).join(' · ');
         summary=(done.length?done.join(' · '):'Nothing logged')+(meta?' · '+meta:'')+(notes?' — '+notes:'');
       }
-      else if(tab===TABS.HEALTH)summary=(row[4]||'-')+' '+(row[5]||'');
-      else if(tab===TABS.FIGHT)summary='Fight: '+(row[6]||'-');
-      else if(tab===TABS.TRANSPORT){const trn=row[3]||'';const jtype=row[6]||'';const time=row[7]||'';const from=row[10]||'';const to=row[11]||'';const route=(from||to)?(from||'?')+' → '+(to||'?'):'';summary=[trn,jtype,time,route].filter(Boolean).join(' · ');}
-      else if(tab===TABS.TRIAL)summary='Mixed: '+(row[3]||'-')+' - '+(row[5]||'-');
-      else if(tab===TABS.ACTLOG)summary=(row[3]||'-')+(row[5]?' - '+row[5]+' mins':'')+(row[4]?' - '+row[4]:'');
+      else if(tab===TABS.HEALTH)summary=(g('Issue')||'-')+' '+(g('Category')||'');
+      else if(tab===TABS.FIGHT)summary='Fight: '+(g('Issue')||'-');
+      else if(tab===TABS.TRANSPORT){const trn=g('Transporter');const jtype=g('JourneyType');const time=g('Time');const from=g('From');const to=g('To');const route=(from||to)?(from||'?')+' → '+(to||'?'):'';summary=[trn,jtype,time,route].filter(Boolean).join(' · ');}
+      else if(tab===TABS.TRIAL)summary='Mixed: '+(g('MixedWith')||'-')+' - '+(g('Suitable')||'-');
+      else if(tab===TABS.ACTLOG)summary=(g('ActivityTitle')||'-')+(g('DurationMins')?' - '+g('DurationMins')+' mins':'')+(g('Staff')?' - '+g('Staff'):'');
       const item=document.createElement('div');item.className='hi';
       item.innerHTML='<div class="hi-h"><span class="hi-d">'+(row[2]||'-')+'</span><span class="htype '+(cls[tab]||'htd')+'">'+(lbl[tab]||tab)+'</span>'+(iP?'<span class="ptag">Private</span>':'')+'</div><div class="hsum">'+summary+'</div><div class="hi-acts"><button class="ebtn">Edit</button></div>';
-      item.querySelector('.ebtn').onclick=()=>openLiveEditDirect(tab,ri,row);
+      item.querySelector('.ebtn').onclick=()=>openLiveEditDirect(tab,ri,row,h);
       list.appendChild(item);
     });
   }catch(e){list.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
 }
-function openLiveEditDirect(tab,ri,row){if(tab===TABS.DAILY){openAddPastLog(row[2]);return;}document.getElementById('editModalBody').innerHTML=buildEditFlds(tab,row[2],row,ri);document.getElementById('editModal').classList.add('open');}
-function buildEditFlds(tab,date,lr,ri){
-  const g=li=>lr?lr[li]||'':'';
+function openLiveEditDirect(tab,ri,row,h={}){const dc=h['Date']!==undefined?h['Date']:2;if(tab===TABS.DAILY){openAddPastLog(row[dc]);return;}document.getElementById('editModalBody').innerHTML=buildEditFlds(tab,row[dc],row,ri,h);document.getElementById('editModal').classList.add('open');}
+function buildEditFlds(tab,date,lr,ri,h={}){
+  const g=col=>lr&&h[col]!==undefined?lr[h[col]]||'':'';
   const info='<div style="background:var(--hnxl);border:1px solid var(--hnl);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--cn);margin-bottom:10px;">Changes overwrite the original row in Google Sheets</div>';
   let flds='',fn='';
-  if(tab===TABS.DAILY){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(16)+'"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(17)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','daily')";}
-  else if(tab===TABS.HEALTH){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Category</label><input class="fi" id="ef_cat" value="'+g(5)+'"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue" value="'+g(4)+'"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc">'+g(8)+'</textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next" value="'+g(10)+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(11)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','health')";}
-  else if(tab===TABS.FIGHT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_time" value="'+g(3)+'"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue">'+g(6)+'</textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev" value="'+g(10)+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(11)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','fight')";}
-  else if(tab===TABS.TRANSPORT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g(3)+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g(4)+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(8)+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g(10)+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g(11)+'" placeholder="Drop-off location"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(9)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
-  else if(tab===TABS.TRIAL){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><input class="fi" id="ef_suit" value="'+g(5)+'"></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g(4)+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g(6)==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
-  else if(tab===TABS.ACTLOG){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Duration (mins)</label><input class="fi" id="ef_dur" value="'+g(5)+'"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g(6)+'"></div>';fn="doEdit('"+ri+"','"+tab+"','actlog')";}
+  if(tab===TABS.DAILY){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','daily')";}
+  else if(tab===TABS.HEALTH){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Category</label><input class="fi" id="ef_cat" value="'+g('Category')+'"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue" value="'+g('Issue')+'"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc">'+g('Description')+'</textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next" value="'+g('NextStep')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','health')";}
+  else if(tab===TABS.FIGHT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_time" value="'+g('Time')+'"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue">'+g('Issue')+'</textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev" value="'+g('Prevention')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','fight')";}
+  else if(tab===TABS.TRANSPORT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g('Transporter')+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g('Vehicle')+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g('From')+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g('To')+'" placeholder="Drop-off location"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
+  else if(tab===TABS.TRIAL){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><input class="fi" id="ef_suit" value="'+g('Suitable')+'"></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g('Observations')+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
+  else if(tab===TABS.ACTLOG){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Duration (mins)</label><input class="fi" id="ef_dur" value="'+g('DurationMins')+'"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div>';fn="doEdit('"+ri+"','"+tab+"','actlog')";}
   return info+flds+'<div class="srow"><button class="sbtn2" onclick="'+fn+'">Save Changes</button><span class="smsg" id="editStatus"></span></div>';
 }
 async function doEdit(riStr,tabStr,type){
@@ -391,10 +391,11 @@ async function openAddPastLog(date){
   let sv=JSON.parse(localStorage.getItem(lk)||'{}');
   // Pre-populate from Google Sheet so edits work across devices
   try{
-    const rows=await readSheet(TABS.DAILY,'A2:R');
-    const keys=['breakfast','medAm','dinner','medPm','snack','walkAm','garden','walkPm','game','beforeSleep','bowl','room','garment'];
-    const row=rows.find(r=>(r[2]===date&&r[0]===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
-    if(row){keys.forEach((k,i)=>{sv[k]=parseState(row[i+3]||'');});sv.notes=row[16]||'';sv.priv=row[17]==='Private';localStorage.setItem(lk,JSON.stringify(sv));}
+    const rawRows=await readSheet(TABS.DAILY,'A1:R');const dh=mkHdr(rawRows[0]||[]);if(dh['Activity']===undefined&&dh['Game']!==undefined)dh['Activity']=dh['Game'];const rows=rawRows.slice(1);
+    const gd=(r,col,fb)=>r[dh[col]!==undefined?dh[col]:fb]||'';
+    const km={breakfast:'Breakfast',medAm:'MedAM',dinner:'Dinner',medPm:'MedPM',snack:'Snack',walkAm:'WalkAM',garden:'Garden',walkPm:'WalkPM',beforeSleep:'BeforeSleep',game:'Activity',bowl:'Bowl',room:'Room',garment:'Garment'};
+    const row=rows.find(r=>(gd(r,'Date',2)===date&&gd(r,'CustomerID',0)===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
+    if(row){Object.entries(km).forEach(([k,col])=>{sv[k]=parseState(dh[col]!==undefined?row[dh[col]]||'':'');});sv.notes=gd(row,'Notes',16);sv.priv=gd(row,'Private',17)==='Private';localStorage.setItem(lk,JSON.stringify(sv));}
     else{// No existing log — if there was a booking for this date, default tiles to 'todo'
       const hadBooking=bookings.some(b=>(b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.sd<=date&&b.ed>=date&&b.status!=='Canceled');
       if(hadBooking&&!keys.some(k=>sv[k])){keys.forEach(k=>{sv[k]='todo';});localStorage.setItem(lk,JSON.stringify(sv));}}
@@ -417,11 +418,10 @@ async function saveAddPastLog(date){
   sv.notes=document.getElementById('ef_notes')?.value||'';sv.priv=document.getElementById('ef_priv')?.checked||false;localStorage.setItem(lk,JSON.stringify(sv));
   const st=document.getElementById('editStatus');st.textContent='Saving...';st.className='smsg';
   const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
-  const row=[curDog.cid,VL_A,date,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('game'),g('beforeSleep'),g('bowl'),g('room'),g('garment'),sv.notes||'',priv];
+  const row=[curDog.cid,VL_A,date,g('breakfast'),g('medAm'),g('dinner'),g('medPm'),g('snack'),g('walkAm'),g('garden'),g('walkPm'),g('beforeSleep'),g('game'),g('bowl'),g('room'),g('garment'),sv.notes||'',priv];
   try{
-    const rows=await readSheet(TABS.DAILY,'A2:R').catch(()=>[]);
-    // Check both new format (CID at [0], date at [2]) and old v27 format (date at [0], CID at [15])
-    const existIdx=rows.findIndex(r=>(r[2]===date&&r[0]===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
+    const rawSave=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dh2=mkHdr(rawSave[0]||[]);const rows=rawSave.slice(1);
+    const existIdx=rows.findIndex(r=>(r[dh2['Date']??2]===date&&r[dh2['CustomerID']??0]===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
     if(existIdx>=0)await updateRow(TABS.DAILY,existIdx+2,row);else await appendRow(TABS.DAILY,row);
     histCache={};st.textContent='Log saved!';st.className='smsg ok';setTimeout(()=>document.getElementById('editModal').classList.remove('open'),1600);
   }catch(e){st.textContent=e.message;st.className='smsg err';}
@@ -541,7 +541,7 @@ async function registerDog(){
   const cid=eid||genId(name);
   // photoUrl: prefer new URL from Drive link; for edit fall back to existing; for new reg start empty
   const photoUrlVal=_regPhotoUrl||(eid?curDog?.photoUrl||'':'');
-  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),_regEmoji||(eid?curDog?.emoji||'':''),gv('reg_jog'),gv('reg_vacc_url'),photoUrlVal];
+  const vals=[cid,name,gv('reg_breed'),gv('reg_gender'),bday,bt,gv('reg_weight'),gv('reg_neut'),gv('reg_chip'),gv('reg_rescue'),document.getElementById('reg_nervous').value,document.getElementById('reg_anxiety').value,gv('reg_dogfriends'),gv('reg_food'),gv('reg_food_measure'),gv('reg_diet'),gv('reg_allergies'),gv('reg_medical'),gv('reg_med_schedule'),gv('reg_fears'),gv('reg_touch'),gv('reg_vacc'),gv('reg_flea'),gv('reg_behaviour'),gv('reg_walk'),gv('reg_car'),gv('reg_sleep'),gv('reg_escape'),gv('reg_toilet'),gv('reg_alone'),gv('reg_commands'),gv('reg_sitters'),gv('reg_updates'),gv('reg_updates_custom'),gv('reg_rel'),gv('reg_notes'),owner,gv('reg_phone'),gv('reg_owner2'),gv('reg_phone2'),gv('reg_owner3'),gv('reg_phone3'),gv('reg_address'),gv('reg_postcode'),gv('reg_emergency'),gv('reg_vet'),gv('reg_insurance'),gv('reg_meetgreet'),gv('reg_referral'),gv('reg_ref_notes'),gv('reg_svc'),gv('reg_status'),gv('reg_remarks'),gv('reg_jog'),gv('reg_vacc_url'),photoUrlVal];
   try{
     if(eid){
       // Search column A of Dogs sheet for the actual row with matching CID
