@@ -308,6 +308,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 .act-item{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:9px 11px;margin-bottom:6px;cursor:pointer;}
 .act-item:hover{background:var(--gr5)!important;}
 .act-cat{font-size:7px;padding:2px 6px;border-radius:99px;font-weight:700;display:inline-block;margin-bottom:3px;margin-right:3px;}
+.act-main-cat-btn.active{background:var(--pu)!important;color:#fff!important;border-color:var(--pu)!important;}
 .cat-walk{background:#DBEAFE;color:#1E40AF;}
 .cat-game{background:#FEF3C7;color:#92400E;}
 .cat-field{background:#DCFCE7;color:#166534;}
@@ -436,7 +437,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v29 · Build 30</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v29 · Build 31</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -796,15 +797,23 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div><div class="pg-t">Activities</div><div class="pg-s">Activity library &amp; smart picker</div></div>
       <button class="sbtn2" style="font-size:11px;padding:6px 11px;" onclick="openActModal(null)">+ Add</button>
     </div>
+    <!-- MAIN CATEGORY CHIPS -->
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch;">
+      <button class="act-main-cat-btn active" data-cat="" onclick="setActMainCat('')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--pu);background:var(--pul);color:var(--pu);font-family:var(--fb);cursor:pointer;white-space:nowrap;">All</button>
+      <button class="act-main-cat-btn" data-cat="Out of house (outdoor)" onclick="setActMainCat('Out of house (outdoor)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🌳 Out (outdoor)</button>
+      <button class="act-main-cat-btn" data-cat="Out of house (indoor)" onclick="setActMainCat('Out of house (indoor)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🏢 Out (indoor)</button>
+      <button class="act-main-cat-btn" data-cat="In house (for fun)" onclick="setActMainCat('In house (for fun)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🎉 In house (fun)</button>
+      <button class="act-main-cat-btn" data-cat="In house (practical)" onclick="setActMainCat('In house (practical)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🔧 In house (practical)</button>
+      <button class="act-main-cat-btn" data-cat="In house (game)" onclick="setActMainCat('In house (game)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🎮 In house (game)</button>
+    </div>
     <!-- FILTER -->
     <div class="fbar">
       <div class="fbar-lbl">Filter Activities</div>
       <div class="fbar-row">
-        <select class="fs" id="act_fCat" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All categories</option><option>Walk</option><option>Game</option><option>Field Visit</option><option>Training</option></select>
         <select class="fs" id="act_fIO" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">In &amp; Outdoor</option><option>Indoor</option><option>Outdoor</option></select>
+        <select class="fs" id="act_fEnergy" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All energy</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select>
       </div>
       <div class="fbar-row" style="margin-top:6px;">
-        <select class="fs" id="act_fEnergy" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All energy</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select>
         <select class="fs" id="act_fWeather" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All weather</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select>
       </div>
       <div class="fbar-row" style="margin-top:6px;">
@@ -1096,7 +1105,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="act_eidx">
       <div class="f"><label>Title <span class="req">*</span></label><input class="fi" id="act_title" placeholder="e.g. Oldbury Court field walk"></div>
-      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Walk</option><option>Game</option><option>Field Visit</option><option>Training</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
+      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Out of house (outdoor)</option><option>Out of house (indoor)</option><option>In house (for fun)</option><option>In house (practical)</option><option>In house (game)</option><option>Walk</option><option>Game</option><option>Field Visit</option><option>Training</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
 <div class="f"><label>Energy level</label><select class="fs" id="act_energy"><option value="">Select...</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select></div>
 <div class="f"><label>Weather suitability</label><select class="fs" id="act_weather"><option value="">Select...</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select></div>
       <div class="fr"><div class="f"><label>Duration (mins)</label><input class="fi" type="number" id="act_dur"></div><div class="f"><label>Distance from home (mins drive)</label><input class="fi" type="number" id="act_dist"></div></div>

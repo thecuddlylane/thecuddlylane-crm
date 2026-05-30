@@ -32,7 +32,7 @@ const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
-let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[];
+let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='';
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
@@ -983,13 +983,13 @@ async function createBookingsFromQuote(){
     const sd=line.sd||'';const ed=line.ed||sd;const st=line.st2||'09:00';const et=line.et||'18:00';
     const svcLabel=svcN[line.svc]||line.svc;
     for(const dogName of dogs){
-      const id='BK-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
+      const id=nextBkId();
       const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
       const rev=line.svc==='taxi'?(_cr.lines.find(l=>l[0].includes('Taxi'))?.[1]||0):revenueMap[dogName]||0;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
       const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
       const vals=[customerId,VL_A,id,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
-      try{await appendRow(TABS.BK,vals);bookings.push(mapBk(vals,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
+      try{await appendRow(TABS.BK,vals);const mv=[...vals];mv[1]=dogName;bookings.push(mapBk(mv,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
   if(created){renderBoard();alert(created+' booking'+(created>1?'s':'')+' created with revenue pre-filled. Check Bookings to adjust.');}
@@ -1009,6 +1009,7 @@ function quoteFromBk(){
 }
 
 // ==================== BOOKINGS ====================
+function nextBkId(){let max=0;bookings.forEach(b=>{const m=(b.id||'').match(/^BK-BD-(\d+)$/);if(m)max=Math.max(max,parseInt(m[1],10));});const n=max+1;return'BK-BD-'+(n<10?'00'+n:n<100?'0'+n:''+n);}
 function openBkModal(editId=null,fromProf=false){
   const modal=document.getElementById('bkModal');const ed=editId&&bookings.find(r=>r.id===editId);
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
@@ -1059,13 +1060,13 @@ async function saveBk(){
   if(eid&&!ri){const existing=bookings.find(b=>b.id===eid);if(existing?.ri)ri=existing.ri;}
   const rev=parseFloat(document.getElementById('bm_rev').value)||0;const tips=parseFloat(document.getElementById('bm_tips').value)||0;const pre=parseFloat(document.getElementById('bm_prepay').value)||0;const fin=parseFloat(document.getElementById('bm_final').value)||0;const unit=parseFloat(document.getElementById('bm_unit').value)||0;
   const ch=document.getElementById('bm_channel').value;const rPct=ch==='Rover'?(parseFloat(document.getElementById('bm_rpct').value)||0):0;const rAmt=ch==='Rover'?(parseFloat(document.getElementById('bm_ramt').value)||0):0;
-  const priv=document.getElementById('bm_priv').checked;const id=eid||('BK-'+Date.now().toString(36).toUpperCase());const rems=getReminderVals();
+  const priv=document.getElementById('bm_priv').checked;const id=eid||nextBkId();const rems=getReminderVals();
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
   const dogData=allDogs.find(d=>d.name===dog);const customerId=dogData?dogData.cid:'';
   const vals=[customerId,VL_A,id,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems];
   try{
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
-    const bkObj=mapBk(vals,eid?ri-2:bookings.length);if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
+    const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length);if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
     st.textContent='Saved!';st.className='smsg ok';setTimeout(()=>{document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();renderBoard();},1400);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';}
 }
@@ -1283,8 +1284,9 @@ async function syncTplsFromSheet(){
 // ==================== ACTIVITIES ====================
 function saveActivities(){localStorage.setItem('tcl_acts',JSON.stringify(activities));}
 function loadActivities(){activities=JSON.parse(localStorage.getItem('tcl_acts')||'[]');}
+function setActMainCat(cat){_actMainCat=cat;document.querySelectorAll('.act-main-cat-btn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));renderActs();}
 function getFilteredActs(){
-  const cat=document.getElementById('act_fCat')?.value||'';const io=document.getElementById('act_fIO')?.value||'';const energy=document.getElementById('act_fEnergy')?.value||'';const weather=document.getElementById('act_fWeather')?.value||'';
+  const cat=_actMainCat||'';const io=document.getElementById('act_fIO')?.value||'';const energy=document.getElementById('act_fEnergy')?.value||'';const weather=document.getElementById('act_fWeather')?.value||'';
   const maxDur=parseFloat(document.getElementById('act_fDur')?.value)||Infinity;const maxDist=parseFloat(document.getElementById('act_fDist')?.value)||Infinity;const maxCost=parseFloat(document.getElementById('act_fCost')?.value)||Infinity;
   return activities.filter(a=>{if(cat&&a.cat!==cat)return false;if(io&&a.io!==io)return false;if(energy&&a.energy!==energy)return false;if(weather&&a.weather!==weather)return false;if(maxDur<Infinity&&(parseFloat(a.dur)||0)>maxDur)return false;if(maxDist<Infinity&&(parseFloat(a.dist)||0)>maxDist)return false;if(maxCost<Infinity&&(parseFloat(a.cost)||0)>maxCost)return false;return true;});
 }
@@ -1307,7 +1309,7 @@ function renderActs(){
     const lastStr=lastLog?fmtDate(lastLog.date)+' - '+lastLog.dogs:'Never done yet';
     return'<div class="act-item" onclick="openActModal('+idx+')">'+
       '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;">'+
-      '<span class="act-cat cat-'+(a.cat||'walk').toLowerCase().replace(' ','-')+'">'+(a.cat||'Walk')+'</span>'+
+      '<span class="act-cat cat-'+(a.cat||'walk').toLowerCase().replace(/[^a-z0-9]/g,'-')+'">'+(a.cat||'Walk')+'</span>'+
       (a.io?'<span class="act-cat cat-'+(a.io==='Indoor'?'in':'out')+'">'+a.io+'</span>':'')+
       (a.energy?'<span class="act-cat '+(energyCls[a.energy]||'cat-any')+'">'+a.energy+' energy</span>':'')+
       (a.weather?'<span class="act-cat '+(weatherCls[a.weather]||'cat-any')+'">'+a.weather+'</span>':'')+
