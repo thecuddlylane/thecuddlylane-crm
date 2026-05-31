@@ -32,7 +32,7 @@ const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
-let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='';
+let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='';
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
@@ -1224,17 +1224,20 @@ function exportTraining(){const recs=trainRecords.length?trainRecords:[{date:'',
 
 // ==================== MESSAGE TEMPLATES ====================
 function saveMsgTpls(){localStorage.setItem('tcl_msg_tpls',JSON.stringify(msgTpls));}
+function setTplCat(cat){_tplCat=cat;document.querySelectorAll('.tpl-cat-btn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));renderTplHub();}
 function renderTplHub(){
   const el=document.getElementById('tplHubList');if(!msgTpls.length){el.innerHTML='<div class="hload">No templates - tap + New or wait for sync</div>';return;}
-  const filterCat=(document.getElementById('tpl_fcat')?.value||'').toLowerCase();
-  const filtered=filterCat?msgTpls.filter(t=>(t.cat||'').toLowerCase()===filterCat):msgTpls;
+  const filtered=_tplCat?msgTpls.filter(t=>(t.cat||'').toLowerCase()===_tplCat.toLowerCase()):msgTpls;
   if(!filtered.length){el.innerHTML='<div class="hload">No templates in this category</div>';return;}
   el.innerHTML='';
   filtered.forEach((tpl,i)=>{
     const realIdx=msgTpls.indexOf(tpl);
     const item=document.createElement('div');item.className='tpl-item';item.draggable=true;
-    item.innerHTML='<span class="tpl-drag">::::</span><div class="tpl-info"><div class="tpl-nm">'+tpl.name+'</div>'+(tpl.cat?'<div style="font-size:8px;color:var(--or);margin-bottom:2px;">'+tpl.cat+'</div>':'')+'<div class="tpl-pv">'+(tpl.content||'').slice(0,80)+'</div></div><button style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;flex-shrink:0;">x</button>';
-    item.querySelector('button').onclick=(e)=>{e.stopPropagation();if(!confirm('Delete this template?'))return;msgTpls.splice(realIdx,1);saveMsgTpls();renderTplHub();};
+    item.innerHTML='<span class="tpl-drag">::::</span><div class="tpl-info"><div class="tpl-nm">'+tpl.name+'</div>'+(tpl.cat?'<div style="font-size:8px;color:var(--or);margin-bottom:2px;">'+tpl.cat+'</div>':'')+'<div class="tpl-pv">'+(tpl.content||'').slice(0,80)+'</div></div>'
+      +'<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">'
+      +'<button class="tpl-copy-btn" onclick="event.stopPropagation();openCopyTpl('+realIdx+')" style="background:var(--pu);color:#fff;border:none;border-radius:6px;font-size:10px;padding:4px 8px;cursor:pointer;font-family:var(--fb);">Copy</button>'
+      +'<button onclick="event.stopPropagation();if(!confirm(\'Delete this template?\'))return;msgTpls.splice('+realIdx+',1);saveMsgTpls();renderTplHub();" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:11px;padding:2px 0;">Delete</button>'
+      +'</div>';
     item.onclick=(e)=>{if(!e.target.closest('button')&&!e.target.classList.contains('tpl-drag'))openTplHub(realIdx);};
     item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',realIdx);item.style.opacity='.5';});
     item.addEventListener('dragend',()=>item.style.opacity='1');
@@ -1243,6 +1246,36 @@ function renderTplHub(){
     item.addEventListener('drop',e=>{e.preventDefault();item.style.borderColor='';const fromReal=parseInt(e.dataTransfer.getData('text/plain'));if(fromReal===realIdx)return;const moved=msgTpls.splice(fromReal,1)[0];msgTpls.splice(realIdx,0,moved);saveMsgTpls();renderTplHub();});
     el.appendChild(item);
   });
+}
+function openCopyTpl(idx){
+  const tpl=msgTpls[idx];if(!tpl)return;
+  const content=tpl.content||'';
+  const vars=[...new Set((content.match(/\{\{(\w+)\}\}/g)||[]).map(m=>m.slice(2,-2)))];
+  document.getElementById('ctpl_title').textContent=tpl.name;
+  document.getElementById('ctpl_idx').value=idx;
+  const fEl=document.getElementById('ctpl_fields');
+  const varLabels={ownerName:'Owner name',dogs:'Dog name(s)',dropoff:'Drop-off date',pickup:'Pick-up date',dropoffTime:'Drop-off time',pickupTime:'Pick-up time',service:'Service',total:'Total amount',prepayAmt:'Prepayment amount',finalAmt:'Balance due',payRef:'Payment reference',payLink:'Payment link',rateBlock:'Rate block',discount:'Discount line'};
+  if(vars.length){
+    fEl.innerHTML=vars.map(v=>'<div style="margin-bottom:7px;"><label style="font-size:10px;color:var(--gr2);font-weight:600;display:block;margin-bottom:3px;">'+(varLabels[v]||v)+'</label><input class="fi" id="ctplv_'+v+'" placeholder="Enter '+(varLabels[v]||v)+'..." style="font-size:11px;" oninput="updateCopyPreview('+idx+')"></div>').join('');
+    if(curDog){const e=document.getElementById('ctplv_ownerName');if(e)e.value=curDog.owner||'';const f=document.getElementById('ctplv_dogs');if(f)f.value=curDog.name||'';}
+  }else{
+    fEl.innerHTML='<div style="font-size:10px;color:var(--gr3);margin-bottom:8px;padding:8px;background:var(--gr5);border-radius:8px;">No personalised fields — ready to copy.</div>';
+  }
+  updateCopyPreview(idx);
+  document.getElementById('copyTplPanel').classList.add('open');
+}
+function updateCopyPreview(idx){
+  const tpl=msgTpls[idx];if(!tpl)return;
+  let msg=tpl.content||'';
+  const vars=[...new Set((msg.match(/\{\{(\w+)\}\}/g)||[]).map(m=>m.slice(2,-2)))];
+  vars.forEach(v=>{const el=document.getElementById('ctplv_'+v);const val=el&&el.value?el.value:'{{'+v+'}}';msg=msg.replace(new RegExp('\\{\\{'+v+'\\}\\}','g'),val);});
+  document.getElementById('ctpl_preview').value=msg;
+}
+function doCopyTpl(){
+  const msg=document.getElementById('ctpl_preview').value;
+  copyText(msg);
+  const btn=document.getElementById('ctpl_copybtn');btn.textContent='Copied! ✓';btn.style.background='var(--gn)';
+  setTimeout(()=>{btn.textContent='Copy';btn.style.background='';},2000);
 }
 function openTplHub(idx){document.getElementById('tpl_eidx').value=idx!==null?idx:'';document.getElementById('tplMTitle').textContent=idx!==null?'Edit Template':'New Template';document.getElementById('tpl_name').value=idx!==null?msgTpls[idx].name:'';document.getElementById('tpl_cat').value=idx!==null?(msgTpls[idx].cat||''):'';document.getElementById('tpl_content').value=idx!==null?msgTpls[idx].content:'';document.getElementById('tplModal').classList.add('open');}
 async function saveTplHub(){
