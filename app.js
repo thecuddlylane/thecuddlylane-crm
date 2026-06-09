@@ -32,7 +32,7 @@ const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
-let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='';
+let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],trialLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='';
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
@@ -135,6 +135,81 @@ function showScreen(id,push=true){
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
 // ==================== BOARD ====================
+function toggleAvailPanel(){
+  const p=document.getElementById('availPanel');const showing=p.style.display!=='none'&&p.style.display!=='';
+  p.style.display=showing?'none':'block';
+  if(!showing){
+    const sel=document.getElementById('av_dog');
+    sel.innerHTML='<option value="">— No dog (skip compatibility check) —</option>';
+    allDogs.forEach(d=>sel.add(new Option(d.name+' – '+d.cid,d.name)));
+    const td=todayStr();
+    if(!document.getElementById('av_sd').value)document.getElementById('av_sd').value=td;
+    if(!document.getElementById('av_ed').value)document.getElementById('av_ed').value=td;
+  }
+}
+function runAvailCheck(){
+  const sd=document.getElementById('av_sd').value;const st=document.getElementById('av_st').value||'00:00';
+  const ed=document.getElementById('av_ed').value;const et=document.getElementById('av_et').value||'23:59';
+  const dogName=document.getElementById('av_dog').value;
+  const el=document.getElementById('av_results');
+  if(!sd||!ed){el.innerHTML='<div style="font-size:10px;color:var(--rd);margin-top:6px;">Please enter start and end dates.</div>';return;}
+  const qStart=new Date(sd+'T'+st);const qEnd=new Date(ed+'T'+et);
+  if(qEnd<=qStart){el.innerHTML='<div style="font-size:10px;color:var(--rd);margin-top:6px;">End must be after start.</div>';return;}
+  const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
+  const overlaps=bookings.filter(b=>{
+    if(!active.includes(b.status)||!b.sd)return false;
+    const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
+    return bS<qEnd&&bE>qStart;
+  });
+  // Build conflict profiles if dog selected
+  let conflictProfiles=[];
+  if(dogName){
+    const conflicts=trialLogs.filter(t=>{
+      const dn=dogName.toLowerCase();
+      const isDog=(t.dog||'').toLowerCase()===dn;
+      const isMixed=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim()).includes(dn);
+      return (isDog||isMixed)&&(t.suitable||'').toLowerCase().includes('not');
+    });
+    conflicts.forEach(t=>{
+      const mixed=(t.mixedWith||'').split(/[,;]+/).map(s=>s.trim());
+      const others=(t.dog||'').toLowerCase()===dogName.toLowerCase()?mixed:[(t.dog||'')];
+      others.forEach(n=>{
+        if(!n||n.toLowerCase()===dogName.toLowerCase())return;
+        const p=allDogs.find(d=>d.name.toLowerCase()===n.toLowerCase());
+        if(p&&!conflictProfiles.find(c=>c.name.toLowerCase()===n.toLowerCase()))conflictProfiles.push(p);
+      });
+    });
+  }
+  if(!overlaps.length){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;margin-top:8px;">✅ No active bookings during this period</div>';return;}
+  const rows=overlaps.map(b=>{
+    let flag='🟢';let detail='';
+    if(dogName&&conflictProfiles.length){
+      const bDog=allDogs.find(d=>d.name.toLowerCase()===(b.dog||'').toLowerCase());
+      if(conflictProfiles.find(c=>c.name.toLowerCase()===(b.dog||'').toLowerCase())){
+        flag='🔴';detail='Known conflict';
+      }else if(bDog){
+        const attrs=[];
+        conflictProfiles.forEach(c=>{
+          if(c.breed&&bDog.breed&&c.breed.toLowerCase()===bDog.breed.toLowerCase()&&!attrs.includes('same breed ('+bDog.breed+')'))attrs.push('same breed ('+bDog.breed+')');
+          if(c.gender&&bDog.gender&&c.gender.toLowerCase()===bDog.gender.toLowerCase()&&!attrs.includes('same sex ('+bDog.gender+')'))attrs.push('same sex ('+bDog.gender+')');
+          if(c.neut&&bDog.neut&&c.neut.toLowerCase()===bDog.neut.toLowerCase()&&!attrs.includes(bDog.neut))attrs.push(bDog.neut);
+        });
+        if(attrs.length){flag='🟡';detail='Similar: '+attrs.join(' · ');}
+      }
+    }
+    const dateStr=b.sd+(b.ed&&b.ed!==b.sd?' – '+b.ed:'');
+    const timeStr=(b.st||'')+(b.et&&b.et!==b.st?' – '+b.et:'');
+    return'<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--gr4);">'
+      +'<span style="font-size:15px;flex-shrink:0;line-height:1.4;">'+flag+'</span>'
+      +'<div style="flex:1;min-width:0;">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--bk);">'+b.dog+'</div>'
+      +'<div style="font-size:9px;color:var(--gr2);">'+b.svc+'&nbsp;·&nbsp;'+dateStr+(timeStr?'&nbsp;·&nbsp;'+timeStr:'')+'</div>'
+      +(detail?'<div style="font-size:9px;font-weight:600;color:'+(flag==='🔴'?'var(--rd)':'#B45309')+';">'+detail+'</div>':'')
+      +'</div></div>';
+  }).join('');
+  const hasRed=overlaps.some((_,i)=>rows.split('🔴').length-1>0);
+  el.innerHTML='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:4px;">'+overlaps.length+' booking'+(overlaps.length>1?'s':'')+' during this period'+(conflictProfiles.length?' · '+conflictProfiles.length+' known conflict dog'+(conflictProfiles.length>1?'s':''):'')+'</div>'+rows;
+}
 async function refreshBoard(){
   const btn=document.getElementById('refreshBtn');btn.style.opacity='.5';btn.style.pointerEvents='none';
   document.getElementById('todayCards').innerHTML='<div class="empty"><p>Loading...</p></div>';
@@ -143,6 +218,7 @@ async function refreshBoard(){
     const bkRows=await readSheet(TABS.BK,'A1:AF').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[2]||'',activity:r[3]||'',dogs:r[1]||'',staff:r[4]||'',dur:r[5]||'',notes:r[6]||''}));
+    const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialLogs=tl.slice(1).map(r=>({dog:r[tlh['DogName']??1]||'',date:r[tlh['Date']??2]||'',mixedWith:r[tlh['MixedWith']??3]||'',obs:r[tlh['Observations']??4]||'',suitable:r[tlh['Suitable']??5]||''}));
     // Sync targets from sheet into localStorage
     syncTargetsFromSheet().catch(()=>{});
     // Sync activities library from sheet so sheet edits show in app
@@ -250,7 +326,7 @@ function buildTodayLog(){
     inc('health','Health','<div class="fr"><div class="f"><label>Category</label><select class="fs" id="ih_cat"><option>Injury</option><option>Illness</option><option>Allergic reaction</option><option>Digestive</option><option>Behavioural</option><option>Medication</option><option>Other</option></select></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'health\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'health\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'health\',\'High\',event)">High</button></div><input type="hidden" id="ih_imp"></div></div><div class="f"><label>Issue</label><input class="fi" id="ih_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ih_desc" style="min-height:48px;"></textarea></div><div class="f"><label>Root cause</label><input class="fi" id="ih_cause"></div><div class="f"><label>Next steps</label><input class="fi" id="ih_next"></div>')+
     inc('fight','Dog Fight','<div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="if_time"></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'fight\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'fight\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'fight\',\'High\',event)">High</button></div><input type="hidden" id="if_imp"></div></div><div class="f"><label>Other dogs</label><select class="fs" id="if_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>What happened</label><textarea class="fta" id="if_issue" style="min-height:48px;"></textarea></div><div class="f"><label>Injuries</label><input class="fi" id="if_inj"></div><div class="f"><label>Treatment</label><input class="fi" id="if_treat"></div><div class="f"><label>Prevention</label><input class="fi" id="if_prev"></div>')+
     inc('transport','Transport','<div class="fr"><div class="f"><label>Transporter</label><input class="fi" id="it_name"></div><div class="f"><label>Vehicle</label><input class="fi" id="it_vehicle"></div></div><div class="fr"><div class="f"><label>Plate</label><input class="fi" id="it_plate"></div><div class="f"><label>Journey</label><select class="fs" id="it_type"><option>Drop-off</option><option>Pick-up</option><option>Both</option></select></div></div><div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="it_time"></div><div class="f"><label>Notes</label><input class="fi" id="it_notes"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="it_from" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="it_to" placeholder="Drop-off location"></div></div>')+
-    inc('trial','Dog Trial','<div class="f"><label>Dogs mixed with</label><select class="fs" id="itr_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>Observations</label><textarea class="fta" id="itr_obs" style="min-height:55px;"></textarea></div><div class="f"><label>Suitable?</label><select class="fs" id="itr_suit"><option>Suitable</option><option>With supervision</option><option>Not suitable</option><option>Further trial needed</option></select></div>')+
+    inc('trial','Dog Trial','<div class="f"><label>Dogs mixed with</label><select class="fs" id="itr_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>Observations</label><textarea class="fta" id="itr_obs" style="min-height:55px;"></textarea></div><div class="f"><label>Suitable?</label><select class="fs" id="itr_suit"><option>Suitable</option><option>Partial</option><option>Not Suitable</option></select></div>')+
     '</div>';
 }
 function parseState(v){return v==='[Y]'?'yes':v==='[Refused]'?'refused':v==='[To-do]'?'todo':v==='[N/A]'?'na':'';}
@@ -367,7 +443,7 @@ function buildEditFlds(tab,date,lr,ri,h={}){
   else if(tab===TABS.HEALTH){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Category</label><input class="fi" id="ef_cat" value="'+g('Category')+'"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue" value="'+g('Issue')+'"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc">'+g('Description')+'</textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next" value="'+g('NextStep')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','health')";}
   else if(tab===TABS.FIGHT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_time" value="'+g('Time')+'"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue">'+g('Issue')+'</textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev" value="'+g('Prevention')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','fight')";}
   else if(tab===TABS.TRANSPORT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g('Transporter')+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g('Vehicle')+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g('From')+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g('To')+'" placeholder="Drop-off location"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
-  else if(tab===TABS.TRIAL){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><input class="fi" id="ef_suit" value="'+g('Suitable')+'"></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g('Observations')+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
+  else if(tab===TABS.TRIAL){const suitVal=g('Suitable');const suitOpts=['Suitable','Partial','Not Suitable'].map(o=>'<option'+(o===suitVal?' selected':'')+'>'+o+'</option>').join('');flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+suitOpts+'</select></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g('Observations')+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
   else if(tab===TABS.ACTLOG){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Duration (mins)</label><input class="fi" id="ef_dur" value="'+g('DurationMins')+'"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div>';fn="doEdit('"+ri+"','"+tab+"','actlog')";}
   return info+flds+'<div class="srow"><button class="sbtn2" onclick="'+fn+'">Save Changes</button><span class="smsg" id="editStatus"></span></div>';
 }
@@ -1028,7 +1104,7 @@ function openBkModal(editId=null,fromProf=false){
   calcBal();toggleRover();updateStatusFlow();modal.classList.add('open');
 }
 function updateDogIdHint(){const n=document.getElementById('bm_dog').value;const d=allDogs.find(x=>x.name===n);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
-function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});}
+function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;const isCancelled=v==='Cancelled';const isCompleted=v==='Completed';steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';el.style.opacity='';if(isCancelled){el.style.opacity='0.3';return;}if(isCompleted){el.classList.add('fsdone');return;}if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});const cancelEl=document.getElementById('bsf_cancelled');const completeEl=document.getElementById('bsf_completed');if(cancelEl)cancelEl.style.display=isCancelled?'inline-block':'none';if(completeEl)completeEl.style.display=isCompleted?'inline-block':'none';}
 function calcBal(){const rev=parseFloat(document.getElementById('bm_rev').value)||0;const tips=parseFloat(document.getElementById('bm_tips').value)||0;const pre=parseFloat(document.getElementById('bm_prepay').value)||0;const fin=parseFloat(document.getElementById('bm_final').value)||0;const owed=rev+tips;const paid=pre+fin;const bal=paid-owed;document.getElementById('bm_owed').textContent=fmtGBP(owed);document.getElementById('bm_paid').textContent=fmtGBP(paid);const balEl=document.getElementById('bm_bal');balEl.textContent=(bal>=0?'+':'')+fmtGBP(bal);balEl.style.color=bal>0?'var(--gn)':bal<0?'var(--rd)':'var(--gr2)';}
 function calcRover(){const rev=parseFloat(document.getElementById('bm_rev').value)||0;const pct=parseFloat(document.getElementById('bm_rpct').value)||0;document.getElementById('bm_ramt').value=(rev*pct/100).toFixed(2);}
 function toggleRover(){const isR=document.getElementById('bm_channel').value==='Rover';document.getElementById('bm_rover_row').style.display=isR?'grid':'none';if(isR)calcRover();}

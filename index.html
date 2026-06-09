@@ -438,7 +438,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v29 · Build 32</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v29 · Build 33</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -450,7 +450,26 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- BOARD -->
 <div class="screen active" id="sc-board">
   <div style="margin:10px 13px 0;background:var(--rdl);border:1px solid #FCA5A5;border-radius:var(--r);padding:9px 11px;font-size:10px;color:var(--rd);display:none;" id="credWarn">No credentials — tap Settings to connect Google Sheets.</div>
-  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div></div>
+  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div><button onclick="toggleAvailPanel()" style="background:var(--pul);border:1.5px solid var(--pu);color:var(--pu);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📅 Check Dates</button></div>
+  <!-- AVAILABILITY CHECKER -->
+  <div id="availPanel" style="display:none;margin:0 13px 8px;">
+    <div style="background:var(--wh);border:1px solid var(--pu);border-radius:var(--r2);padding:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📅 Availability &amp; Compatibility Check</div>
+      <div class="f" style="margin-bottom:7px;"><label>Dog (optional — enables compatibility flags)</label>
+        <select class="fs" id="av_dog" style="font-size:11px;"></select>
+      </div>
+      <div class="fr" style="margin-bottom:6px;">
+        <div class="f"><label>From date</label><input class="fi" type="date" id="av_sd"></div>
+        <div class="f"><label>From time</label><input class="fi" type="time" id="av_st" value="09:00"></div>
+      </div>
+      <div class="fr" style="margin-bottom:9px;">
+        <div class="f"><label>To date</label><input class="fi" type="date" id="av_ed"></div>
+        <div class="f"><label>To time</label><input class="fi" type="time" id="av_et" value="18:00"></div>
+      </div>
+      <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;" onclick="runAvailCheck()">Check Availability</button>
+      <div id="av_results"></div>
+    </div>
+  </div>
   <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name or ID..." oninput="renderBoard()"></div>
   <div class="bsec">
     <div class="bsec-l on">Active today</div>
@@ -671,7 +690,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="fbar-row">
         <input class="fi" id="bkSearch" placeholder="Search dog name..." oninput="renderBk()" style="flex:1;min-width:120px;font-size:11px;padding:5px 9px;">
         <select class="fs" id="bkSF" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderBk()">
-          <option value="live">Live / Upcoming</option><option value="">All</option><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Canceled</option>
+          <option value="live">Live / Upcoming</option><option value="">All</option><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Completed</option><option>Cancelled</option>
         </select>
         <select class="fs" id="bkVF" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderBk()">
           <option value="">All services</option><option>Boarding</option><option>DayCare</option><option>Walking</option><option>Drop-in</option><option>Dog Sit</option><option>Pet Taxi</option><option>Training</option>
@@ -1059,8 +1078,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <span class="bk-flow-step" id="bsf_prepaid">Prepaid</span>
         <span class="bk-flow-arr">›</span>
         <span class="bk-flow-step" id="bsf_fullypaid">Fully Paid</span>
+        <span class="bk-flow-step" id="bsf_cancelled" style="display:none;background:var(--rdl);color:var(--rd);border-color:var(--rd);">✕ Cancelled</span>
+        <span class="bk-flow-step" id="bsf_completed" style="display:none;background:var(--gnl);color:var(--gn);border-color:var(--gn);">✓ Completed</span>
       </div>
-      <div class="f"><label>Status</label><select class="fs" id="bm_status" onchange="updateStatusFlow()"><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Canceled</option></select></div>
+      <div class="f"><label>Status</label><select class="fs" id="bm_status" onchange="updateStatusFlow()"><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Cancelled</option><option>Completed</option></select></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:11px;"><input type="checkbox" id="bm_priv" style="width:13px;height:13px;accent-color:var(--gr);">Private booking</label>
       <div class="fsec">Post-Stay Review</div>
       <div class="fr">
