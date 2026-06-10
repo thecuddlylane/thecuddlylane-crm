@@ -438,7 +438,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v29 · Build 33</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v35 · Build 36</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -450,12 +450,19 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- BOARD -->
 <div class="screen active" id="sc-board">
   <div style="margin:10px 13px 0;background:var(--rdl);border:1px solid #FCA5A5;border-radius:var(--r);padding:9px 11px;font-size:10px;color:var(--rd);display:none;" id="credWarn">No credentials — tap Settings to connect Google Sheets.</div>
-  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div><button onclick="toggleAvailPanel()" style="background:var(--pul);border:1.5px solid var(--pu);color:var(--pu);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📅 Check Dates</button></div>
+  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div><div style="display:flex;gap:6px;"><button onclick="togglePendingPanel()" style="position:relative;background:var(--orl);border:1.5px solid var(--or);color:var(--or);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📋 To-Do<span id="pendingBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--rd);color:#fff;border-radius:99px;font-size:8px;padding:1px 5px;"></span></button><button onclick="toggleAvailPanel()" style="background:var(--pul);border:1.5px solid var(--pu);color:var(--pu);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📅 Check Dates</button></div></div>
+  <div id="pendingPanel" style="display:none;margin:0 13px 8px;">
+    <div style="background:var(--wh);border:1px solid var(--or);border-radius:var(--r2);padding:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📋 Pending Actions</div>
+      <div id="pending_results"></div>
+    </div>
+  </div>
   <!-- AVAILABILITY CHECKER -->
   <div id="availPanel" style="display:none;margin:0 13px 8px;">
     <div style="background:var(--wh);border:1px solid var(--pu);border-radius:var(--r2);padding:12px;">
       <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📅 Availability &amp; Compatibility Check</div>
       <div class="f" style="margin-bottom:7px;"><label>Dog (optional — enables compatibility flags)</label>
+        <input class="fi" id="av_dog_search" placeholder="Search dog name..." style="font-size:11px;margin-bottom:4px;" oninput="filterAvDog()">
         <select class="fs" id="av_dog" style="font-size:11px;"></select>
       </div>
       <div class="fr" style="margin-bottom:6px;">
@@ -904,13 +911,24 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
   </div>
   <div class="ptc" id="ptab-history">
     <div class="hfil">
-      <button class="hfb active" onclick="filtHist('all',this)">All</button>
-      <button class="hfb" onclick="filtHist('daily',this)">Daily</button>
-      <button class="hfb" onclick="filtHist('health',this)">Health</button>
-      <button class="hfb" onclick="filtHist('incidents',this)">Incidents</button>
-      <button class="hfb" onclick="filtHist('transport',this)">Transport</button>
-      <button class="hfb" onclick="filtHist('activities',this)">Activities</button>
-      <button class="hfb" onclick="filtHist('trial',this)">Trial</button>
+      <button class="hfb active" data-type="all" onclick="filtHist('all',this)">All</button>
+      <button class="hfb" data-type="daily" onclick="filtHist('daily',this)">Daily</button>
+      <button class="hfb" data-type="health" onclick="filtHist('health',this)">Health</button>
+      <button class="hfb" data-type="incidents" onclick="filtHist('incidents',this)">Incidents</button>
+      <button class="hfb" data-type="transport" onclick="filtHist('transport',this)">Transport</button>
+      <button class="hfb" data-type="activities" onclick="filtHist('activities',this)">Activities</button>
+      <button class="hfb" data-type="trial" onclick="filtHist('trial',this)">Trial</button>
+    </div>
+    <div style="display:flex;gap:5px;align-items:center;margin:-3px 0 9px;flex-wrap:wrap;">
+      <input type="date" id="hist_add_date" class="fi" style="flex:1;min-width:90px;font-size:10px;padding:4px 8px;">
+      <select id="hist_add_type" class="fs" style="flex:1;font-size:10px;">
+        <option value="daily">Daily</option>
+        <option value="health">Health</option>
+        <option value="fight">Fight/Incident</option>
+        <option value="transport">Transport</option>
+        <option value="trial">Trial</option>
+      </select>
+      <button class="sbtn2" style="font-size:10px;padding:5px 10px;flex-shrink:0;" onclick="openHistAddLog()">+ Add</button>
     </div>
     <div class="hlist" id="histList"><div class="hload">Tap a filter to load</div></div>
   </div>
@@ -1046,13 +1064,13 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <input type="hidden" id="bm_eid"><input type="hidden" id="bm_ridx">
       <div class="f"><label>Dog Name <span class="req">*</span></label>
         <input class="fi" id="bm_dog_search" placeholder="Search dog..." oninput="filterBmDog()" style="margin-bottom:4px;font-size:11px;">
-        <select class="fs" id="bm_dog" onchange="updateDogIdHint()"><option value="">Select dog</option></select>
+        <select class="fs" id="bm_dog" onchange="updateDogIdHint();renderOverlapCheck()"><option value="">Select dog</option></select>
         <div style="font-size:9px;color:var(--gr3);margin-top:2px;" id="bm_dog_id"></div>
       </div>
       <div class="f"><label>Service</label><select class="fs" id="bm_svc"><option>Boarding</option><option>DayCare</option><option>Walking</option><option>Drop-in</option><option>Dog Sit</option><option>Pet Taxi</option><option>Training</option></select></div>
-      <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="bm_sd"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="bm_st" value="09:00"></div></div>
+      <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="bm_sd" onchange="renderOverlapCheck()"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="bm_st" value="09:00" onchange="renderOverlapCheck()"></div></div>
       <div class="f"><label>Drop-off location</label><input class="fi" id="bm_drop_loc" placeholder="e.g. Home address or agreed meet point"></div>
-      <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="bm_ed"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="bm_et" value="09:00"></div></div>
+      <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="bm_ed" onchange="renderOverlapCheck()"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="bm_et" value="09:00" onchange="renderOverlapCheck()"></div></div>
       <div class="f"><label>Pick-up location</label><input class="fi" id="bm_pick_loc" placeholder="e.g. Home address or agreed meet point"></div>
       <div class="fsec">Revenue &amp; Payment</div>
       <div class="fr"><div class="f"><label>Per Unit Cost Before Discount (£)</label><input class="fi" type="number" id="bm_unit" placeholder="0" step="0.01"></div><div class="f"><label>Discount notes</label><input class="fi" id="bm_disc_notes" placeholder="e.g. 10% loyalty"></div></div>
@@ -1082,11 +1100,18 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <span class="bk-flow-step" id="bsf_completed" style="display:none;background:var(--gnl);color:var(--gn);border-color:var(--gn);">✓ Completed</span>
       </div>
       <div class="f"><label>Status</label><select class="fs" id="bm_status" onchange="updateStatusFlow()"><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Cancelled</option><option>Completed</option></select></div>
+      <div id="bm_status_warn" style="display:none;background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--or);margin-bottom:9px;"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:11px;"><input type="checkbox" id="bm_priv" style="width:13px;height:13px;accent-color:var(--gr);">Private booking</label>
       <div class="fsec">Post-Stay Review</div>
       <div class="fr">
         <div class="f"><label>Rating (1–5 ⭐)</label><select class="fs" id="bm_rating"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
         <div class="f"><label>Feedback</label><input class="fi" id="bm_feedback" placeholder="Owner's comments..."></div>
+      </div>
+      <div class="fsec">Workflow Checklist</div>
+      <div id="bm_workflow"></div>
+      <div class="fsec">Overlap Approval</div>
+      <div id="bm_overlap_wrap">
+        <div id="bm_overlap"></div>
       </div>
       <div class="fsec">Reminders Sent</div>
       <div id="bm_reminders"></div>
