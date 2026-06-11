@@ -27,13 +27,26 @@ const TP_QUOTE='Hi {{ownerName}},\n\nHere is the rate for our services with THE 
 const TP_BOOK='Hi {{ownerName}},\n\nThank you for choosing THE CUDDLY LANE \u2014 we can\u2019t wait to welcome *{{dogs}}*! \ud83d\udc3e\n\nHere is a summary of your booking:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\n\nTo confirm your spot, please send your 50% prepayment:\n*{{prepayAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nThis payment is non-refundable but fully transferable to alternative dates. Once received, your booking is confirmed!\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
 const TP_PREPAY='Hi {{ownerName}},\n\nGreat news \u2014 your prepayment has been received and your booking is confirmed! \ud83c\udf89\n\nHere is your booking summary:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\nPrepayment received: *{{prepayAmt}}*\n*Balance due at drop-off: {{finalAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nWe look forward to seeing *{{dogs}}*! \ud83d\udc3e\nKatie & Osbert';
 const TP_FINAL='Hi {{ownerName}},\n\nYour booking is coming up soon! \ud83d\udc3e\n\nHere is your final payment summary:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\nPrepayment received: {{prepayAmt}}\n*Balance due: {{finalAmt}}*\n\nPlease settle the balance before drop-off.\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nLooking forward to seeing *{{dogs}}*!\nKatie & Osbert \ud83d\udc3e';
+const TP_AVAIL='Hi {{ownerName}},\n\nThanks for your message! Let me check {{dates}} for {{dogs}} \ud83d\udc3e\n\n{{availability}}\n\n{{overlapBlock}}\nLet me know if you\u2019d like to go ahead and I can put together a quote for you!\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
 const REMINDER_TYPES=['Packing list sent','Drop-off location confirmed','Pick-up location confirmed','Drop-off time confirmed','Pick-up time confirmed'];
 const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
 let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],trialLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='',dailyLogSet=new Set();
-const WF_STEPS=[{k:'packing',l:'Packing list sent'},{k:'drop',l:'Drop-off confirmed (location & time)'},{k:'pick',l:'Pick-up confirmed (location & time)'},{k:'logs',l:'Daily logs completed'},{k:'compat',l:'Compatibility / overlap logged'},{k:'review',l:'Post-stay review logged'}];
+const WF_STEPS=[
+  {k:'whatsapp',l:'WhatsApp group created'},
+  {k:'prep',l:'Docs requested / Consent sent / Packing list sent'},
+  {k:'docsReceived',l:'Docs received'},
+  {k:'consentSigned',l:'Consent signed'},
+  {k:'finalpay',l:'Final payment reminder sent'},
+  {k:'dropoff',l:'Drop-off reminder sent'},
+  {k:'logs',l:'Daily logs completed'},
+  {k:'compat',l:'Compatibility / overlap logged'},
+  {k:'pickup',l:'Pick-up reminder sent'},
+  {k:'reviewReq',l:'Review request sent'},
+  {k:'review',l:'Review logged (or marked N/A)'}
+];
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
@@ -101,7 +114,7 @@ async function doCreateSheet(){
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
     {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','UpdateCustom','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Jogging','VaccinationURL','PhotoURL']},
-    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','OverlapApprovals']},
+    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','OverlapApprovals','WF_WhatsApp','WF_Prep','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review']},
     {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','BeforeSleep','Activity','Bowl','Room','Garment','Notes','Private']},
     {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
     {n:TABS.FIGHT,h:['CustomerID','DogName','Date','Time','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
@@ -137,6 +150,32 @@ function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
 // ==================== BOARD ====================
 // ==================== PENDING ACTIONS ====================
+function bkWfPendingItems(bk){
+  const today=todayStr();
+  const addDays=(ds,n)=>{const d=new Date(ds+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+  const items=[];
+  if(bk.status==='Prepaid'){
+    if(!wfStepValue(bk,'whatsapp'))items.push({key:'whatsapp',label:'WhatsApp group created'});
+    if(!wfStepValue(bk,'prep'))items.push({key:'prep',label:'Send Docs request / Consent / Packing list'});
+  }
+  if(wfStepValue(bk,'prep')){
+    if(!wfStepValue(bk,'docsReceived'))items.push({key:'docsReceived',label:'Docs received'});
+    if(!wfStepValue(bk,'consentSigned'))items.push({key:'consentSigned',label:'Consent signed'});
+  }
+  if(bk.sd&&today>=addDays(bk.sd,-2)){
+    if(!wfStepValue(bk,'finalpay'))items.push({key:'finalpay',label:'Send final payment reminder'});
+    if(!wfStepValue(bk,'dropoff'))items.push({key:'dropoff',label:'Send drop-off reminder'});
+  }
+  const ed=bk.ed||bk.sd;
+  if(ed&&today>=addDays(ed,-1)){
+    if(!wfStepValue(bk,'pickup'))items.push({key:'pickup',label:'Send pick-up reminder'});
+  }
+  if(ed&&today>=addDays(ed,1)){
+    if(!wfStepValue(bk,'reviewReq'))items.push({key:'reviewReq',label:'Send review request'});
+    else if(!wfStepValue(bk,'review'))items.push({key:'review',label:'Log review (or mark N/A)'});
+  }
+  return items;
+}
 function computePendingActions(){
   const today=todayStr();const yD=new Date(today+'T12:00:00Z');yD.setUTCDate(yD.getUTCDate()-1);const yesterday=yD.toISOString().slice(0,10);
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
@@ -148,12 +187,16 @@ function computePendingActions(){
     if(missingSet.size)missingLogs.push({dog:d,dates:[...missingSet].sort()});
   });
   const pendingCompletion=bookings.filter(b=>b.ed&&b.ed<today&&!['Cancelled','Canceled','Completed'].includes(b.status));
-  return{missingLogs,pendingCompletion};
+  const wfTasks=[];
+  bookings.filter(b=>!['Cancelled','Canceled','Completed'].includes(b.status)).forEach(b=>{
+    bkWfPendingItems(b).forEach(item=>wfTasks.push({bk:b,...item}));
+  });
+  return{missingLogs,pendingCompletion,wfTasks};
 }
 function updatePendingBadge(){
   const b=document.getElementById('pendingBadge');if(!b)return;
-  const{missingLogs,pendingCompletion}=computePendingActions();
-  const n=missingLogs.length+pendingCompletion.length;
+  const{missingLogs,pendingCompletion,wfTasks}=computePendingActions();
+  const n=missingLogs.length+pendingCompletion.length+wfTasks.length;
   if(n){b.textContent=n;b.style.display='block';}else b.style.display='none';
 }
 function togglePendingPanel(){
@@ -161,13 +204,21 @@ function togglePendingPanel(){
   p.style.display=showing?'none':'block';
   if(!showing)renderPendingPanel();
 }
+async function quickToggleWf(bkId,key,checked){
+  if(key==='review'){await toggleWfStep(bkId,'review',checked);}else await toggleWfStep(bkId,key,checked);
+  renderPendingPanel();
+}
 function renderPendingPanel(){
   const el=document.getElementById('pending_results');if(!el)return;
-  const{missingLogs,pendingCompletion}=computePendingActions();
-  if(!missingLogs.length&&!pendingCompletion.length){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
+  const{missingLogs,pendingCompletion,wfTasks}=computePendingActions();
+  if(!missingLogs.length&&!pendingCompletion.length&&!wfTasks.length){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
   let html='';
+  if(wfTasks.length){
+    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">To-Do by Booking</div>';
+    html+=wfTasks.map(({bk,key,label})=>'<label style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid var(--gr4);cursor:pointer;"><input type="checkbox" onclick="event.stopPropagation()" onchange="quickToggleWf(\''+bk.id+'\',\''+key+'\',this.checked)" style="width:13px;height:13px;accent-color:var(--gr);margin-top:2px;"><span style="flex:1;" onclick="togglePendingPanel();openBkModal(\''+bk.id+'\')"><div style="font-size:11px;font-weight:700;color:var(--bk);">'+label+'</div><div style="font-size:9px;color:var(--gr2);">'+bk.dog+' · '+bk.svc+' · '+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</div></span></label>').join('');
+  }
   if(missingLogs.length){
-    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Missing Daily Logs</div>';
+    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Missing Daily Logs</div>';
     html+=missingLogs.map(({dog,dates})=>'<div onclick="togglePendingPanel();openProfile(allDogs.find(d=>d.cid===\''+dog.cid+'\'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+dog.name+'</div><div style="font-size:9px;color:var(--gr2);">'+dates.length+' day'+(dates.length>1?'s':'')+' missing: '+dates.map(fmtDate).join(', ')+'</div></div><span style="font-size:14px;">⚠️</span></div>').join('');
   }
   if(pendingCompletion.length){
@@ -269,12 +320,44 @@ function runAvailCheck(){
   const hasRed=overlaps.some((_,i)=>rows.split('🔴').length-1>0);
   el.innerHTML='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:4px;">'+overlaps.length+' booking'+(overlaps.length>1?'s':'')+' during this period'+(conflictProfiles.length?' · '+conflictProfiles.length+' known conflict dog'+(conflictProfiles.length>1?'s':''):'')+'</div>'+rows;
 }
+function copyAvailReply(){
+  const sd=document.getElementById('av_sd').value;const ed=document.getElementById('av_ed').value;
+  const dogName=document.getElementById('av_dog').value;
+  if(!sd||!ed){alert('Please run the availability check first.');return;}
+  const dog=allDogs.find(d=>d.name===dogName);
+  const dates=fmtDate(sd)+(ed&&ed!==sd?' – '+fmtDate(ed):'');
+  const t=getTpls();let msg=t.avail||TP_AVAIL;
+  const qStart=new Date(sd+'T'+(document.getElementById('av_st').value||'00:00'));
+  const qEnd=new Date(ed+'T'+(document.getElementById('av_et').value||'23:59'));
+  const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
+  const overlaps=bookings.filter(b=>{
+    if(!active.includes(b.status)||!b.sd)return false;
+    const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
+    return bS<qEnd&&bE>qStart;
+  });
+  const availability=overlaps.length?'We have some other dogs staying during part of this period — see below for details.':'Good news, we\'re available for these dates! ✅';
+  let overlapBlock='';
+  if(overlaps.length){
+    overlapBlock='Dogs already booked during this period:\n'+overlaps.map(b=>{
+      const dateStr=b.sd+(b.ed&&b.ed!==b.sd?' – '+b.ed:'');
+      return '• '+b.dog+' ('+(b.svc||'')+', '+dateStr+')';
+    }).join('\n')+'\n\n';
+  }
+  msg=msg.replace(/\{\{ownerName\}\}/g,dog?.owner||'there')
+    .replace(/\{\{dates\}\}/g,dates)
+    .replace(/\{\{dogs\}\}/g,dogName||'your dog(s)')
+    .replace(/\{\{availability\}\}/g,availability)
+    .replace(/\{\{overlapBlock\}\}/g,overlapBlock);
+  msg=msg.replace(/\n{3,}/g,'\n\n').trim();
+  copyText(msg);
+  alert('Availability reply copied!');
+}
 async function refreshBoard(){
   const btn=document.getElementById('refreshBtn');btn.style.opacity='.5';btn.style.pointerEvents='none';
   document.getElementById('todayCards').innerHTML='<div class="empty"><p>Loading...</p></div>';
   try{
     const dogRows=await readSheet(TABS.DOGS,'A1:BG');const dh=mkHdr(dogRows[0]||[]);allDogs=dogRows.slice(1).map((r,i)=>mapDog(r,i,dh)).filter(d=>d.name.trim());
-    const bkRows=await readSheet(TABS.BK,'A1:AF').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
+    const bkRows=await readSheet(TABS.BK,'A1:AN').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[2]||'',activity:r[3]||'',dogs:r[1]||'',staff:r[4]||'',dur:r[5]||'',notes:r[6]||''}));
     const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialLogs=tl.slice(1).map(r=>({dog:r[tlh['DogName']??1]||'',date:r[tlh['Date']??2]||'',mixedWith:r[tlh['MixedWith']??3]||'',obs:r[tlh['Observations']??4]||'',suitable:r[tlh['Suitable']??5]||''}));
@@ -284,14 +367,17 @@ async function refreshBoard(){
     // Sync activities library from sheet so sheet edits show in app
     syncActsFromSheet(true).catch(()=>{});
     // Sync dog photo URLs from Rates sheet so photos work across devices
-    readSheet(TABS.RATES,'A2:C').then(rr=>{rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1])localStorage.setItem('dog_photo_'+cid,r[1]);});}).catch(()=>{});
+    readSheet(TABS.RATES,'A2:C').then(rr=>{let changed=false;rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1]&&localStorage.getItem('dog_photo_'+cid)!==r[1]){localStorage.setItem('dog_photo_'+cid,r[1]);changed=true;}});if(changed){renderBoard();if(curDog){const photo=curDog.photoUrl||localStorage.getItem('dog_photo_'+curDog.cid);if(photo){const w=document.getElementById('profPhotoWrap');let img=w&&w.querySelector('img.pl');if(img){img.src=photo;img.style.display='block';}}}}}).catch(()=>{});
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();updatePendingBadge();
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
 function mapDog(r,i,h){const g=n=>r[h&&h[n]!==undefined?h[n]:(n==='CustomerID'?0:n==='Name'?1:n==='Breed'?2:n==='Gender'?3:n==='Birthday'?4:n==='BirthdayType'?5:n==='Weight'?6:n==='Neutered'?7:n==='ChipID'?8:n==='Rescue'?9:n==='Nervous'?10:n==='SepAnxiety'?11:n==='DogFriends'?12:n==='FoodType'?13:n==='FoodMeasure'?14:n==='DietNotes'?15:n==='Allergies'?16:n==='Medical'?17:n==='MedSchedule'?18:n==='Fears'?19:n==='Untouchable'?20:n==='Vaccination'?21:n==='Flea'?22:n==='Behaviour'?23:n==='WalkSchedule'?24:n==='CarSeat'?25:n==='SleepLocation'?26:n==='EscapeAttempts'?27:n==='ToiletTrained'?28:n==='AloneHours'?29:n==='TrainingCommands'?30:n==='PrevSitters'?31:n==='UpdateFrequency'?32:n==='UpdateCustom'?33:n==='Relationships'?34:n==='AdditionalNotes'?35:n==='Owner1'?36:n==='Phone1'?37:n==='Owner2'?38:n==='Phone2'?39:n==='Owner3'?40:n==='Phone3'?41:n==='Address'?42:n==='Postcode'?43:n==='Emergency'?44:n==='Vet'?45:n==='Insurance'?46:n==='MeetGreetDate'?47:n==='Referral'?48:n==='ReferralNotes'?49:n==='Service'?50:n==='Status'?51:n==='Remarks'?52:n==='Emoji'?99:n==='Jogging'?53:n==='VaccinationURL'?54:55)]||'';
   return{cid:g('CustomerID')||genId(g('Name')||'Dog'),name:g('Name'),breed:g('Breed'),gender:g('Gender'),birthday:g('Birthday'),bdayType:g('BirthdayType')||'exact',weight:g('Weight'),neut:g('Neutered'),chip:g('ChipID'),rescue:g('Rescue'),nervous:g('Nervous'),anxiety:g('SepAnxiety'),dogfriends:g('DogFriends'),food:g('FoodType'),foodMeasure:g('FoodMeasure'),dietNotes:g('DietNotes'),allerg:g('Allergies'),med:g('Medical'),medSchedule:g('MedSchedule'),fears:g('Fears'),notouch:g('Untouchable'),vacc:g('Vaccination'),flea:g('Flea'),behav:g('Behaviour'),walk:g('WalkSchedule'),car:g('CarSeat'),sleep:g('SleepLocation'),escape:g('EscapeAttempts'),toilet:g('ToiletTrained'),alone:g('AloneHours'),commands:g('TrainingCommands'),sitters:g('PrevSitters'),updates:g('UpdateFrequency'),updatesCustom:g('UpdateCustom'),rel:g('Relationships'),notes:g('AdditionalNotes'),owner:g('Owner1'),phone:g('Phone1'),owner2:g('Owner2'),phone2:g('Phone2'),owner3:g('Owner3'),phone3:g('Phone3'),addr:g('Address'),postcode:g('Postcode'),emergency:g('Emergency'),vet:g('Vet'),ins:g('Insurance'),meetgreet:g('MeetGreetDate'),referral:g('Referral'),refNotes:g('ReferralNotes'),svc:g('Service'),status:g('Status'),remarks:g('Remarks'),emoji:g('Emoji'),jog:g('Jogging'),vaccUrl:g('VaccinationURL'),photoUrl:g('PhotoURL'),rowIdx:i+2};}
-function mapBk(r,i,h){const gi=(n,fb)=>h&&h[n]!==undefined?h[n]:fb;return{id:r[gi('ID',2)]||'',dog:r[gi('DogName',1)]||'',customerId:r[gi('CustomerID',0)]||'',svc:r[gi('ServiceType',3)]||'',sd:r[gi('StartDate',4)]||'',st:r[gi('StartTime',5)]||'',ed:r[gi('EndDate',6)]||'',et:r[gi('EndTime',7)]||'',dropLoc:r[gi('DropoffLocation',8)]||'',pickLoc:r[gi('PickupLocation',9)]||'',rev:parseFloat(r[gi('Revenue',10)])||0,tips:parseFloat(r[gi('Tips',11)])||0,prepay:parseFloat(r[gi('Prepayment',12)])||0,finalPay:parseFloat(r[gi('FinalPayment',13)])||0,unit:parseFloat(r[gi('UnitCost',14)])||0,discNotes:r[gi('DiscountNotes',15)]||'',roverPct:parseFloat(r[gi('RoverCommissionPct',16)])||0,roverAmt:parseFloat(r[gi('RoverCommissionGBP',17)])||0,ch:r[gi('Channel',18)]||'TCL',pay:r[gi('Payment',19)]||'',status:r[gi('Status',20)]||'',priv:r[gi('Private',21)]==='Private',month:r[gi('Month',22)]||'',rating:r[gi('Rating',23)]||'',feedback:r[gi('Feedback',24)]||'',rem:[r[gi('Rem1',25)]||'',r[gi('Rem2',26)]||'',r[gi('Rem3',27)]||'',r[gi('Rem4',28)]||'',r[gi('Rem5',29)]||''],overlapAppr:r[gi('OverlapApprovals',30)]||'',ri:i+2};}
+function mapBk(r,i,h){const gi=(n,fb)=>h&&h[n]!==undefined?h[n]:fb;return{id:r[gi('ID',2)]||'',dog:r[gi('DogName',1)]||'',customerId:r[gi('CustomerID',0)]||'',svc:r[gi('ServiceType',3)]||'',sd:r[gi('StartDate',4)]||'',st:r[gi('StartTime',5)]||'',ed:r[gi('EndDate',6)]||'',et:r[gi('EndTime',7)]||'',dropLoc:r[gi('DropoffLocation',8)]||'',pickLoc:r[gi('PickupLocation',9)]||'',rev:parseFloat(r[gi('Revenue',10)])||0,tips:parseFloat(r[gi('Tips',11)])||0,prepay:parseFloat(r[gi('Prepayment',12)])||0,finalPay:parseFloat(r[gi('FinalPayment',13)])||0,unit:parseFloat(r[gi('UnitCost',14)])||0,discNotes:r[gi('DiscountNotes',15)]||'',roverPct:parseFloat(r[gi('RoverCommissionPct',16)])||0,roverAmt:parseFloat(r[gi('RoverCommissionGBP',17)])||0,ch:r[gi('Channel',18)]||'TCL',pay:r[gi('Payment',19)]||'',status:r[gi('Status',20)]||'',priv:r[gi('Private',21)]==='Private',month:r[gi('Month',22)]||'',rating:r[gi('Rating',23)]||'',feedback:r[gi('Feedback',24)]||'',rem:[r[gi('Rem1',25)]||'',r[gi('Rem2',26)]||'',r[gi('Rem3',27)]||'',r[gi('Rem4',28)]||'',r[gi('Rem5',29)]||''],overlapAppr:r[gi('OverlapApprovals',30)]||'',
+  wf:{whatsapp:r[gi('WF_WhatsApp',31)]||'',prep:r[gi('WF_Prep',32)]||'',docsReceived:r[gi('WF_DocsReceived',33)]||'',consentSigned:r[gi('WF_ConsentSigned',34)]||'',dropoff:r[gi('WF_DropoffReminder',35)]||'',pickup:r[gi('WF_PickupReminder',36)]||'',finalpay:r[gi('WF_FinalPayReminder',37)]||'',reviewReq:r[gi('WF_ReviewRequest',38)]||'',review:r[gi('WF_Review',39)]||''},
+  ri:i+2};}
+function bkRowVals(bk){return[bk.customerId,bk.dog,bk.id,bk.svc,bk.sd,bk.st,bk.ed,bk.et,bk.dropLoc,bk.pickLoc,bk.rev,bk.tips,bk.prepay,bk.finalPay,bk.unit,bk.discNotes,bk.roverPct,bk.roverAmt,bk.ch,bk.pay,bk.status,bk.priv?'Private':'',bk.month,bk.rating,bk.feedback,...(bk.rem||['','','','','']),bk.overlapAppr||'',bk.wf?.whatsapp||'',bk.wf?.prep||'',bk.wf?.docsReceived||'',bk.wf?.consentSigned||'',bk.wf?.dropoff||'',bk.wf?.pickup||'',bk.wf?.finalpay||'',bk.wf?.reviewReq||'',bk.wf?.review||''];}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
   const in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().split('T')[0];
@@ -585,7 +671,7 @@ function openAddHistEntry(type,date){
   if(type==='health')flds=df+'<div class="fr"><div class="f"><label>Category</label><input class="fi" id="ef_cat"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc"></textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next"></div>'+prv;
   else if(type==='fight')flds='<div class="fr">'+df+'<div class="f"><label>Time</label><input class="fi" type="time" id="ef_time"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue"></textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev"></div>'+prv;
   else if(type==='transport')flds='<div class="fr">'+df+'<div class="f"><label>Transporter</label><input class="fi" id="ef_trn"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from"></div><div class="f"><label>To</label><input class="fi" id="ef_to"></div></div>'+prv;
-  else if(type==='trial'){const opts=['Suitable','Partial','Not Suitable'].map(o=>'<option>'+o+'</option>').join('');flds='<div class="fr">'+df+'<div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+opts+'</select></div></div><div class="f"><label>Mixed with (dog names)</label><input class="fi" id="ef_mixed" placeholder="e.g. Bertie, Daisy"></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs"></textarea></div>'+prv;}
+  else if(type==='trial'){const opts=['Suitable','Partial','Not Suitable'].map(o=>'<option>'+o+'</option>').join('');const dogOpts=allDogs.filter(d=>d.cid!==curDog.cid).map(d=>'<option value="'+d.name+'">').join('');flds='<div class="fr">'+df+'<div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+opts+'</select></div></div><div class="f"><label>Mixed with (dog names)</label><input class="fi" id="ef_mixed" list="mixedDogList" placeholder="e.g. Bertie, Daisy (comma-separated)"><datalist id="mixedDogList">'+dogOpts+'</datalist></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs"></textarea></div>'+prv;}
   else return;
   document.getElementById('editModalBody').innerHTML=warn+flds+ss;
   document.getElementById('editModal').classList.add('open');
@@ -853,7 +939,8 @@ function calcMultiQ(){
         const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;
         let d=new Date(l.sd+'T12:00:00');const endD=new Date(l.ed+'T12:00:00');
         while(d<endD){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
-        const mainAmt=(sN*r.board_std)+(hN*r.board_hol);
+        const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:r.board_hol;
+        const mainAmt=(sN*stdR)+(hN*holR);
         amt=mainAmt;
         const em='\u{1F4A4}';const allDogStr=dogs.join(' & ');
         lines.push([em+' Boarding \u2014 '+mainDog+' (main)',mainAmt]);
@@ -861,9 +948,9 @@ function calcMultiQ(){
         let dp=em+' Boarding ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
         if(hN>0)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN+' night'+(hN!==1?'s':'')+(holRangeStr?' ('+holRangeStr+')':'');
         dp+='\n\n'+mainDog+':\n';
-        if(sN>0&&hN>0){dp+=fmtGBP(r.board_std)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_std)+'\n'+fmtGBP(r.board_hol)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*r.board_hol)+'\nTotal: '+fmtGBP(mainAmt);}
-        else{dp+=fmtGBP(sN>0?r.board_std:r.board_hol)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(mainAmt);}
-        if(exHrs>0){const baseN=sN>0?r.board_std:r.board_hol;const extAmt=exHrs<8?Math.round(baseN*0.5*100)/100:baseN;amt+=extAmt;lines.push([em+' Boarding \u2014 extra hours '+( exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h'+(hN>0&&sN===0?' holiday':'')+', '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
+        if(sN>0&&hN>0){dp+=fmtGBP(stdR)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*stdR)+'\n'+fmtGBP(holR)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*holR)+'\nTotal: '+fmtGBP(mainAmt);}
+        else{dp+=fmtGBP(sN>0?stdR:holR)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(mainAmt);}
+        if(exHrs>0){const baseN=sN>0?stdR:holR;const extAmt=exHrs<8?Math.round(baseN*0.5*100)/100:baseN;amt+=extAmt;lines.push([em+' Boarding \u2014 extra hours '+( exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h'+(hN>0&&sN===0?' holiday':'')+', '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
         addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*r.board_addh);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n\n'+dog+' (additional dog):\n';if(sN>0&&hN>0){dp+=fmtGBP(r.board_add)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_add)+'\n'+fmtGBP(r.board_addh)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*r.board_addh)+'\nTotal: '+fmtGBP(addAmt);}else{dp+=fmtGBP(sN>0?r.board_add:r.board_addh)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(addAmt);}});
         descParts.push(dp);
       }
@@ -871,7 +958,7 @@ function calcMultiQ(){
       const hol=l.sd?isHol(l.sd):false;
       const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
       const mainDog=dogs[0];const addDogs=dogs.slice(1);
-      const dayBase=hol?r.day_hol:r.day_std;const mainAmt=dayBase;amt=mainAmt;
+      const dayBase=l.rate>0?l.rate:(hol?r.day_hol:r.day_std);const mainAmt=dayBase;amt=mainAmt;
       const em='\u2600\uFE0F';const allDogStr=dogs.join(' & ');
       lines.push([em+' Daycare \u2014 '+mainDog+(hol?' (holiday)':''),mainAmt]);
       let dp=em+' Daycare ('+allDogStr+'): '+fmtDate(l.sd||'')+'  Drop-off: '+(l.st2||'07:00')+'  Pick-up: '+(l.et||'18:00')+(hol?'\n\uD83C\uDFDD\uFE0F Holiday rate':'');
@@ -912,12 +999,13 @@ function calcMultiQ(){
         const holDates2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
         let d2=new Date(l.sd+'T12:00:00');const endD2=new Date(l.ed+'T12:00:00');
         while(d2<endD2){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
-        const nights2=sN2+hN2;const mainAmt2=(sN2*r.board_std)+(hN2*r.board_hol);amt=mainAmt2;
+        const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:r.board_hol;
+        const nights2=sN2+hN2;const mainAmt2=(sN2*stdR2)+(hN2*holR2);amt=mainAmt2;
         let dp2=em+' Dog Sit ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
         if(hN2>0)dp2+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN2+' night'+(hN2!==1?'s':'');
         dp2+='\n\n'+dogs[0]+':\n';
-        if(sN2>0&&hN2>0){dp2+=fmtGBP(r.board_std)+'/night \u00D7 '+sN2+' night'+(sN2!==1?'s':'')+' = '+fmtGBP(sN2*r.board_std)+'\n'+fmtGBP(r.board_hol)+'/night \u00D7 '+hN2+' night'+(hN2!==1?'s':'')+' = '+fmtGBP(hN2*r.board_hol)+'\nTotal: '+fmtGBP(mainAmt2);}
-        else{dp2+=fmtGBP(sN2>0?r.board_std:r.board_hol)+'/night \u00D7 '+nights2+' night'+(nights2!==1?'s':'')+' = '+fmtGBP(mainAmt2);}
+        if(sN2>0&&hN2>0){dp2+=fmtGBP(stdR2)+'/night \u00D7 '+sN2+' night'+(sN2!==1?'s':'')+' = '+fmtGBP(sN2*stdR2)+'\n'+fmtGBP(holR2)+'/night \u00D7 '+hN2+' night'+(hN2!==1?'s':'')+' = '+fmtGBP(hN2*holR2)+'\nTotal: '+fmtGBP(mainAmt2);}
+        else{dp2+=fmtGBP(sN2>0?stdR2:holR2)+'/night \u00D7 '+nights2+' night'+(nights2!==1?'s':'')+' = '+fmtGBP(mainAmt2);}
         lines.push([em+' Dog Sit \u2014 '+dogs[0],mainAmt2]);descParts.push(dp2);
       }else{
         const qty2=l.qty||1;const nRate=l.rate||r.board_std;amt=nRate*qty2;
@@ -951,7 +1039,7 @@ function calcMultiQ(){
 
 function getRates(){return JSON.parse(localStorage.getItem('tcl_rates')||JSON.stringify(DR));}
 function getHolRanges(){return JSON.parse(localStorage.getItem('tcl_hol_ranges')||JSON.stringify(DEFAULT_RANGES));}
-function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');return{quote:s.quote||TP_QUOTE,book:s.book||TP_BOOK,prepay:s.prepay||TP_PREPAY,final:s.final||TP_FINAL,payLink:s.payLink||'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:s.payRefPfx||'KCHEUNG'};}
+function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');return{quote:s.quote||TP_QUOTE,book:s.book||TP_BOOK,prepay:s.prepay||TP_PREPAY,final:s.final||TP_FINAL,avail:s.avail||TP_AVAIL,payLink:s.payLink||'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:s.payRefPfx||'KCHEUNG'};}
 function isHol(d){return getHolRanges().some(r=>d>=r.start&&d<=r.end);}
 function getHolDates(sd,ed){const ranges=getHolRanges();const dates=[];let d=new Date(sd+'T12:00:00');const e=new Date(ed+'T12:00:00');while(d<e){const ds=d.toISOString().split('T')[0];if(ranges.some(r=>ds>=r.start&&ds<=r.end))dates.push(ds);d.setDate(d.getDate()+1);}return dates;}
 function loadQSettings(){
@@ -1098,6 +1186,7 @@ function genQuote(type){
   // clear other output boxes
   ['q_out_quote','q_out_book','q_out_prepay','q_out_final'].forEach(id=>{if('q_out_'+type!==id){const el=document.getElementById(id);if(el){el.style.display='none';el.textContent='';}}});
   if(type==='quote'){
+    markBookingsQuotedFromQuote();
     const rateBlock=genRateBlock();
     msg+='Here is the rate for our services with THE CUDDLY LANE \u2601\ufe0f\u2728\n\n';
     msg+=rateBlock;
@@ -1146,6 +1235,33 @@ function genQuote(type){
   allBtns.forEach(b=>{if(b.dataset.qtype===type){b.textContent='Copied!';setTimeout(()=>b.textContent=btnLabels[type]||'Copy',2000);}});
 }
 
+async function markBookingsQuotedFromQuote(){
+  try{
+    const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
+    const mainLine=_svcLines.find(l=>l.svc!=='extra');if(!mainLine)return;
+    const sd=mainLine.sd||'';const ed=mainLine.ed||sd;const svcLabel=svcN[mainLine.svc]||mainLine.svc;
+    const dogs=(_selDogs&&_selDogs.length)?_selDogs:(mainLine.dogs||[]);
+    let changed=false;
+    for(const dogName of dogs){
+      if(!dogName)continue;
+      const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
+      const existing=bookings.find(b=>(b.customerId===customerId||b.dog.toLowerCase()===dogName.toLowerCase())&&b.sd===sd&&(b.ed||b.sd)===(ed||sd)&&!['Cancelled','Canceled'].includes(b.status));
+      if(existing){
+        if(!existing.status){
+          const vals=[existing.customerId,dogName,existing.id,existing.svc,existing.sd,existing.st,existing.ed,existing.et,existing.dropLoc,existing.pickLoc,existing.rev,existing.tips,existing.prepay,existing.finalPay,existing.unit,existing.discNotes,existing.roverPct,existing.roverAmt,existing.ch,existing.pay,'Quoted',existing.priv?'Private':'',existing.month,existing.rating,existing.feedback,...existing.rem,existing.overlapAppr];
+          await updateRow(TABS.BK,existing.ri,vals);
+          existing.status='Quoted';changed=true;
+        }
+      }else if(sd){
+        const id=nextBkId();const month=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'});
+        const vals=[customerId,dogName,id,svcLabel,sd,mainLine.st2||'09:00',ed||sd,mainLine.et||'18:00','','',0,0,0,0,0,'',0,0,'TCL','','Quoted','',month,'','','','','','','','','','','','','','','',''];
+        await appendRow(TABS.BK,vals);
+        bookings.push(mapBk(vals,bookings.length));changed=true;
+      }
+    }
+    if(changed){renderBoard();updatePendingBadge();}
+  }catch(e){}
+}
 async function createBookingsFromQuote(){
   if(!_svcLines.length){alert('Complete the quote first');return;}
   calcMultiQ();
@@ -1168,7 +1284,7 @@ async function createBookingsFromQuote(){
       const rev=line.svc==='taxi'?(_cr.lines.find(l=>l[0].includes('Taxi'))?.[1]||0):revenueMap[dogName]||0;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
       const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
-      const vals=[customerId,VL_A,id,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','',''];
+      const vals=[customerId,VL_A,id,svcLabel,sd,st,ed,et,'','',rev,0,prepayAmt,0,0,'',0,0,'TCL','','Booked','',month,'','','','','','','','','','','','','','','',''];
       try{await appendRow(TABS.BK,vals);const mv=[...vals];mv[1]=dogName;bookings.push(mapBk(mv,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
@@ -1207,9 +1323,7 @@ function openBkModal(editId=null,fromProf=false){
   }
   calcBal();toggleRover();updateStatusFlow();renderOverlapCheck();renderWfChecklist();modal.classList.add('open');
 }
-// ==================== WORKFLOW CHECKLIST ====================
-function getWfState(id){return JSON.parse(localStorage.getItem('wfchk_'+id)||'{}');}
-function setWfState(id,key,val){const sv=getWfState(id);sv[key]=val;localStorage.setItem('wfchk_'+id,JSON.stringify(sv));}
+// ==================== WORKFLOW CHECKLIST (stored on Bookings sheet) ====================
 function wfAutoLogs(bk){
   if(!bk||!bk.sd)return null;
   const today=todayStr();const endD=bk.ed&&bk.ed<today?bk.ed:(()=>{const y=new Date(today+'T12:00:00Z');y.setUTCDate(y.getUTCDate()-1);return y.toISOString().slice(0,10);})();
@@ -1222,45 +1336,55 @@ function wfAutoCompat(bk){
   if(!bk||!bk.dog)return null;
   return trialLogs.some(t=>t.dog.toLowerCase()===bk.dog.toLowerCase()&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd));
 }
+function wfStepValue(bk,key){
+  const sv=bk.wf||{};
+  if(key==='logs'){const v=sv.logs;return v!==undefined&&v!==''?!!v:wfAutoLogs(bk);}
+  if(key==='compat'){const v=sv.compat;return v!==undefined&&v!==''?!!v:wfAutoCompat(bk);}
+  if(key==='review')return sv.review==='done'||sv.review==='na';
+  return !!sv[key];
+}
 function wfCompletion(bk){
   if(!bk)return{done:0,total:WF_STEPS.length,pct:0,allDone:false};
-  const sv=getWfState(bk.id);
   let done=0;
-  WF_STEPS.forEach(s=>{
-    let v=sv[s.k];
-    if(v===undefined){
-      if(s.k==='logs')v=wfAutoLogs(bk);
-      else if(s.k==='compat')v=wfAutoCompat(bk);
-      else if(s.k==='review')v=!!(bk.rating||bk.feedback)||sv.reviewNA;
-      else v=false;
-    }
-    if(v)done++;
-  });
+  WF_STEPS.forEach(s=>{if(wfStepValue(bk,s.k))done++;});
   return{done,total:WF_STEPS.length,pct:Math.round(done/WF_STEPS.length*100),allDone:done===WF_STEPS.length};
+}
+async function toggleWfStep(eid,key,checked){
+  const bk=bookings.find(b=>b.id===eid);if(!bk)return;
+  if(!bk.wf)bk.wf={};
+  if(key==='review')bk.wf.review=checked?'done':'';
+  else bk.wf[key]=checked?'1':'';
+  if(key==='logs'||key==='compat'){
+    // store explicit override even when matching auto value, so it sticks
+  }
+  try{await updateRow(TABS.BK,bk.ri,bkRowVals(bk));}catch(e){}
+  renderWfChecklist();updateStatusFlow();updatePendingBadge();
+}
+async function setWfReviewNA(eid,isNA){
+  const bk=bookings.find(b=>b.id===eid);if(!bk)return;
+  if(!bk.wf)bk.wf={};
+  bk.wf.review=isNA?'na':'';
+  try{await updateRow(TABS.BK,bk.ri,bkRowVals(bk));}catch(e){}
+  renderWfChecklist();updateStatusFlow();updatePendingBadge();
 }
 function renderWfChecklist(){
   const c=document.getElementById('bm_workflow');if(!c)return;
   const eid=document.getElementById('bm_eid')?.value;
   if(!eid){c.innerHTML='<div style="font-size:9px;color:var(--gr3);">Save the booking first to track its workflow checklist.</div>';return;}
   const bk=bookings.find(b=>b.id===eid);if(!bk)return;
-  const sv=getWfState(eid);
   const rows=WF_STEPS.map(s=>{
-    let v=sv[s.k];let auto=false;
-    if(v===undefined){
-      if(s.k==='logs'){v=wfAutoLogs(bk);auto=true;}
-      else if(s.k==='compat'){v=wfAutoCompat(bk);auto=true;}
-      else if(s.k==='review'){v=!!(bk.rating||bk.feedback)||sv.reviewNA;auto=!!(bk.rating||bk.feedback);}
-      else v=false;
-    }
+    const v=wfStepValue(bk,s.k);
+    const auto=(s.k==='logs'||s.k==='compat')&&(bk.wf?.[s.k]===undefined||bk.wf?.[s.k]==='');
     const checked=v?'checked':'';
     const autoTag=auto?'<span style="font-size:8px;color:var(--gr3);margin-left:4px;">(auto)</span>':'';
     let extra='';
-    if(s.k==='review')extra='<label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer;margin:2px 0 6px 19px;"><input type="checkbox" '+(sv.reviewNA?'checked':'')+' onchange="setWfState(\''+eid+'\',\'reviewNA\',this.checked);renderWfChecklist();updateStatusFlow();"> No review needed</label>';
-    return'<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" '+checked+' onchange="setWfState(\''+eid+'\',\''+s.k+'\',this.checked);renderWfChecklist();updateStatusFlow();" style="width:13px;height:13px;accent-color:var(--gr);">'+s.l+autoTag+'</label>'+extra;
+    if(s.k==='review')extra='<label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer;margin:2px 0 6px 19px;"><input type="checkbox" '+(bk.wf?.review==='na'?'checked':'')+' onchange="setWfReviewNA(\''+eid+'\',this.checked)"> No review needed</label>';
+    return'<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" '+checked+' onchange="toggleWfStep(\''+eid+'\',\''+s.k+'\',this.checked)" style="width:13px;height:13px;accent-color:var(--gr);">'+s.l+autoTag+'</label>'+extra;
   }).join('');
   const comp=wfCompletion(bk);
   c.innerHTML='<div style="font-size:9px;font-weight:700;color:'+(comp.allDone?'var(--gn)':'var(--gr3)')+';margin-bottom:6px;">'+comp.done+'/'+comp.total+' steps complete'+(comp.allDone?' ✅':'')+'</div>'+rows;
 }
+// ==================== OVERLAP / COMPATIBILITY REMINDER (Trial-Log based) ====================
 function renderOverlapCheck(){
   const c=document.getElementById('bm_overlap');if(!c)return;
   const dog=document.getElementById('bm_dog')?.value;
@@ -1268,8 +1392,6 @@ function renderOverlapCheck(){
   const ed=document.getElementById('bm_ed')?.value;const et=document.getElementById('bm_et')?.value||'23:59';
   if(!dog||!sd||!ed){c.innerHTML='<div style="font-size:9px;color:var(--gr3);">Select dog and dates to check overlaps.</div>';return;}
   const eid=document.getElementById('bm_eid')?.value;
-  const cur=eid?bookings.find(b=>b.id===eid):null;
-  const prevAppr=(cur?.overlapAppr||'').split(/[,;]+/).map(s=>s.trim()).filter(Boolean);
   const qStart=new Date(sd+'T'+st);const qEnd=new Date(ed+'T'+et);
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
   const overlaps=bookings.filter(b=>{
@@ -1280,11 +1402,11 @@ function renderOverlapCheck(){
     return bS<qEnd&&bE>qStart;
   });
   if(!overlaps.length){c.innerHTML='<div style="font-size:9px;color:var(--gn);">✅ No other dogs booked during this period.</div>';return;}
-  const seen=new Set();
-  c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">Tick to confirm '+dog+' is approved to be around these dogs:</div>'+overlaps.filter(b=>{const k=b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).map(b=>{
-    const checked=prevAppr.some(n=>n.toLowerCase()===b.dog.toLowerCase())?'checked':'';
-    return'<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:6px;"><input type="checkbox" value="'+b.dog+'" '+checked+' style="width:13px;height:13px;accent-color:var(--gr);">Approved with '+b.dog+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</label>';
-  }).join('');
+  const seen=new Set();const names=overlaps.filter(b=>{const k=b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+  const dogObj=allDogs.find(d=>d.name===dog);
+  const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log compatibility in Trial-Log</button>':'';
+  c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">⚠️ Other dogs staying during this period — please log compatibility in the Trial-Log:</div>'+
+    names.map(b=>'<div style="font-size:11px;padding:3px 0;">• '+b.dog+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</div>').join('')+logBtn;
 }
 function updateDogIdHint(){const n=document.getElementById('bm_dog').value;const d=allDogs.find(x=>x.name===n);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
 function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;const isCancelled=v==='Cancelled';const isCompleted=v==='Completed';steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';el.style.opacity='';if(isCancelled){el.style.opacity='0.3';return;}if(isCompleted){el.classList.add('fsdone');return;}if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});const cancelEl=document.getElementById('bsf_cancelled');const completeEl=document.getElementById('bsf_completed');if(cancelEl)cancelEl.style.display=isCancelled?'inline-block':'none';if(completeEl)completeEl.style.display=isCompleted?'inline-block':'none';
@@ -1332,8 +1454,10 @@ async function saveBk(){
   const priv=document.getElementById('bm_priv').checked;const id=eid||nextBkId();const rems=getReminderVals();
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
   const dogData=allDogs.find(d=>d.name===dog);const customerId=dogData?dogData.cid:'';
-  const overlapAppr=[...document.querySelectorAll('#bm_overlap input[type=checkbox]:checked')].map(c=>c.value).join(', ');
-  const vals=[customerId,VL_A,id,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems,overlapAppr];
+  const overlapAppr=eid?(bookings.find(b=>b.id===eid)?.overlapAppr||''):'';
+  const existingWf=eid?(bookings.find(b=>b.id===eid)?.wf||{}):{};
+  const wfVals=[existingWf.whatsapp||'',existingWf.prep||'',existingWf.docsReceived||'',existingWf.consentSigned||'',existingWf.dropoff||'',existingWf.pickup||'',existingWf.finalpay||'',existingWf.reviewReq||'',existingWf.review||''];
+  const vals=[customerId,VL_A,id,document.getElementById('bm_svc').value,sd,document.getElementById('bm_st').value,document.getElementById('bm_ed').value,document.getElementById('bm_et').value,gv('bm_drop_loc'),gv('bm_pick_loc'),rev,tips,pre,fin,unit,document.getElementById('bm_disc_notes').value,rPct,rAmt,ch,document.getElementById('bm_pay').value,document.getElementById('bm_status').value,priv?'Private':'',month,gv('bm_rating'),gv('bm_feedback'),...rems,overlapAppr,...wfVals];
   try{
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
     const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length);if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
@@ -1506,7 +1630,7 @@ function renderTplHub(){
     item.innerHTML='<span class="tpl-drag">::::</span><div class="tpl-info"><div class="tpl-nm">'+tpl.name+'</div>'+(tpl.cat?'<div style="font-size:8px;color:var(--or);margin-bottom:2px;">'+tpl.cat+'</div>':'')+'<div class="tpl-pv">'+(tpl.content||'').slice(0,80)+'</div></div>'
       +'<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">'
       +'<button class="tpl-copy-btn" onclick="event.stopPropagation();openCopyTpl('+realIdx+')" style="background:var(--pu);color:#fff;border:none;border-radius:6px;font-size:10px;padding:4px 8px;cursor:pointer;font-family:var(--fb);">Copy</button>'
-      +'<button onclick="event.stopPropagation();if(!confirm(\'Delete this template?\'))return;msgTpls.splice('+realIdx+',1);saveMsgTpls();renderTplHub();" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:11px;padding:2px 0;">Delete</button>'
+      +'<button onclick="event.stopPropagation();delTplHub('+realIdx+')" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:11px;padding:2px 0;">Delete</button>'
       +'</div>';
     item.onclick=(e)=>{if(!e.target.closest('button')&&!e.target.classList.contains('tpl-drag'))openTplHub(realIdx);};
     item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',realIdx);item.style.opacity='.5';});
@@ -1516,6 +1640,16 @@ function renderTplHub(){
     item.addEventListener('drop',e=>{e.preventDefault();item.style.borderColor='';const fromReal=parseInt(e.dataTransfer.getData('text/plain'));if(fromReal===realIdx)return;const moved=msgTpls.splice(fromReal,1)[0];msgTpls.splice(realIdx,0,moved);saveMsgTpls();renderTplHub();});
     el.appendChild(item);
   });
+}
+async function delTplHub(idx){
+  const tpl=msgTpls[idx];if(!tpl)return;
+  if(!confirm('Delete this template?'))return;
+  msgTpls.splice(idx,1);saveMsgTpls();renderTplHub();
+  try{
+    const rows=await readSheet(TABS.TPLS,'A2:D').catch(()=>[]);
+    const ri=rows.findIndex(r=>r[0]===tpl.name);
+    if(ri>=0)await clearRow(TABS.TPLS,ri+2);
+  }catch(e){}
 }
 function openCopyTpl(idx){
   const tpl=msgTpls[idx];if(!tpl)return;
