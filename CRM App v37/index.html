@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cuddly Lane">
+<meta name="theme-color" content="#44403C">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>THE CUDDLY LANE</title>
+<style>
+:root{
+  --or:#F97316;--orl:#FED7AA;--orxl:#FFF7ED;
+  --hn:#F59E0B;--hnl:#FDE68A;--hnxl:#FFFBEB;
+  --cn:#B45309;--cnl:#FEF2EE;
+  --gr:#44403C;--gr2:#78716C;--gr3:#A8A29E;--gr4:#E7E5E4;--gr5:#FAFAF9;
+  --wh:#FFFFFF;
+  --rd:#DC2626;--rdl:#FEE2E2;
+  --gn:#16A34A;--gnl:#DCFCE7;
+  --bl:#1E40AF;--bll:#DBEAFE;
+  --sk:#0284C7;--skl:#7DD3FC;
+  --pu:#7C3AED;--pul:#EDE9FE;
+  --fh:-apple-system,"SF Pro Rounded","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  --fb:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  --r:10px;--r2:14px;
+}
+*,*::before,*::after{
+  box-sizing:border-box;margin:0;padding:0;
+  -webkit-text-size-adjust:100%;
+  color-scheme:light!important;
+}
+html{background:#fff!important;color-scheme:light!important;}
+body{
+  font-family:var(--fb);font-size:13px;
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  background:var(--hnxl)!important;color:var(--gr)!important;
+  color-scheme:light!important;
+  forced-color-adjust:none;
+}
+.main{flex:1;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+@media(prefers-color-scheme:dark){
+  html,body,*{color-scheme:light!important;background-color:unset;color:unset;}
+}
+/* PIN */
+.pin-screen{position:fixed;inset:0;background:var(--gr);z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.pin-screen.active{display:flex;}
+.pin-logo{font-family:var(--fh);font-size:20px;font-weight:800;color:var(--hnl);letter-spacing:.05em;}
+.pin-tag{font-size:10px;color:rgba(255,255,255,.38);text-align:center;line-height:1.6;max-width:200px;}
+.pin-dots{display:flex;gap:10px;margin-top:4px;}
+.pin-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.18);transition:background .15s;}
+.pin-dot.on{background:var(--or);}
+.pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:10px;}
+.pin-key{width:72px;height:72px;background:rgba(255,255,255,.1);border:none;border-radius:12px;font-size:22px;font-family:var(--fh);font-weight:700;color:#fff;cursor:pointer;}
+.pin-key:hover{background:rgba(255,255,255,.18);}
+.pin-err{font-size:10px;color:#FCA5A5;min-height:15px;}
+.pin-skip{font-size:9px;color:rgba(255,255,255,.3);cursor:pointer;text-decoration:underline;}
+/* HEADER - slim */
+.hdr{background:var(--gr);padding:7px 13px;display:flex;align-items:center;gap:7px;flex-shrink:0;z-index:200;}
+.hdr-logo{font-family:var(--fh);font-size:13px;font-weight:800;color:var(--hnl);letter-spacing:.05em;}
+.hdr-sub{font-size:8px;color:rgba(255,255,255,.35);margin-top:1px;}
+.hsp{flex:1;}
+.hbtn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:4px 9px;border-radius:6px;font-size:10px;cursor:pointer;font-family:var(--fb);white-space:nowrap;}
+.hbtn:hover{background:rgba(255,255,255,.18);}
+.hbtn.or{background:var(--or);border-color:var(--or);}
+.hdr-back{display:none;align-items:center;gap:4px;background:none;border:none;color:var(--hnl);font-size:10px;cursor:pointer;font-family:var(--fb);padding:3px;}
+/* SETTINGS */
+.setup-bar{background:var(--hnxl);border-bottom:2px solid var(--hnl);padding:10px 13px;display:none;flex-shrink:0;max-height:75vh;overflow-y:auto;}
+.setup-bar.open{display:block;}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:7px;}
+.si{width:100%;padding:6px 8px;border:1px solid var(--hnl);border-radius:var(--r);font-size:11px;font-family:var(--fb);background:var(--wh)!important;color:var(--gr)!important;}
+.si.sta{grid-column:1/-1;height:54px;resize:vertical;font-size:10px;font-family:monospace;}
+.si:focus{outline:none;border-color:var(--or);}
+.key-preview{font-size:10px;color:var(--cn);background:var(--cnl);border:1px solid var(--orl);border-radius:6px;padding:4px 8px;margin-bottom:6px;word-break:break-all;display:none;}
+.brow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.sbtn{background:var(--gr);color:#fff;border:none;padding:6px 11px;border-radius:var(--r);font-size:11px;cursor:pointer;font-family:var(--fb);font-weight:600;}
+.sbtn.rd{background:var(--rd);}
+/* SECTION NAV */
+.snav-bar{background:var(--gr);border-top:1px solid rgba(255,255,255,.06);display:flex;flex-shrink:0;}
+.snav{flex:1;padding:7px 4px;text-align:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.35);cursor:pointer;border-bottom:2px solid transparent;background:none;border-left:none;border-right:none;border-top:none;font-family:var(--fb);letter-spacing:.05em;text-transform:uppercase;}
+.snav.active{color:var(--hnl);border-bottom-color:var(--or);}
+/* MAIN */
+.main{flex:1;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+.screen{display:none;min-height:100%;padding-bottom:40px;}
+.screen.active{display:block;}
+.pg{padding:12px;}
+.pg-t{font-family:var(--fh);font-size:17px;font-weight:800;color:var(--gr);margin-bottom:2px;}
+.pg-s{font-size:10px;color:var(--gr2);margin-bottom:11px;}
+/* BOARD */
+.brd-hdr{padding:10px 13px 4px;display:flex;align-items:center;justify-content:space-between;}
+.brd-t{font-family:var(--fh);font-size:17px;font-weight:800;color:var(--gr);}
+.brd-d{font-size:8px;color:var(--gr3);}
+.srch-row{padding:0 13px 7px;position:relative;}
+.srch-inp{width:100%;padding:7px 10px 7px 26px;border:1px solid var(--gr4);border-radius:20px;font-size:11px;font-family:var(--fb);background:var(--wh)!important;color:var(--gr)!important;outline:none;}
+.srch-inp:focus{border-color:var(--or);}
+.srch-ico{position:absolute;left:21px;top:50%;transform:translateY(-50%);color:var(--gr3);font-size:11px;pointer-events:none;}
+.bsec{padding:0 13px 5px;}
+.bsec-l{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;margin-top:9px;display:flex;align-items:center;gap:5px;}
+.bsec-l::after{content:"";flex:1;height:1px;background:var(--gr4);}
+.bsec-l.on{color:var(--gn);}.bsec-l.off{color:var(--gr3);}
+.bsec-l.wk{color:var(--bl);}.bsec-l.up{color:var(--pu);}
+/* DOG CARDS */
+.dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;}
+.dcard{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);overflow:hidden;cursor:pointer;transition:transform .1s;}
+.dcard:hover{transform:translateY(-1px);box-shadow:0 3px 12px rgba(68,64,60,.1);}
+.dcard.on{border-color:var(--gn);border-width:2px;}
+.dcard.wk{border-color:var(--bl);border-width:2px;}
+.dcard.up{border-color:var(--pu);border-width:1.5px;}
+.dc-photo{width:100%;aspect-ratio:4/3;background:var(--hnxl);display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden;}
+.dc-photo img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.live-badge{position:absolute;top:3px;right:3px;background:var(--gn);color:#fff;font-size:7px;font-weight:700;padding:2px 4px;border-radius:99px;}
+.dc-em-badge{position:absolute;bottom:3px;left:5px;font-size:15px;line-height:1;z-index:2;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
+.dcb{padding:5px 7px;}
+.dcb-n{font-family:var(--fh);font-size:11px;font-weight:800;color:var(--gr);}
+.dcb-b{font-size:8px;color:var(--gr3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dcb-id{font-size:7px;color:var(--or);font-weight:700;margin-top:1px;}
+.dcb-ch{display:flex;gap:2px;flex-wrap:wrap;margin-top:3px;}
+.chip{font-size:7px;padding:1px 4px;border-radius:99px;font-weight:700;}
+.cg{background:var(--gnl);color:var(--gn);}
+.ca{background:#FEF3C7;color:#92400E;}
+.cr{background:var(--rdl);color:var(--rd);}
+.co{background:var(--orl);color:var(--cn);}
+.cb{background:var(--bll);color:var(--bl);}
+.cp{background:var(--pul);color:var(--pu);}
+.add-btn{margin:7px 13px 12px;background:var(--or);color:#fff;border:none;width:calc(100% - 26px);padding:9px;border-radius:var(--r2);font-size:12px;font-weight:700;font-family:var(--fh);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
+.add-btn:hover{background:var(--cn);}
+.empty{text-align:center;padding:14px 13px;color:var(--gr3);}
+.empty p{font-size:11px;line-height:1.5;}
+/* PROFILE */
+.p-hero{background:var(--gr);padding:11px 13px 14px;}
+.phw{width:58px;height:58px;border-radius:50%;background:var(--cnl);border:2px solid var(--hn);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;margin-bottom:8px;position:relative;cursor:pointer;flex-shrink:0;}
+.phw img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.phe{position:absolute;bottom:0;right:0;width:18px;height:18px;background:var(--or);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;}
+.pnm{font-family:var(--fh);font-size:19px;color:#fff;font-weight:800;}
+.pmt{font-size:9px;color:rgba(255,255,255,.45);margin-top:2px;}
+.pid{display:inline-block;background:var(--or);color:#fff;font-size:8px;font-weight:700;padding:2px 6px;border-radius:99px;margin-top:4px;}
+.ptabs{display:flex;background:var(--wh)!important;border-bottom:1px solid var(--gr4);overflow-x:auto;}
+.ptab{flex-shrink:0;padding:7px 10px;font-size:8px;font-weight:700;color:var(--gr3);cursor:pointer;border-bottom:2px solid transparent;background:none;border-left:none;border-right:none;border-top:none;font-family:var(--fb);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;}
+.ptab.active{color:var(--or);border-bottom-color:var(--or);}
+.ptc{display:none;padding:12px;}
+.ptc.active{display:block;}
+/* LOGS */
+.drow{display:flex;align-items:center;gap:5px;background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:6px 10px;margin-bottom:9px;}
+.drow label{font-size:9px;font-weight:600;color:var(--gr2);flex-shrink:0;}
+.cat-sec{margin-bottom:9px;}
+.cat-t{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gr2);margin-bottom:4px;display:flex;align-items:center;gap:4px;}
+.cat-t::after{content:"";flex:1;height:1px;background:var(--gr4);}
+.tile-row{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+.tile{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:5px 4px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;user-select:none;}
+.tile:hover{border-color:var(--orl);}
+.tile.done,.tile.done-yes{background:var(--gnl)!important;border-color:var(--gn);}
+.t-ico{font-size:11px;flex-shrink:0;}
+.t-lbl{font-size:9px;font-weight:600;color:var(--gr);}
+.tile.done .t-lbl,.tile.done-yes .t-lbl{color:var(--gn);}
+.tile.done-refused{background:#fff0f0!important;border-color:var(--rd);}
+.tile.done-refused .t-lbl{color:var(--rd);}
+.tile.done-todo{background:var(--orl)!important;border-color:var(--or);}
+.tile.done-todo .t-lbl{color:var(--or);}
+.tile.done-na{background:var(--gr5,#f5f5f4)!important;border-color:var(--gr3);}
+.tile.done-na .t-lbl{color:var(--gr3);}
+.inc-tog{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);cursor:pointer;margin-bottom:3px;font-size:10px;font-weight:600;color:var(--gr);}
+.inc-tog:hover{border-color:var(--orl);}
+.inc-fld{background:var(--gr5)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:10px;margin-bottom:3px;display:none;}
+.inc-fld.open{display:block;}
+.slb{width:100%;background:var(--or);color:#fff;border:none;padding:9px;border-radius:var(--r2);font-size:11px;font-weight:700;font-family:var(--fh);cursor:pointer;margin-top:7px;}
+/* HISTORY */
+.hfil{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:9px;}
+.hfb{padding:3px 8px;border-radius:99px;border:1px solid var(--gr4);background:none;font-size:8px;font-weight:700;cursor:pointer;font-family:var(--fb);color:var(--gr2);}
+.hfb.active{background:var(--gr);color:#fff;border-color:var(--gr);}
+.hfb.act{background:var(--pul);color:var(--pu);border-color:#C4B5FD;}
+.hlist{display:flex;flex-direction:column;gap:4px;}
+.hi{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:8px 10px;}
+.hi-h{display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap;}
+.hi-d{font-size:8px;font-weight:700;color:var(--gr3);}
+.htype{font-size:7px;padding:2px 5px;border-radius:99px;font-weight:700;}
+.htd{background:var(--gnl);color:var(--gn);}
+.hth{background:var(--rdl);color:var(--rd);}
+.hti{background:var(--orl);color:var(--cn);}
+.hta{background:var(--pul);color:var(--pu);}.htmiss{background:var(--orl);color:var(--or);}
+.hsum{font-size:9px;color:var(--gr2);line-height:1.5;}
+.hi-acts{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;}
+.ebtn{font-size:8px;padding:2px 7px;border-radius:99px;border:1px solid var(--gr4);background:none;cursor:pointer;font-family:var(--fb);color:var(--gr2);}
+.ptag{font-size:7px;background:var(--gr4);color:var(--gr2);padding:1px 4px;border-radius:99px;}
+.hload{text-align:center;padding:16px;color:var(--gr3);font-size:10px;}
+/* PROFILE INFO */
+.epb{width:100%;background:var(--gr5)!important;border:1px solid var(--gr4);color:var(--gr2);padding:7px;border-radius:var(--r2);font-size:10px;cursor:pointer;font-family:var(--fb);font-weight:600;margin-bottom:10px;}
+.isec{margin-bottom:11px;}
+.isec-t{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--or);margin-bottom:4px;padding-bottom:2px;border-bottom:1px solid var(--orl);}
+.irow{display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--gr4);font-size:10px;}
+.irow:last-child{border-bottom:none;}
+.ikey{color:var(--gr3);min-width:130px;flex-shrink:0;font-size:9px;}
+.ival{color:var(--gr);font-weight:600;word-break:break-word;}
+.nb-bar{display:flex;gap:2px;}
+.nb-seg{height:6px;flex:1;border-radius:2px;background:var(--gr4);}
+.sum-c{background:var(--cnl)!important;border:1px solid var(--orl);border-radius:var(--r2);padding:10px;margin-bottom:10px;}
+.sum-t{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--or);margin-bottom:3px;}
+.sum-x{font-size:10px;color:var(--gr2);line-height:1.6;}
+.alert-r{display:flex;align-items:flex-start;gap:5px;background:var(--rdl)!important;border:1px solid #FCA5A5;border-radius:6px;padding:6px 8px;margin-top:5px;font-size:9px;color:var(--rd);line-height:1.4;}
+/* CONSENT */
+.cfld{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gr4);}
+.cfld:last-child{border-bottom:none;}
+.cfld label{font-size:9px;color:var(--gr);flex:1;padding-right:7px;line-height:1.4;}
+.ctog{display:flex;gap:3px;}
+.ctb{padding:2px 7px;border-radius:99px;border:1px solid var(--gr4);background:none;font-size:8px;font-weight:700;cursor:pointer;font-family:var(--fb);color:var(--gr3);}
+.ctb.yes{background:var(--gnl);border-color:var(--gn);color:var(--gn);}
+.ctb.no{background:var(--rdl);border-color:var(--rd);color:var(--rd);}
+/* SERVICES */
+.sitem{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:8px 10px;margin-bottom:4px;cursor:pointer;}
+.sitem:hover{background:var(--gr5)!important;}
+.spill{font-size:7px;padding:2px 5px;border-radius:99px;font-weight:700;white-space:nowrap;}
+.sq{background:#F0E8FF;color:#6B21A8;}
+.sb{background:var(--bll);color:var(--bl);}
+.spp{background:var(--hnl);color:var(--cn);}
+.sf{background:var(--gnl);color:var(--gn);}
+.scr{background:#e0f0ff;color:#1e4d6b;}
+.sc{background:var(--gr4);color:var(--gr2);}
+/* Booking status flow indicator */
+.bk-flow{display:flex;align-items:center;gap:3px;padding:9px 11px;background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);flex-wrap:wrap;margin-bottom:4px;}
+.bk-flow-label{font-size:8px;font-weight:700;color:var(--gr3);text-transform:uppercase;letter-spacing:.06em;width:100%;margin-bottom:5px;}
+.bk-flow-step{font-size:9px;font-weight:600;color:var(--gr3);padding:3px 8px;border-radius:99px;white-space:nowrap;border:1.5px solid var(--gr4);background:var(--wh);transition:all .15s;}
+.bk-flow-step.fsdone{background:var(--gnl);color:var(--gn);border-color:var(--gn);}
+.bk-flow-step.fsactive{background:var(--or);color:#fff;border-color:var(--or);}
+.bk-flow-arr{font-size:10px;color:var(--gr4);flex-shrink:0;}
+.sc{background:var(--rdl);color:var(--rd);}
+.scr{background:#F0FDF4;color:#166534;}
+/* QUOTE */
+.sp-panel{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:10px;margin-bottom:8px;}
+.sp-hd{display:flex;align-items:center;justify-content:space-between;}
+.sp-ht{font-family:var(--fh);font-size:11px;font-weight:700;color:var(--gr);}
+.sp-tog{font-size:9px;color:var(--or);cursor:pointer;font-weight:600;}
+.sp-bd{display:none;padding-top:10px;}
+.sp-bd.open{display:block;}
+.hol-yr{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:6px;}
+.hyrb{padding:2px 8px;border-radius:99px;border:1px solid var(--gr4);background:none;font-size:8px;font-weight:700;cursor:pointer;color:var(--gr2);}
+.hyrb.active{background:var(--gr);color:#fff;border-color:var(--gr);}
+.hol-list{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;min-height:18px;}
+.hol-rng{display:inline-flex;align-items:center;gap:3px;background:var(--bll);color:var(--bl);font-size:8px;padding:2px 6px;border-radius:99px;font-weight:700;}
+.hol-rng button{background:none;border:none;cursor:pointer;color:var(--rd);font-size:10px;line-height:1;padding:0;}
+.tpl-bts{display:flex;gap:3px;margin-bottom:6px;flex-wrap:wrap;}
+.tplb{padding:3px 8px;border-radius:6px;border:1px solid var(--gr4);background:var(--gr5)!important;font-size:9px;font-weight:600;cursor:pointer;font-family:var(--fb);color:var(--gr2);}
+.tplb.or{background:var(--or)!important;color:#fff;border-color:var(--or);}
+.tplb.rd{background:var(--rdl)!important;color:var(--rd);border-color:var(--rdl);}
+.q-res{background:var(--gr);color:#fff;border-radius:var(--r2);padding:12px;margin-top:11px;}
+.q-tot{font-family:var(--fh);font-size:26px;font-weight:800;color:var(--hnl);}
+.q-ln{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:10px;}
+.q-ln:last-child{border-bottom:none;font-weight:700;font-size:11px;}
+.cpbtn{width:100%;background:var(--or);color:#fff;border:none;padding:8px;border-radius:var(--r2);font-size:11px;font-weight:700;font-family:var(--fh);cursor:pointer;margin-top:6px;}
+.cpbtn.pu{background:var(--pu);margin-top:4px;}
+.cpbtn.bl{background:var(--bl);margin-top:4px;}
+.cpbtn.gn{background:var(--gn);margin-top:4px;}
+.cpbtn:hover{opacity:.9;}
+.q-out{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:10px;font-size:9px;white-space:pre-wrap;line-height:1.7;display:none;margin-top:6px;color:var(--gr);}
+/* DOG MULTISELECT */
+.dog-ms{border:1px solid var(--gr4);border-radius:var(--r);background:var(--wh)!important;max-height:150px;overflow-y:auto;}
+.dog-ms-item{display:flex;align-items:center;gap:7px;padding:5px 9px;cursor:pointer;border-bottom:1px solid var(--gr4);font-size:11px;}
+.dog-ms-item:last-child{border-bottom:none;}
+.dog-ms-item:hover{background:var(--gr5)!important;}
+.dog-ms-item.sel{background:var(--hnxl)!important;}
+.dog-ms-item input[type=checkbox]{accent-color:var(--or);width:13px;height:13px;flex-shrink:0;}
+.main-dog-sel{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}
+.main-dog-pill{padding:3px 9px;border-radius:99px;border:1.5px solid var(--gr4);background:none;font-size:9px;cursor:pointer;font-family:var(--fb);font-weight:600;color:var(--gr2);}
+.main-dog-pill.active{background:var(--or);border-color:var(--or);color:#fff;}
+/* EMOJI PICKER */
+.emoji-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:8px;}
+.epick{background:none;border:1px solid var(--gr4);border-radius:6px;font-size:18px;cursor:pointer;padding:4px;text-align:center;}
+.epick:hover{border-color:var(--or);background:var(--hnxl)!important;}
+.epick.sel{border-color:var(--or);border-width:2px;background:var(--hnxl)!important;}
+/* BUSINESS */
+.biz-grid{padding:11px;display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.bc{border-radius:var(--r2);cursor:pointer;transition:transform .1s;overflow:hidden;}
+.bc:hover{transform:translateY(-1px);box-shadow:0 3px 12px rgba(68,64,60,.1);}
+.bci{padding:11px;}
+.bc-ico{font-size:17px;margin-bottom:5px;}
+.bc-t{font-family:var(--fh);font-size:12px;font-weight:800;margin-bottom:2px;}
+.bc-d{font-size:8px;line-height:1.4;opacity:.7;}
+.bc-bk{background:var(--bll);color:var(--bl);border:1px solid #93C5FD;}
+.bc-ct{background:var(--rdl);color:var(--rd);border:1px solid #FCA5A5;}
+.bc-pl{background:var(--hnl);color:var(--cn);border:1px solid var(--hn);}
+.bc-tr{background:var(--cnl);color:var(--cn);border:1px solid var(--orl);}
+.bc-tp{background:var(--gnl);color:var(--gn);border:1px solid #86EFAC;}
+.bc-ac{background:var(--pul);color:var(--pu);border:1px solid #C4B5FD;}
+/* TABLES */
+.tw{overflow-x:auto;margin-top:8px;border-radius:var(--r);border:1px solid var(--gr4);}
+table{width:100%;border-collapse:collapse;font-size:10px;}
+thead th{background:var(--gr5)!important;padding:5px 7px;text-align:left;font-weight:700;font-size:8px;color:var(--gr2);white-space:nowrap;border-bottom:1px solid var(--gr4);}
+tbody td{padding:5px 7px;border-bottom:1px solid var(--gr4);color:var(--gr);vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
+/* P&L */
+.kpi-g{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:11px;}
+.kpi{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:10px;}
+.kpi-l{font-size:8px;color:var(--gr3);margin-bottom:2px;}
+.kpi-v{font-family:var(--fh);font-size:17px;font-weight:800;color:var(--gr);}
+.kpi-s{font-size:8px;color:var(--gr3);margin-top:1px;}
+.chart-w{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:11px;margin-bottom:11px;}
+.legend{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
+.leg{display:flex;align-items:center;gap:3px;font-size:8px;color:var(--gr3);}
+.leg-d{width:7px;height:7px;border-radius:50%;}
+/* TEMPLATES HUB */
+.tpl-item{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r);padding:8px 10px;margin-bottom:4px;display:flex;align-items:center;gap:7px;cursor:pointer;}
+.tpl-item:hover{background:var(--gr5)!important;}
+.tpl-drag{color:var(--gr3);font-size:12px;cursor:grab;flex-shrink:0;user-select:none;}
+.tpl-info{flex:1;overflow:hidden;}
+.tpl-nm{font-size:11px;font-weight:600;color:var(--gr);}
+.tpl-pv{font-size:8px;color:var(--gr3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* ACTIVITIES */
+.act-item{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:9px 11px;margin-bottom:6px;cursor:pointer;}
+.act-item:hover{background:var(--gr5)!important;}
+.act-cat{font-size:7px;padding:2px 6px;border-radius:99px;font-weight:700;display:inline-block;margin-bottom:3px;margin-right:3px;}
+.act-main-cat-btn.active{background:var(--pu)!important;color:#fff!important;border-color:var(--pu)!important;}
+.tpl-cat-btn.active{background:var(--or)!important;color:#fff!important;border-color:var(--or)!important;}
+.cat-walk{background:#DBEAFE;color:#1E40AF;}
+.cat-game{background:#FEF3C7;color:#92400E;}
+.cat-field{background:#DCFCE7;color:#166534;}
+.cat-train{background:#EDE9FE;color:#5B21B6;}
+.cat-low{background:#F0FDF4;color:#166534;}
+.cat-med{background:#FEF9C3;color:#713F12;}
+.cat-high{background:#FEE2E2;color:#DC2626;}
+.cat-sun{background:#FEF9C3;color:#713F12;}
+.cat-rain{background:#DBEAFE;color:#1E40AF;}
+.cat-any{background:var(--gr4);color:var(--gr2);}
+.cat-in{background:#DBEAFE;color:#1E40AF;}
+.cat-out{background:#DCFCE7;color:#166534;}
+.act-title{font-family:var(--fh);font-size:12px;font-weight:700;color:var(--gr);}
+.act-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center;}
+.act-m{font-size:8px;color:var(--gr3);}
+.act-last{font-size:8px;background:var(--cnl);color:var(--cn);padding:2px 6px;border-radius:99px;font-weight:600;}
+.maps-btn{display:inline-flex;align-items:center;gap:3px;background:var(--bll);color:var(--bl);border:none;padding:3px 7px;border-radius:6px;font-size:8px;font-weight:700;cursor:pointer;text-decoration:none;}
+/* SURPRISE CARD */
+.surprise-card{background:var(--gr);border-radius:var(--r2);padding:16px;text-align:center;margin-bottom:11px;}
+.surprise-title{font-family:var(--fh);font-size:18px;font-weight:800;color:var(--hnl);margin-bottom:5px;}
+.surprise-meta{font-size:10px;color:rgba(255,255,255,.55);margin-bottom:13px;}
+.surprise-btn{background:var(--or);color:#fff;border:none;padding:8px 18px;border-radius:var(--r2);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fh);}
+/* REMINDER ROWS */
+.rem-row{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--gr4);}
+.rem-row:last-child{border-bottom:none;}
+.rem-row input[type=checkbox]{accent-color:var(--gn);width:13px;height:13px;flex-shrink:0;}
+.rem-label{flex:1;font-size:10px;color:var(--gr);}
+.rem-label.done{text-decoration:line-through;color:var(--gr3);}
+.rem-copy{background:none;border:1px solid var(--gr4);border-radius:5px;padding:2px 7px;font-size:8px;cursor:pointer;color:var(--gr2);font-family:var(--fb);flex-shrink:0;}
+.rem-tpl-sel{font-size:9px;padding:2px 18px 2px 5px;border:1px solid var(--gr4);border-radius:5px;background:var(--wh)!important;color:var(--gr);font-family:var(--fb);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%2344403C' stroke-width='1.2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;}
+/* FORMS */
+.fsec{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--or);margin:10px 0 5px;padding-bottom:2px;border-bottom:1px solid var(--orl);}
+.f{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.f label{font-size:9px;font-weight:600;color:var(--gr);}
+.f label .req{color:var(--or);}
+.fi,.fs,.fta{padding:6px 8px;border:1px solid var(--gr4);border-radius:var(--r);font-size:11px;font-family:var(--fb);background:var(--wh)!important;color:var(--gr)!important;width:100%;}
+.fi:focus,.fs:focus,.fta:focus{outline:none;border-color:var(--or);background:var(--hnxl)!important;}
+.fta{resize:vertical;min-height:56px;}
+.fs{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2344403C' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 8px center!important;padding-right:24px;}
+.ib{padding:3px 8px;border-radius:99px;border:1.5px solid var(--gr4);background:none;font-size:9px;font-family:var(--fb);cursor:pointer;font-weight:600;color:var(--gr2);}
+.ib.il{background:var(--gnl);border-color:var(--gn);color:var(--gn);}
+.ib.im{background:var(--hnl);border-color:var(--hn);color:var(--cn);}
+.ib.ih{background:var(--rdl);border-color:var(--rd);color:var(--rd);}
+.sbtn2{background:var(--or);color:#fff;border:none;padding:7px 14px;border-radius:var(--r2);font-size:11px;font-weight:700;font-family:var(--fh);cursor:pointer;}
+.sbtn2:hover{background:var(--cn);}
+.sbtn2:disabled{background:var(--gr4);color:var(--gr3);cursor:not-allowed;}
+.sbtn2.grey{background:var(--gr);}
+.sbtn2.rd{background:var(--rd);}
+.sbtn2.gn{background:var(--gn);}
+.smsg{font-size:9px;font-weight:600;}
+.smsg.ok{color:var(--gn);}.smsg.err{color:var(--rd);}
+.srow{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.nval{min-width:18px;font-weight:700;font-size:11px;text-align:center;color:var(--gr);}
+/* MODALS */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:300;display:none;align-items:flex-end;}
+.modal.open{display:flex;}
+.msh{background:var(--hnxl)!important;border-radius:16px 16px 0 0;width:100%;max-height:92vh;overflow-y:auto;padding:0 0 30px;}
+.mhnd{width:28px;height:4px;background:var(--gr4);border-radius:2px;margin:8px auto 0;}
+.mhdr{padding:10px 14px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--gr4);}
+.mttl{font-family:var(--fh);font-size:13px;font-weight:800;color:var(--gr);}
+.mcl{background:none;border:none;font-size:17px;cursor:pointer;color:var(--gr3);}
+.mbdy{padding:12px 14px;}
+/* CONFIRM */
+.confirm{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:400;display:none;align-items:center;justify-content:center;padding:16px;}
+.confirm.open{display:flex;}
+.cbox{background:var(--wh)!important;border-radius:14px;padding:16px;max-width:300px;width:100%;}
+.cbox h3{font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:6px;color:var(--gr);}
+.cbox p{font-size:10px;color:var(--gr2);line-height:1.6;margin-bottom:11px;}
+.cbts{display:flex;gap:6px;}
+.ccan{flex:1;background:var(--gr5)!important;border:1px solid var(--gr4);color:var(--gr2);padding:7px;border-radius:var(--r2);font-size:10px;cursor:pointer;font-family:var(--fb);font-weight:600;}
+.cok{flex:1;background:var(--rd);color:#fff;border:none;padding:7px;border-radius:var(--r2);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--fb);}
+.cok.gn{background:var(--gn);}
+/* FILTER BAR */
+.fbar{background:var(--wh)!important;border:1px solid var(--gr4);border-radius:var(--r2);padding:9px 11px;margin-bottom:9px;}
+.fbar-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.fbar-lbl{font-size:8px;font-weight:700;color:var(--gr3);text-transform:uppercase;letter-spacing:.06em;width:100%;margin-bottom:2px;}
+.main::-webkit-scrollbar{width:3px;}
+.main::-webkit-scrollbar-thumb{background:var(--gr4);border-radius:2px;}
+/* P&L table inputs */
+.pl-inp{border:1px solid var(--gr4);border-radius:5px;padding:3px 5px;width:56px;font-size:9px;font-family:var(--fb);background:var(--wh)!important;color:var(--gr)!important;outline:none;}
+.pl-inp:focus{border-color:var(--or);}
+/* Sort bar */
+.sort-row{display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap;}
+.sort-lbl{font-size:9px;color:var(--gr3);flex-shrink:0;}
+@media(max-width:360px){.fr{grid-template-columns:1fr;}.dcards{grid-template-columns:1fr 1fr;}.biz-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<!-- PIN -->
+<div class="pin-screen" id="pinScreen">
+  <div class="pin-logo">THE CUDDLY LANE</div>
+  <div style="font-size:11px;color:rgba(255,255,255,.55);">Enter PIN</div>
+  <div class="pin-dots"><div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div></div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pk('1')">1</button><button class="pin-key" onclick="pk('2')">2</button><button class="pin-key" onclick="pk('3')">3</button>
+    <button class="pin-key" onclick="pk('4')">4</button><button class="pin-key" onclick="pk('5')">5</button><button class="pin-key" onclick="pk('6')">6</button>
+    <button class="pin-key" onclick="pk('7')">7</button><button class="pin-key" onclick="pk('8')">8</button><button class="pin-key" onclick="pk('9')">9</button>
+    <button class="pin-key" style="opacity:0" disabled></button><button class="pin-key" onclick="pk('0')">0</button><button class="pin-key" onclick="pdel()" style="font-size:13px;">&#9003;</button>
+  </div>
+  <div class="pin-err" id="pinErr"></div>
+</div>
+<!-- HEADER -->
+<div class="hdr">
+  <button class="hdr-back" id="backBtn" onclick="goBack()">&#8592; Back</button>
+  <div id="hdrTitle"><div class="hdr-logo">THE CUDDLY LANE</div><div class="hdr-sub" id="hdrSub">Staff Portal</div></div>
+  <div class="hsp"></div>
+  <button class="hbtn or" onclick="refreshBoard()" id="refreshBtn" title="Refresh data">&#8635;</button>
+  <button class="hbtn" onclick="toggleSetup()">Settings</button>
+</div>
+<!-- SETTINGS -->
+<div class="setup-bar" id="setupBar">
+  <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Google Sheets &amp; PIN</div>
+  <div style="font-size:10px;color:var(--gr2);margin-bottom:7px;">Credentials stored locally only — never sent to anyone except Google.</div>
+  <div class="sg">
+    <input class="si" id="cfg_sid" placeholder="Spreadsheet ID">
+    <input class="si" id="cfg_email" placeholder="client_email">
+    <input class="si" id="cfg_keyid" placeholder="private_key_id">
+    <textarea class="si sta" id="cfg_key" placeholder="private_key (include -----BEGIN PRIVATE KEY-----)"></textarea>
+    <div id="keyPreview" style="display:none;font-size:9px;color:var(--gn);margin-top:3px;"></div>
+  </div>
+  <div style="margin-bottom:8px;"><label style="font-size:10px;font-weight:600;display:block;margin-bottom:3px;">PIN (4 digits)</label><input class="si" id="cfg_pin" type="password" maxlength="4" placeholder="e.g. 1234" style="max-width:110px;"></div>
+  <div class="brow">
+    <button class="sbtn" onclick="saveConfig()">Save</button>
+    <div style="flex:1;"></div>
+    <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
+  </div>
+  <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v37 · Build 38</div>
+</div>
+<!-- NAV -->
+<div class="snav-bar">
+  <button class="snav active" id="snav-board" onclick="switchSection('board')">Board</button>
+  <button class="snav" id="snav-quote" onclick="switchSection('quote')">Quote</button>
+  <button class="snav" id="snav-business" onclick="switchSection('business')">Business</button>
+</div>
+<div class="main" id="mainScroll">
+<!-- BOARD -->
+<div class="screen active" id="sc-board">
+  <div style="margin:10px 13px 0;background:var(--rdl);border:1px solid #FCA5A5;border-radius:var(--r);padding:9px 11px;font-size:10px;color:var(--rd);display:none;" id="credWarn">No credentials — tap Settings to connect Google Sheets.</div>
+  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div><div style="display:flex;gap:6px;"><button onclick="togglePendingPanel()" style="position:relative;background:var(--orl);border:1.5px solid var(--or);color:var(--or);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📋 To-Do<span id="pendingBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--rd);color:#fff;border-radius:99px;font-size:8px;padding:1px 5px;"></span></button><button onclick="toggleAvailPanel()" style="background:var(--pul);border:1.5px solid var(--pu);color:var(--pu);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📅 Check Dates</button></div></div>
+  <div id="pendingPanel" style="display:none;margin:0 13px 8px;">
+    <div style="background:var(--wh);border:1px solid var(--or);border-radius:var(--r2);padding:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📋 Pending Actions</div>
+      <div id="pending_results"></div>
+    </div>
+  </div>
+  <!-- AVAILABILITY CHECKER -->
+  <div id="availPanel" style="display:none;margin:0 13px 8px;">
+    <div style="background:var(--wh);border:1px solid var(--pu);border-radius:var(--r2);padding:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📅 Availability &amp; Compatibility Check</div>
+      <div class="f" style="margin-bottom:7px;"><label>Dog (optional — enables compatibility flags)</label>
+        <input class="fi" id="av_dog_search" placeholder="Search dog name..." style="font-size:11px;margin-bottom:4px;" oninput="filterAvDog()">
+        <select class="fs" id="av_dog" style="font-size:11px;"></select>
+      </div>
+      <div class="fr" style="margin-bottom:6px;">
+        <div class="f"><label>From date</label><input class="fi" type="date" id="av_sd"></div>
+        <div class="f"><label>From time</label><input class="fi" type="time" id="av_st" value="09:00"></div>
+      </div>
+      <div class="fr" style="margin-bottom:9px;">
+        <div class="f"><label>To date</label><input class="fi" type="date" id="av_ed"></div>
+        <div class="f"><label>To time</label><input class="fi" type="time" id="av_et" value="18:00"></div>
+      </div>
+      <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;" onclick="runAvailCheck()">Check Availability</button>
+      <div id="av_results"></div>
+      <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;margin-top:8px;background:var(--pu);" onclick="copyAvailReply()">📋 Copy Availability Reply</button>
+    </div>
+  </div>
+  <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name or ID..." oninput="renderBoard()"></div>
+  <div class="bsec">
+    <div class="bsec-l on">Active today</div>
+    <div class="dcards" id="todayCards"><div class="empty"><p>Tap Refresh to load</p></div></div>
+    <div class="bsec-l wk" style="margin-top:14px;">Upcoming this week</div>
+    <div class="dcards" id="weekCards"><div class="empty"><p></p></div></div>
+    <div class="bsec-l up" style="margin-top:14px;">Other upcoming</div>
+    <div class="dcards" id="upcomingCards"><div class="empty"><p></p></div></div>
+    <div class="bsec-l off" style="margin-top:14px;">All other dogs</div>
+    <div class="dcards" id="otherCards"><div class="empty"><p></p></div></div>
+  </div>
+  <button class="add-btn" onclick="startReg()">+ Register New Dog</button>
+  <div style="height:14px;"></div>
+</div>
+<!-- QUOTE -->
+<div class="screen" id="sc-quote">
+  <div class="pg">
+    <div class="pg-t">Quote</div><div class="pg-s">Calculate fees &amp; generate WhatsApp quotes</div>
+    <!-- QUOTE DETAILS FIRST -->
+    <div class="fsec">Quote Details</div>
+    <div class="fsec">Add Service Lines</div>
+          <div class="fr">
+            <div class="f"><label>Service</label>
+              <select class="fs" id="ml_svc" onchange="onMLSvc()">
+                <option value="">Select service...</option>
+                <option value="boarding">&#x1F4A4; Boarding</option>
+                <option value="daycare">&#x2600;&#xFE0F; Daycare</option>
+                <option value="walk">&#x1F415; Dog Walk</option>
+                <option value="dropin">&#x1F511; Drop-in Visit</option>
+                <option value="dogsit">&#x1FA91; Dog Sit</option>
+                <option value="taxi">&#x1F695; Pet Taxi (flat rate)</option>
+                <option value="training">&#x1F3C5; Training</option>
+              </select>
+            </div>
+            <div class="f"><label>Manual rate (&#163;)</label><input class="fi" type="number" id="ml_rate" placeholder="Auto or override"></div>
+          </div>
+          <div id="ml_sub_wrap" style="display:none;">
+            <div class="f"><label>Type</label>
+              <select class="fs" id="ml_sub" onchange="onMLSub()">
+                <option value="">Select type...</option>
+              </select>
+            </div>
+          </div>
+          <div id="ml_date_wrap">
+            <div class="fr">
+              <div class="f"><label>Start date</label><input class="fi" type="date" id="ml_sd"></div>
+              <div class="f"><label>End date</label><input class="fi" type="date" id="ml_ed"></div>
+            </div>
+            <div class="fr">
+              <div class="f"><label>Drop-off time</label><input class="fi" type="time" id="ml_st" value="09:00"></div>
+              <div class="f"><label>Pick-up time</label><input class="fi" type="time" id="ml_et" value="18:00"></div>
+            </div>
+          </div>
+          <div id="ml_qty_wrap" style="display:none;">
+            <div class="fr">
+              <div class="f"><label>Quantity (e.g. 5 walks)</label><input class="fi" type="number" id="ml_qty" value="1" min="1"></div>
+              <div class="f"><label>Date (optional)</label><input class="fi" type="date" id="ml_qty_date"></div>
+            </div>
+          </div>
+          <div class="fr" style="margin-top:4px;">
+            <button class="sbtn2" onclick="addSvcLine()" style="flex:1;">+ Add Service</button>
+            <button class="sbtn2" onclick="addExtraCost()" style="flex:1;background:var(--gr4);color:var(--gr2);">+ Extra Cost</button>
+          </div>
+          <div id="ml_extra_wrap" style="display:none;background:var(--gr5);border-radius:var(--r);padding:9px;margin-top:6px;margin-bottom:4px;">
+            <div class="fr">
+              <div class="f"><label>Extra cost label</label><input class="fi" id="ml_extra_label" placeholder="e.g. Dog food purchase"></div>
+              <div class="f"><label>Amount (£)</label><input class="fi" type="number" id="ml_extra_amt" placeholder="0.00" step="0.01"></div>
+            </div>
+            <button class="sbtn2" onclick="confirmExtraCost()" style="width:100%;margin-top:4px;font-size:10px;">Add Extra Cost to Quote</button>
+          </div>
+          <div style="margin-bottom:5px;"></div>
+          <div class="fsec">Quote Lines</div>
+          <div id="svcLines" style="margin-bottom:9px;"><div style="font-size:10px;color:var(--gr3);padding:5px 0;">No services added yet.</div></div>
+    <div id="q_dt_wrap" style="display:none;">
+      <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="q_dd" oninput="calcMultiQ()"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="q_dt_t" value="09:00" oninput="calcMultiQ()"></div></div>
+      <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="q_pd" oninput="calcMultiQ()"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="q_pt" value="09:00" oninput="calcMultiQ()"></div></div>
+    </div>
+    <div id="q_taxi_wrap" style="display:none;">
+      <div class="fr"><div class="f"><label>Duration</label><select class="fs" id="q_taxi_d" onchange="calcMultiQ()"><option value="15s">15 min Single</option><option value="15r">15 min Return</option><option value="30s">30 min Single</option><option value="30r">30 min Return</option><option value="60s">60 min Single</option><option value="60r">60 min Return</option></select></div><div class="f"><label>Date</label><input class="fi" type="date" id="q_taxi_dt" oninput="calcMultiQ()"></div></div>
+    </div>
+    <div id="q_manual_wrap" style="display:none;"><div class="fr"><div class="f"><label>Rate (£)</label><input class="fi" type="number" id="q_rate" oninput="calcMultiQ()"></div><div class="f"><label>Sessions</label><input class="fi" type="number" id="q_qty" value="1" oninput="calcMultiQ()"></div></div></div>
+    <div id="q_shared_wrap">
+      <div class="f"><label>Select dogs <span class="req">*</span></label>
+        <input class="fi" id="q_dog_search" placeholder="Search dog..." oninput="buildQDogMS()" style="margin-bottom:4px;">
+        <div class="dog-ms" id="q_dog_ms"></div>
+      </div>
+      <div id="q_main_dog_wrap" style="display:none;">
+        <div style="font-size:10px;font-weight:600;color:var(--gr);margin-bottom:4px;">Main dog (full rate):</div>
+        <div class="main-dog-sel" id="q_main_dog_btns"></div>
+      </div>
+      <div class="fr">
+        <div class="f"><label>Owner name</label><input class="fi" id="q_owner"></div>
+        <div class="f"><label>Payment reference</label><input class="fi" id="q_payref" placeholder="e.g. ObiMay2026"></div>
+      </div>
+      <div class="fr">
+        <div class="f"><label>Discount type</label><select class="fs" id="q_disc_t" onchange="calcMultiQ()"><option value="none">No discount</option><option value="pct">% discount</option><option value="gbp">£ discount</option></select></div>
+        <div class="f"><label>Discount value</label><input class="fi" type="number" id="q_disc_v" value="0" oninput="calcMultiQ()"></div>
+      </div>
+      <div class="f"><label>Prepayment %</label><select class="fs" id="q_prepay_pct" onchange="calcMultiQ()"><option value="50">50% prepayment</option><option value="100">100% full payment</option><option value="30">30% prepayment</option><option value="0">No prepayment</option></select></div>
+    </div>
+    <div id="q_result" style="display:none;">
+      <div class="q-res">
+        <div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Total</div>
+        <div class="q-tot" id="q_total">£0</div>
+        <div id="q_breakdown" style="margin-top:9px;border-top:1px solid rgba(255,255,255,.12);padding-top:9px;"></div>
+        <div style="font-size:9px;color:var(--hnl);margin-top:5px;" id="q_hol_note"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px;background:var(--wh);border-radius:var(--r2);padding:9px 11px;border:1px solid var(--gr4);">
+        <div style="font-size:10px;color:var(--gr3);">Prepayment</div><div style="font-size:12px;font-weight:700;color:var(--or);text-align:right;" id="q_prepay_show">£0</div>
+        <div style="font-size:10px;color:var(--gr3);">Final payment</div><div style="font-size:12px;font-weight:700;text-align:right;color:var(--gr);" id="q_final_show">£0</div>
+      </div>
+      <div style="margin-top:7px;background:var(--wh);border-radius:var(--r2);padding:9px 11px;border:1px solid var(--gr4);">
+        <label style="font-size:10px;color:var(--gr3);display:block;margin-bottom:4px;">For final payment quote — actual prepay already received (£):</label>
+        <input class="fi" type="number" id="q_actual_prepay" placeholder="Defaults to prepayment above" step="0.01" oninput="updateFinalShow()">
+      </div>
+      <button class="cpbtn pu" data-qtype="quote" onclick="genQuote('quote')">Copy Get Quote</button>
+      <div class="q-out" id="q_out_quote"></div>
+      <button class="cpbtn" data-qtype="book" onclick="genQuote('book')">Copy Book with Us</button>
+      <div class="q-out" id="q_out_book"></div>
+      <button class="cpbtn bl" data-qtype="prepay" onclick="genQuote('prepay')">Copy Prepayment Received</button>
+      <div class="q-out" id="q_out_prepay"></div>
+      <button class="cpbtn gn" data-qtype="final" onclick="genQuote('final')">Copy Final Payment</button>
+      <div class="q-out" id="q_out_final"></div>
+      <button class="cpbtn gn" onclick="createBookingsFromQuote()">+ Create Booking(s) from Quote</button>
+    </div>
+    <!-- SETTINGS PANELS BELOW -->
+    <div style="margin-top:14px;">
+      <div class="sp-panel">
+        <div class="sp-hd"><div class="sp-ht">Service Rates</div><span class="sp-tog" onclick="toggleSP('rates')">Edit</span></div>
+        <div class="sp-bd" id="sp-rates">
+          <div class="fr"><div class="f"><label>Boarding/night (£)</label><input class="fi" id="r_board_std" type="number" step="0.5"></div><div class="f"><label>Boarding holiday (£)</label><input class="fi" id="r_board_hol" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>Add. dog boarding (£)</label><input class="fi" id="r_board_add" type="number" step="0.5"></div><div class="f"><label>Add. dog holiday (£)</label><input class="fi" id="r_board_addh" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>Daycare/day (£)</label><input class="fi" id="r_day_std" type="number" step="0.5"></div><div class="f"><label>Daycare holiday (£)</label><input class="fi" id="r_day_hol" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>Add. dog daycare (£)</label><input class="fi" id="r_day_add" type="number" step="0.5"></div><div class="f"><label>Evening surcharge %</label><input class="fi" id="r_evening_pct" type="number" step="1"></div></div>
+          <div class="fsec">Dog Walk</div>
+          <div class="fr"><div class="f"><label>Group 30 min (£)</label><input class="fi" id="r_walk30" type="number" step="0.5"></div><div class="f"><label>Group 60 min (£)</label><input class="fi" id="r_walk60" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>Add-on pet 30 min (£)</label><input class="fi" id="r_walk30a" type="number" step="0.5"></div><div class="f"><label>Add-on pet 60 min (£)</label><input class="fi" id="r_walk60a" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>1:1 walk 30 min (£)</label><input class="fi" id="r_walk30_11" type="number" step="0.5"></div><div class="f"><label>1:1 walk 60 min (£)</label><input class="fi" id="r_walk60_11" type="number" step="0.5"></div></div>
+          <div class="fsec">Drop-in Visit</div>
+          <div class="fr"><div class="f"><label>Drop-in 30 min (£)</label><input class="fi" id="r_dropin30" type="number" step="0.5"></div><div class="f"><label>Drop-in 60 min (£)</label><input class="fi" id="r_dropin60" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>Add-on pet 30 min (£)</label><input class="fi" id="r_dropin30a" type="number" step="0.5"></div><div class="f"><label>Add-on pet 60 min (£)</label><input class="fi" id="r_dropin60a" type="number" step="0.5"></div></div>
+          <div class="fsec">Pet Taxi</div>
+          <div class="fr"><div class="f"><label>15min Single (£)</label><input class="fi" id="r_t15s" type="number" step="0.5"></div><div class="f"><label>15min Return (£)</label><input class="fi" id="r_t15r" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>30min Single (£)</label><input class="fi" id="r_t30s" type="number" step="0.5"></div><div class="f"><label>30min Return (£)</label><input class="fi" id="r_t30r" type="number" step="0.5"></div></div>
+          <div class="fr"><div class="f"><label>60min Single (£)</label><input class="fi" id="r_t60s" type="number" step="0.5"></div><div class="f"><label>60min Return (£)</label><input class="fi" id="r_t60r" type="number" step="0.5"></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px;">
+            <button class="sbtn2" onclick="saveRates()">Save &amp; Sync to Sheet</button>
+            <button class="sbtn2" onclick="loadRatesFromSheet()" style="background:var(--gr4);color:var(--gr2);">Load from Sheet</button>
+          </div>
+          <span class="smsg" id="rateStatus" style="display:block;margin-top:5px;"></span>
+        </div>
+      </div>
+      <div class="sp-panel">
+        <div class="sp-hd"><div class="sp-ht">Holiday Date Ranges</div><span class="sp-tog" onclick="toggleSP('holidays')">Edit</span></div>
+        <div class="sp-bd" id="sp-holidays">
+          <div class="hol-yr" id="holYrBtns"></div>
+          <div class="hol-list" id="holList"></div>
+          <div class="fr"><div class="f"><label>Range start</label><input class="fi" type="date" id="holStart"></div><div class="f"><label>Range end</label><input class="fi" type="date" id="holEnd"></div></div>
+          <button class="sbtn2" style="font-size:11px;padding:6px 12px;" onclick="addHolRange()">+ Add Range</button>
+        </div>
+      </div>
+      <div class="sp-panel">
+        <div class="sp-hd"><div class="sp-ht">Quote Templates</div><span class="sp-tog" onclick="toggleSP('templates')">Edit</span></div>
+        <div class="sp-bd" id="sp-templates">
+          <div class="f"><label>Get Quote template (no payment details)</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('quote')">Save</button><button class="tplb" onclick="redoTpl('quote')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('quote')">Restore default</button></div>
+            <textarea class="fta" id="tpl_quote" style="min-height:130px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Book with Us template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('book')">Save</button><button class="tplb" onclick="redoTpl('book')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('book')">Restore default</button></div>
+            <textarea class="fta" id="tpl_book" style="min-height:150px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Prepayment Received template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('prepay')">Save</button><button class="tplb" onclick="redoTpl('prepay')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('prepay')">Restore default</button></div>
+            <textarea class="fta" id="tpl_prepay" style="min-height:150px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Final Payment template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('final')">Save</button><button class="tplb" onclick="redoTpl('final')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('final')">Restore default</button></div>
+            <textarea class="fta" id="tpl_final" style="min-height:130px;font-size:10px;"></textarea>
+          </div>
+          <div class="fr"><div class="f"><label>Payment link</label><input class="fi" id="tpl_paylink" placeholder="https://..."></div><div class="f"><label>Pay ref prefix</label><input class="fi" id="tpl_payref_pfx"></div></div>
+          <button class="sbtn2" style="width:100%;" onclick="saveTplSettingsAndSync()">Save &amp; Sync to Sheet</button>
+          <div style="font-size:9px;color:var(--gr3);margin-top:7px;line-height:1.7;">Variables: {{ownerName}} {{dogs}} {{service}} {{dropoff}} {{pickup}} {{dropoffTime}} {{pickupTime}} {{nights}} {{ratePerNight}} {{addDogLine}} {{total}} {{prepayAmt}} {{finalAmt}} {{payRef}} {{payLink}} {{discount}} {{holidayDates}}</div>
+        </div>
+      </div>
+    </div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- BUSINESS HUB -->
+<div class="screen" id="sc-business">
+  <div style="padding:13px 15px 6px;"><div class="pg-t">Business Hub</div><div class="pg-s">Katie &amp; Osbert</div></div>
+  <div class="biz-grid">
+    <div class="bc bc-bk" onclick="showScreen('sc-bookings')"><div class="bci"><div class="bc-ico">📋</div><div class="bc-t">Bookings</div><div class="bc-d">Records, payments &amp; reminders</div></div></div>
+    <div class="bc bc-ct" onclick="showScreen('sc-costs')"><div class="bci"><div class="bc-ico">💸</div><div class="bc-t">Costs</div><div class="bc-d">Expenses &amp; marketing</div></div></div>
+    <div class="bc bc-pl" onclick="showScreen('sc-pl')"><div class="bci"><div class="bc-ico">📈</div><div class="bc-t">P&amp;L</div><div class="bc-d">Revenue vs targets</div></div></div>
+    <div class="bc bc-tr" onclick="showScreen('sc-training')"><div class="bci"><div class="bc-ico">📚</div><div class="bc-t">Staff Training</div><div class="bc-d">CPD &amp; Bristol export</div></div></div>
+    <div class="bc bc-tp" onclick="showScreen('sc-templates')"><div class="bci"><div class="bc-ico">✉️</div><div class="bc-t">Templates</div><div class="bc-d">Shared message library</div></div></div>
+    <div class="bc bc-ac" onclick="showScreen('sc-activities')"><div class="bci"><div class="bc-ico">🎯</div><div class="bc-t">Activities</div><div class="bc-d">Library &amp; smart picker</div></div></div>
+  </div>
+  <div style="padding:0 13px 18px;">
+    <div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r2);padding:11px;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gr2);margin-bottom:9px;">Data Export</div>
+      <button onclick="exportData(true)" style="display:block;width:100%;padding:9px 11px;background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);cursor:pointer;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--gr);text-align:left;margin-bottom:5px;">Full export — all records including private</button>
+      <button onclick="exportData(false)" style="display:block;width:100%;padding:9px 11px;background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);cursor:pointer;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--gr);text-align:left;">Public export — excludes Private records</button>
+    </div>
+  </div>
+</div>
+<!-- BOOKINGS -->
+<div class="screen" id="sc-bookings">
+  <div class="pg">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px;">
+      <div><div class="pg-t">Booking Records</div><div style="font-size:10px;color:var(--gr3);margin-top:1px;" id="bkCount"></div></div>
+      <button class="sbtn2" style="font-size:11px;padding:6px 11px;" onclick="openBkModal(null)">+ Add</button>
+    </div>
+    <div class="fbar">
+      <div class="fbar-lbl">Search &amp; Filter</div>
+      <div class="fbar-row">
+        <input class="fi" id="bkSearch" placeholder="Search dog name..." oninput="renderBk()" style="flex:1;min-width:120px;font-size:11px;padding:5px 9px;">
+        <select class="fs" id="bkSF" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderBk()">
+          <option value="live">Live / Upcoming</option><option value="">All</option><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Completed</option><option>Cancelled</option>
+        </select>
+        <select class="fs" id="bkVF" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderBk()">
+          <option value="">All services</option><option>Boarding</option><option>DayCare</option><option>Walking</option><option>Drop-in</option><option>Dog Sit</option><option>Pet Taxi</option><option>Training</option>
+        </select>
+      </div>
+      <div class="fbar-row" style="margin-top:6px;">
+        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Period:</div>
+        <input class="fi" type="date" id="bkFrom" oninput="renderBk()" style="font-size:10px;padding:4px 8px;width:auto;flex:1;">
+        <div style="font-size:9px;color:var(--gr3);">to</div>
+        <input class="fi" type="date" id="bkTo" oninput="renderBk()" style="font-size:10px;padding:4px 8px;width:auto;flex:1;">
+      </div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Dog</th><th>Service</th><th>Dates</th><th>Owed</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead>
+      <tbody id="bkBody"><tr><td colspan="7" style="text-align:center;padding:14px;color:var(--gr3);">No bookings</td></tr></tbody>
+    </table></div>
+    <div style="margin-top:5px;font-size:9px;color:var(--gr3);">Tap row to edit · Balance = paid − owed · positive = credit</div>
+  </div>
+</div>
+<!-- COSTS -->
+<div class="screen" id="sc-costs">
+  <div class="pg">
+    <div class="pg-t">Cost Records</div><div class="pg-s">Expenses, licenses &amp; marketing</div>
+    <!-- Filter bar -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+      <select class="fs" id="cost_fYear" style="font-size:10px;padding:4px 8px;width:auto;" onchange="renderCostTable()">
+        <option value="">All Years</option><option>2024</option><option>2025</option><option>2026</option><option>2027</option><option>2028</option>
+      </select>
+      <select class="fs" id="cost_fMonth" style="font-size:10px;padding:4px 8px;width:auto;" onchange="renderCostTable()">
+        <option value="">All Months</option><option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+      </select>
+      <select class="fs" id="cost_fCat" style="font-size:10px;padding:4px 8px;flex:1;min-width:100px;" onchange="renderCostTable()">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+    <!-- Pie chart -->
+    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;">
+      <svg id="costPieSvg" width="200" height="200" viewBox="0 0 200 200" style="flex-shrink:0;"></svg>
+      <div id="costPieLegend" style="flex:1;min-width:120px;display:flex;flex-direction:column;gap:4px;padding-top:10px;"></div>
+    </div>
+    <!-- Table -->
+    <div class="tw" style="margin-bottom:9px;"><table><thead><tr><th>Date</th><th>Category</th><th>Amount (£)</th><th>Notes</th><th></th></tr></thead><tbody id="costBody"></tbody></table></div>
+    <button class="sbtn2 grey" style="font-size:11px;padding:6px 13px;width:100%;" onclick="addCostRow()">+ Add row</button>
+    <div class="srow"><button class="sbtn2" onclick="saveCosts()">Save all costs</button><span class="smsg" id="costStatus"></span></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- P&L -->
+<div class="screen" id="sc-pl">
+  <div class="pg">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:7px;">
+      <div class="pg-t">P&amp;L Dashboard</div>
+      <select class="fs" id="plYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="updatePL()"><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
+    </div>
+    <div class="kpi-g">
+      <div class="kpi"><div class="kpi-l">Cash Received</div><div class="kpi-v" id="kpi_rev">£0</div><div class="kpi-s" id="kpi_rev_s"></div></div>
+      <div class="kpi"><div class="kpi-l">Achievement</div><div class="kpi-v" id="kpi_pct">0%</div><div class="kpi-s">vs target</div></div>
+      <div class="kpi"><div class="kpi-l">Total Costs</div><div class="kpi-v" id="kpi_cost">£0</div><div class="kpi-s" id="kpi_cost_s"></div></div>
+      <div class="kpi"><div class="kpi-l">Net Profit</div><div class="kpi-v" id="kpi_net">£0</div><div class="kpi-s">After all costs</div></div>
+    </div>
+    <div class="fsec">Revenue &amp; Cost Trends</div>
+    <div class="chart-w">
+      <svg id="plChart" viewBox="0 0 560 190" style="width:100%;display:block;"></svg>
+      <div class="legend">
+        <div class="leg"><div class="leg-d" style="background:#F97316;"></div>Revenue</div>
+        <div class="leg"><div class="leg-d" style="background:#FED7AA;border:1px solid #F97316;"></div>Rev Target</div>
+        <div class="leg"><div class="leg-d" style="background:#1E40AF;"></div>Costs</div>
+        <div class="leg"><div class="leg-d" style="background:#7DD3FC;border:1px solid #0284C7;"></div>Cost Target</div>
+      </div>
+    </div>
+    <div class="fsec">Monthly Targets &amp; Actuals</div>
+    <div class="tw" style="margin-bottom:11px;"><table><thead><tr><th>Month</th><th>Rev Target</th><th>Cost Target</th><th>Cash In</th><th>Actual Cost</th><th>Net</th></tr></thead><tbody id="plTbl"></tbody></table></div>
+    <div class="srow"><button class="sbtn2" onclick="saveTargets()">Save Targets</button><span class="smsg" id="tgtStatus"></span></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- STAFF TRAINING -->
+<div class="screen" id="sc-training">
+  <div class="pg">
+    <div class="pg-t">Staff Training</div><div class="pg-s">CPD records for Katie &amp; Osbert</div>
+    <div class="fsec">Log New Training</div>
+    <div class="fr"><div class="f"><label>Date</label><input class="fi" id="st_date" type="date"></div><div class="f"><label>Staff Member</label><select class="fs" id="st_who"><option value="">Select</option><option>Katie</option><option>Osbert</option><option>Katie, Osbert</option></select></div></div>
+    <div class="f"><label>Category</label><select class="fs" id="st_cat"><option value="">Select</option><option>Animal behaviour</option><option>First aid</option><option>Health &amp; safety</option><option>Dog handling</option><option>Nutrition</option><option>Business / admin</option><option>Safeguarding</option><option>Other</option></select></div>
+    <div class="f"><label>Objective / Knowledge Gap</label><textarea class="fta" id="st_obj"></textarea></div>
+    <div class="f"><label>Course Provider</label><input class="fi" id="st_prov"></div>
+    <div class="f"><label>What I learnt / improved</label><textarea class="fta" id="st_learnt"></textarea></div>
+    <div class="fr"><div class="f"><label>CPD Points</label><input class="fi" id="st_cpd"></div><div class="f"><label>Certificate Link</label><input class="fi" id="st_link"></div></div>
+    <div class="srow"><input type="hidden" id="st_eid"><input type="hidden" id="st_ridx"><div id="stForm"></div><button class="sbtn2" onclick="submitTraining()">Save Record</button><button class="sbtn2 grey" style="font-size:11px;padding:6px 11px;" onclick="exportTraining()">Export CSV</button><span class="smsg" id="stStatus"></span></div>
+    <div class="fsec" style="margin-top:14px;">Records <button class="hbtn" style="float:right;background:var(--gr);" onclick="loadTraining()">Load</button></div>
+    <div id="stList" style="margin-top:7px;"><div class="hload">Tap Load to view</div></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- MESSAGE TEMPLATES -->
+<div class="screen" id="sc-templates">
+  <div class="pg">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px;">
+      <div><div class="pg-t">Message Templates</div><div class="pg-s">Shared — synced via Google Sheet</div></div>
+      <div style="display:flex;gap:5px;">
+        <button class="sbtn2 grey" style="font-size:11px;padding:6px 11px;" onclick="syncTplsFromSheet()">Sync</button>
+        <button class="sbtn2" style="font-size:11px;padding:6px 11px;" onclick="openTplHub(null)">+ New</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch;">
+      <button class="tpl-cat-btn active" data-cat="" onclick="setTplCat('')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--or);background:rgba(239,111,54,.1);color:var(--or);font-family:var(--fb);cursor:pointer;white-space:nowrap;">All</button>
+      <button class="tpl-cat-btn" data-cat="Payment" onclick="setTplCat('Payment')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">💳 Payment</button>
+      <button class="tpl-cat-btn" data-cat="Review" onclick="setTplCat('Review')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">⭐ Review</button>
+      <button class="tpl-cat-btn" data-cat="Arrival" onclick="setTplCat('Arrival')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🚗 Arrival</button>
+      <button class="tpl-cat-btn" data-cat="Departure" onclick="setTplCat('Departure')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">👋 Departure</button>
+      <button class="tpl-cat-btn" data-cat="Meet &amp; Greet" onclick="setTplCat('Meet &amp; Greet')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🤝 Meet &amp; Greet</button>
+      <button class="tpl-cat-btn" data-cat="First Touch" onclick="setTplCat('First Touch')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">✉️ First Touch</button>
+      <button class="tpl-cat-btn" data-cat="Require Info" onclick="setTplCat('Require Info')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">❓ Require Info</button>
+      <button class="tpl-cat-btn" data-cat="Reject" onclick="setTplCat('Reject')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🚫 Reject</button>
+      <button class="tpl-cat-btn" data-cat="Others" onclick="setTplCat('Others')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">📎 Others</button>
+    </div>
+    <div id="tplHubList"><div class="hload">Loading templates from sheet...</div></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- ACTIVITIES -->
+<div class="screen" id="sc-activities">
+  <div class="pg">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px;">
+      <div><div class="pg-t">Activities</div><div class="pg-s">Activity library &amp; smart picker</div></div>
+      <button class="sbtn2" style="font-size:11px;padding:6px 11px;" onclick="openActModal(null)">+ Add</button>
+    </div>
+    <!-- MAIN CATEGORY CHIPS -->
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch;">
+      <button class="act-main-cat-btn active" data-cat="" onclick="setActMainCat('')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--pu);background:var(--pul);color:var(--pu);font-family:var(--fb);cursor:pointer;white-space:nowrap;">All</button>
+      <button class="act-main-cat-btn" data-cat="Out of house (outdoor)" onclick="setActMainCat('Out of house (outdoor)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🌳 Out (outdoor)</button>
+      <button class="act-main-cat-btn" data-cat="Out of house (indoor)" onclick="setActMainCat('Out of house (indoor)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🏢 Out (indoor)</button>
+      <button class="act-main-cat-btn" data-cat="In house (for fun)" onclick="setActMainCat('In house (for fun)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🎉 In house (fun)</button>
+      <button class="act-main-cat-btn" data-cat="In house (practical)" onclick="setActMainCat('In house (practical)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🔧 In house (practical)</button>
+      <button class="act-main-cat-btn" data-cat="In house (game)" onclick="setActMainCat('In house (game)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🎮 In house (game)</button>
+      <button class="act-main-cat-btn" data-cat="Others" onclick="setActMainCat('Others')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">📎 Others</button>
+    </div>
+    <!-- FILTER -->
+    <div class="fbar">
+      <div class="fbar-lbl">Filter Activities</div>
+      <div class="fbar-row">
+        <select class="fs" id="act_fIO" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">In &amp; Outdoor</option><option>Indoor</option><option>Outdoor</option></select>
+        <select class="fs" id="act_fEnergy" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All energy</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select>
+      </div>
+      <div class="fbar-row" style="margin-top:6px;">
+        <select class="fs" id="act_fWeather" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All weather</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select>
+      </div>
+      <div class="fbar-row" style="margin-top:6px;">
+        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Max duration:</div>
+        <input class="fi" type="number" id="act_fDur" placeholder="mins" style="font-size:10px;padding:4px 8px;width:70px;" oninput="renderActs()">
+        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Max drive:</div>
+        <input class="fi" type="number" id="act_fDist" placeholder="mins" style="font-size:10px;padding:4px 8px;width:70px;" oninput="renderActs()">
+        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Max cost:</div>
+        <input class="fi" type="number" id="act_fCost" placeholder="£" style="font-size:10px;padding:4px 8px;width:60px;" oninput="renderActs()">
+      </div>
+      <div class="fbar-row" style="margin-top:6px;">
+        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Sort:</div>
+        <select class="fs" id="act_sort" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;flex:1;" onchange="renderActs()">
+          <option value="title">A–Z</option>
+          <option value="least_recent">Least recently done</option>
+          <option value="least_freq">Least frequently done</option>
+          <option value="cost">Lowest cost</option>
+          <option value="drive">Shortest drive</option>
+          <option value="duration">Shortest duration</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="sbtn2" style="flex:1;font-size:11px;padding:7px;" onclick="showAllActs()">Show All Matching</button>
+        <button class="sbtn2 grey" style="flex:1;font-size:11px;padding:7px;" onclick="surpriseAct()">🎲 Surprise Me</button>
+        <button class="hbtn" onclick="syncActsFromSheet()" style="font-size:10px;">&#8635; Sync</button>
+      </div>
+    </div>
+    <div id="surpriseWrap" style="display:none;"></div>
+    <div id="actList"><div class="hload">Add activities to build your library</div></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- PROFILE -->
+<div class="screen" id="sc-profile">
+  <div class="p-hero">
+    <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;">
+      <div class="phw" id="profPhotoWrap" onclick="trigPh()">
+        <span id="profEmoji" style="font-size:33px;">🐶</span>
+        <div class="phe">📷</div>
+        <input type="file" id="profPhotoInput" accept="image/*" style="display:none;" onchange="handlePh(event)">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <button onclick="promptGdriveUrl('profile')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">🔗 Drive URL</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <div class="pnm" id="profName"></div>
+    </div>
+    <div class="pmt" id="profMeta"></div>
+    <div class="pid" id="profId"></div>
+  </div>
+  <div class="ptabs">
+    <button class="ptab active" data-tab="logs" onclick="swPTab('logs',this)">Logs</button>
+    <button class="ptab" data-tab="history" onclick="swPTab('history',this)">History</button>
+    <button class="ptab" data-tab="info" onclick="swPTab('info',this)">Profile</button>
+    <button class="ptab" data-tab="consent" onclick="swPTab('consent',this)">Consent</button>
+    <button class="ptab" data-tab="services" onclick="swPTab('services',this)">Services</button>
+  </div>
+  <div class="ptc active" id="ptab-logs">
+    <div class="sum-c" id="smartSum" style="display:none;"><div class="sum-t">Summary</div><div class="sum-x" id="sumText"></div><div id="alertRows"></div></div>
+    <div class="drow"><label>Today</label><div id="logDateDisplay" style="flex:1;font-size:12px;font-weight:600;color:var(--gr);"></div></div>
+    <div id="logsBody"></div>
+    <div class="f" style="margin-top:9px;"><label>Notes</label><textarea class="fta" id="logNotes"></textarea></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:7px;"><input type="checkbox" id="logPrivate" style="width:13px;height:13px;accent-color:var(--gr);">Private</label>
+    <button class="slb" onclick="saveLog()">Save Today's Log</button>
+    <div id="logStatus" style="text-align:center;font-size:10px;margin-top:6px;font-weight:600;display:none;"></div>
+  </div>
+  <div class="ptc" id="ptab-history">
+    <div class="hfil">
+      <button class="hfb active" data-type="all" onclick="filtHist('all',this)">All</button>
+      <button class="hfb" data-type="daily" onclick="filtHist('daily',this)">Daily</button>
+      <button class="hfb" data-type="health" onclick="filtHist('health',this)">Health</button>
+      <button class="hfb" data-type="incidents" onclick="filtHist('incidents',this)">Incidents</button>
+      <button class="hfb" data-type="transport" onclick="filtHist('transport',this)">Transport</button>
+      <button class="hfb" data-type="activities" onclick="filtHist('activities',this)">Activities</button>
+      <button class="hfb" data-type="trial" onclick="filtHist('trial',this)">Trial</button>
+    </div>
+    <div style="display:flex;gap:5px;align-items:center;margin:-3px 0 9px;flex-wrap:wrap;">
+      <input type="date" id="hist_add_date" class="fi" style="flex:1;min-width:90px;font-size:10px;padding:4px 8px;">
+      <select id="hist_add_type" class="fs" style="flex:1;font-size:10px;">
+        <option value="daily">Daily</option>
+        <option value="health">Health</option>
+        <option value="fight">Fight/Incident</option>
+        <option value="transport">Transport</option>
+        <option value="trial">Trial</option>
+      </select>
+      <button class="sbtn2" style="font-size:10px;padding:5px 10px;flex-shrink:0;" onclick="openHistAddLog()">+ Add</button>
+    </div>
+    <div class="hlist" id="histList"><div class="hload">Tap a filter to load</div></div>
+  </div>
+  <div class="ptc" id="ptab-info">
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <button class="epb" onclick="openEditProf()" style="flex:1;">Edit Profile</button>
+      <button class="epb" onclick="duplicateDog()" style="flex:1;background:var(--gr4);color:var(--gr2);">+ Duplicate (same owner)</button>
+    </div>
+    <div id="profInfoBody"></div>
+  </div>
+  <div class="ptc" id="ptab-consent">
+    <div id="consentBody"></div>
+    <div class="srow"><button class="sbtn2" onclick="saveConsent()">Save Consent</button><span class="smsg" id="consentStatus"></span></div>
+  </div>
+  <div class="ptc" id="ptab-services">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+      <div style="font-size:10px;color:var(--gr3);">All bookings for this dog</div>
+      <button class="sbtn2" style="font-size:10px;padding:5px 9px;" onclick="openBkModal(null,true)">+ Add</button>
+    </div>
+    <div id="servicesList"><div class="hload">Loading...</div></div>
+  </div>
+</div>
+<!-- REGISTER / EDIT -->
+<div class="screen" id="sc-register">
+  <div class="pg">
+    <div class="pg-t" id="regTitle">Register New Dog</div>
+    <div style="display:flex;flex-direction:column;align-items:center;padding:12px 0;">
+      <div id="regPhotoCircle" onclick="document.getElementById('regPhotoInput').click()" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
+      <input type="file" id="regPhotoInput" accept="image/*" style="display:none;" onchange="handleRegPh(event)">
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+        <span style="font-size:9px;color:var(--gr3);">Tap circle to add photo</span>
+        <button class="sbtn2" onclick="promptGdriveUrl('register')" style="font-size:11px;padding:4px 10px;">🔗 Drive URL</button>
+      </div>
+    </div>
+    <input type="hidden" id="reg_eid"><input type="hidden" id="reg_ridx">
+    <div class="fsec">Dog Details</div>
+    <div class="fr"><div class="f"><label>Name <span class="req">*</span></label><input class="fi" id="reg_name"></div><div class="f"><label>Breed</label><input class="fi" id="reg_breed"></div></div>
+    <div class="fr"><div class="f"><label>Gender</label><select class="fs" id="reg_gender"><option value="">Select</option><option>Male</option><option>Female</option></select></div><div class="f"><label>Birthday</label>
+      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+        <select class="fs" id="reg_bday_type" onchange="toggleBdayType()" style="font-size:10px;padding:5px 22px 5px 7px;width:auto;"><option value="exact">Exact date</option><option value="approx">Month &amp; year only</option></select>
+        <input class="fi" type="date" id="reg_bday" style="flex:1;display:none;">
+        <select class="fs" id="reg_bday_m" style="flex:1;display:none;font-size:11px;"><option value="">Month</option><option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option><option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option><option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select>
+        <input class="fi" type="number" id="reg_bday_y" placeholder="Year e.g. 2022" style="flex:1;display:none;font-size:11px;">
+      </div>
+    </div></div>
+    <div class="fr"><div class="f"><label>Weight (kg)</label><input class="fi" id="reg_weight"></div><div class="f"><label>Spayed/Neutered</label><select class="fs" id="reg_neut"><option value="">Select</option><option>Yes</option><option>No</option></select></div></div>
+    <div class="fr"><div class="f"><label>Microchip ID</label><input class="fi" id="reg_chip"></div><div class="f"><label>Rescue dog?</label><select class="fs" id="reg_rescue"><option value="">Select</option><option>Yes</option><option>No</option></select></div></div>
+    <div class="f"><label>Nervous level (1–5)</label>
+      <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
+        <input type="range" id="reg_nervous" min="1" max="5" value="3" oninput="updNB('reg')" style="flex:1;">
+        <div class="nb-bar" id="reg_nb_bar" style="width:72px;"><div class="nb-seg" id="rns0"></div><div class="nb-seg" id="rns1"></div><div class="nb-seg" id="rns2"></div><div class="nb-seg" id="rns3"></div><div class="nb-seg" id="rns4"></div></div>
+        <span class="nval" id="reg_nval">3</span>
+      </div>
+    </div>
+    <div class="f"><label>Separation anxiety (1–5)</label>
+      <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
+        <input type="range" id="reg_anxiety" min="1" max="5" value="1" oninput="updAnxBar()" style="flex:1;">
+        <div class="nb-bar" id="reg_ax_bar" style="width:72px;"><div class="nb-seg" id="axs0"></div><div class="nb-seg" id="axs1"></div><div class="nb-seg" id="axs2"></div><div class="nb-seg" id="axs3"></div><div class="nb-seg" id="axs4"></div></div>
+        <span class="nval" id="reg_axval">1</span>
+      </div>
+    </div>
+    <div class="f"><label>Jogging suitability (1–5)</label>
+      <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
+        <input type="range" id="reg_jog" min="1" max="5" value="3" oninput="updJogBar()" style="flex:1;">
+        <div class="nb-bar" id="reg_jog_bar" style="width:72px;"><div class="nb-seg" id="jgs0"></div><div class="nb-seg" id="jgs1"></div><div class="nb-seg" id="jgs2"></div><div class="nb-seg" id="jgs3"></div><div class="nb-seg" id="jgs4"></div></div>
+        <span class="nval" id="reg_jogval">3</span>
+      </div>
+    </div>
+    <div class="f"><label>Friendly with dogs? (breeds to avoid)</label><input class="fi" id="reg_dogfriends" placeholder="e.g. Good with small breeds — avoid Huskies"></div>
+    <div class="fsec">Food &amp; Health</div>
+    <div class="fr"><div class="f"><label>Food type</label><select class="fs" id="reg_food"><option value="">Select</option><option>Dry food</option><option>Wet food</option><option>Mixed</option><option>Raw</option></select></div><div class="f"><label>Food measurement</label><input class="fi" id="reg_food_measure" placeholder="e.g. 150g morning, 150g eve"></div></div>
+    <div class="f"><label>Diet notes</label><textarea class="fta" id="reg_diet" style="min-height:48px;"></textarea></div>
+    <div class="f"><label>Allergies</label><input class="fi" id="reg_allergies"></div>
+    <div class="f"><label>Medical / medication</label><input class="fi" id="reg_medical"></div>
+    <div class="f"><label>Medication volume &amp; schedule</label><input class="fi" id="reg_med_schedule" placeholder="e.g. 1 tablet (YuMove) with breakfast daily"></div>
+    <div class="f"><label>Fears</label><input class="fi" id="reg_fears"></div>
+    <div class="f"><label>Untouchable areas</label><input class="fi" id="reg_touch"></div>
+    <div class="fr"><div class="f"><label>Last vaccination</label><input class="fi" type="date" id="reg_vacc"></div><div class="f"><label>Flea/tick treatment</label><input class="fi" id="reg_flea"></div></div>
+    <div class="f"><label>Vaccination record (Google Drive link)</label><input class="fi" id="reg_vacc_url" placeholder="https://drive.google.com/..."></div>
+    <div class="fsec">Behaviour &amp; Routine</div>
+    <div class="f"><label>Behaviour at home</label><textarea class="fta" id="reg_behaviour" style="min-height:48px;"></textarea></div>
+    <div class="f"><label>Walking schedule</label><input class="fi" id="reg_walk"></div>
+    <div class="f"><label>Car seat preference</label><select class="fs" id="reg_car"><option value="">Select</option><option>Back seat</option><option>Car boot</option><option>Dog crate in boot</option><option>Front passenger</option></select></div>
+    <div class="f"><label>Where does the dog normally sleep?</label><input class="fi" id="reg_sleep" placeholder="e.g. Dog bed in bedroom, crate, sofa"></div>
+    <div class="f"><label>Has the dog tried to escape? (explain)</label><input class="fi" id="reg_escape" placeholder="e.g. Never / once jumped over a 4ft fence"></div>
+    <div class="f"><label>Toilet trained outdoors only?</label><input class="fi" id="reg_toilet" placeholder="e.g. Yes, always outdoors"></div>
+    <div class="f"><label>How long can the dog be left alone? (hours)</label><input class="fi" id="reg_alone" placeholder="e.g. 3 hours max" type="text"></div>
+    <div class="f"><label>Training commands to keep up with</label><textarea class="fta" id="reg_commands" style="min-height:48px;" placeholder="e.g. Sit, stay, come, paw"></textarea></div>
+    <div class="f"><label>Has the dog stayed with other sitters?</label><input class="fi" id="reg_sitters" placeholder="e.g. Yes — Rover sitter in 2024, no issues"></div>
+    <div class="f"><label>How often should we send updates? </label><select class="fs" id="reg_updates"><option value="">Select</option><option>Daily</option><option>More frequently</option><option>Only if something happens</option><option>Custom</option></select></div>
+    <div class="f" id="reg_updates_custom_wrap" style="display:none;"><label>Custom update frequency</label><input class="fi" id="reg_updates_custom" placeholder="e.g. Every 2 hours during first stay"></div>
+    <div class="f"><label>Dog relationships</label><input class="fi" id="reg_rel" placeholder="e.g. Same family as Obi"></div>
+    <div class="f"><label>Additional notes</label><textarea class="fta" id="reg_notes" style="min-height:56px;"></textarea></div>
+    <div class="fsec">Owner Details</div>
+    <div class="fr"><div class="f"><label>Owner 1 <span class="req">*</span></label><input class="fi" id="reg_owner"></div><div class="f"><label>Phone 1 <span class="req">*</span></label><input class="fi" id="reg_phone" type="tel" placeholder="+447..."></div></div>
+    <div class="fr"><div class="f"><label>Owner 2</label><input class="fi" id="reg_owner2"></div><div class="f"><label>Phone 2</label><input class="fi" id="reg_phone2" type="tel" placeholder="+447..."></div></div>
+    <div class="fr"><div class="f"><label>Owner 3</label><input class="fi" id="reg_owner3"></div><div class="f"><label>Phone 3</label><input class="fi" id="reg_phone3" type="tel" placeholder="+447..."></div></div>
+    <div class="f"><label>Address</label><input class="fi" id="reg_address"></div>
+    <div class="f"><label>Emergency Contact</label><input class="fi" id="reg_emergency"></div>
+    <div class="f"><label>Vet Info</label><input class="fi" id="reg_vet"></div>
+    <div class="f"><label>Insurance</label><input class="fi" id="reg_insurance"></div>
+    <div class="f"><label>Date of first meet &amp; greet</label><input class="fi" type="date" id="reg_meetgreet"></div>
+    <div class="fr"><div class="f"><label>Where did they hear about us?</label><select class="fs" id="reg_referral"><option value="">Select</option><option>Social media</option><option>Word of mouth</option><option>Search engine</option><option>Leaflets</option><option>Rover</option><option>Other</option></select></div><div class="f"><label>Referral notes</label><input class="fi" id="reg_ref_notes" placeholder="e.g. Referred by Sophie W."></div></div>
+    <div class="fsec">Service</div>
+    <div class="f"><label>Service types</label>
+      <div id="reg_svc_chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;">
+        <button type="button" class="ib" data-svc="💤 Boarding" onclick="toggleSvcChip(this)">💤 Boarding</button>
+        <button type="button" class="ib" data-svc="☀️ Daycare" onclick="toggleSvcChip(this)">☀️ Daycare</button>
+        <button type="button" class="ib" data-svc="🐕 Dog Walk" onclick="toggleSvcChip(this)">🐕 Dog Walk</button>
+        <button type="button" class="ib" data-svc="🔑 Drop-in" onclick="toggleSvcChip(this)">🔑 Drop-in</button>
+        <button type="button" class="ib" data-svc="🪑 Dog Sit" onclick="toggleSvcChip(this)">🪑 Dog Sit</button>
+        <button type="button" class="ib" data-svc="🚕 Pet Taxi" onclick="toggleSvcChip(this)">🚕 Pet Taxi</button>
+        <button type="button" class="ib" data-svc="🏅 Training" onclick="toggleSvcChip(this)">🏅 Training</button>
+      </div>
+      <input type="hidden" id="reg_svc">
+    </div>
+    <div class="f"><label>Status</label><select class="fs" id="reg_status"><option>Active</option><option>Inactive</option></select></div>
+    <div class="f"><label>Remarks</label><textarea class="fta" id="reg_remarks"></textarea></div>
+    <div class="srow"><button class="sbtn2" id="regBtn" onclick="registerDog()">Register Dog</button><span class="smsg" id="regStatus"></span></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+</div><!-- /main -->
+<!-- BOOKING MODAL -->
+<div class="modal" id="bkModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl" id="bkMTitle">Add Booking</div><button class="mcl" onclick="document.getElementById('bkModal').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy">
+      <div style="background:var(--cnl);border:1px solid var(--orl);border-radius:var(--r);padding:9px 11px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <div style="font-size:10px;font-weight:600;color:var(--cn);">Generate a quote for this booking</div>
+        <button onclick="quoteFromBk()" style="background:var(--or);color:#fff;border:none;padding:4px 11px;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--fb);">Open in Quote</button>
+      </div>
+      <input type="hidden" id="bm_eid"><input type="hidden" id="bm_ridx">
+      <div class="f"><label>Dog Name <span class="req">*</span></label>
+        <input class="fi" id="bm_dog_search" placeholder="Search dog..." oninput="filterBmDog()" style="margin-bottom:4px;font-size:11px;">
+        <select class="fs" id="bm_dog" onchange="updateDogIdHint();renderOverlapCheck()"><option value="">Select dog</option></select>
+        <div style="font-size:9px;color:var(--gr3);margin-top:2px;" id="bm_dog_id"></div>
+      </div>
+      <div class="f"><label>Service</label><select class="fs" id="bm_svc"><option>Boarding</option><option>DayCare</option><option>Walking</option><option>Drop-in</option><option>Dog Sit</option><option>Pet Taxi</option><option>Training</option></select></div>
+      <div class="fr"><div class="f"><label>Drop-off date</label><input class="fi" type="date" id="bm_sd" onchange="renderOverlapCheck()"></div><div class="f"><label>Drop-off time</label><input class="fi" type="time" id="bm_st" value="09:00" onchange="renderOverlapCheck()"></div></div>
+      <div class="f"><label>Drop-off location</label><input class="fi" id="bm_drop_loc" placeholder="e.g. Home address or agreed meet point"></div>
+      <div class="fr"><div class="f"><label>Pick-up date</label><input class="fi" type="date" id="bm_ed" onchange="renderOverlapCheck()"></div><div class="f"><label>Pick-up time</label><input class="fi" type="time" id="bm_et" value="09:00" onchange="renderOverlapCheck()"></div></div>
+      <div class="f"><label>Pick-up location</label><input class="fi" id="bm_pick_loc" placeholder="e.g. Home address or agreed meet point"></div>
+      <div class="fsec">Revenue &amp; Payment</div>
+      <div class="fr"><div class="f"><label>Per Unit Cost Before Discount (£)</label><input class="fi" type="number" id="bm_unit" placeholder="0" step="0.01"></div><div class="f"><label>Discount notes</label><input class="fi" id="bm_disc_notes" placeholder="e.g. 10% loyalty"></div></div>
+      <div class="fr"><div class="f"><label>Revenue + Tips owed (£)</label><input class="fi" type="number" id="bm_rev" oninput="calcBal()" placeholder="0"></div><div class="f"><label>Tips (£)</label><input class="fi" type="number" id="bm_tips" placeholder="0" oninput="calcBal()"></div></div>
+      <div class="fr"><div class="f"><label>Prepayment received (£)</label><input class="fi" type="number" id="bm_prepay" oninput="calcBal()" placeholder="0"></div><div class="f"><label>Final payment received (£)</label><input class="fi" type="number" id="bm_final" oninput="calcBal()" placeholder="0"></div></div>
+      <div style="background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);padding:9px 11px;margin-bottom:9px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+          <div style="font-size:10px;color:var(--gr3);">Total owed</div><div style="font-size:12px;font-weight:700;color:var(--gr);text-align:right;" id="bm_owed">£0.00</div>
+          <div style="font-size:10px;color:var(--gr3);">Total paid</div><div style="font-size:12px;font-weight:700;color:var(--gn);text-align:right;" id="bm_paid">£0.00</div>
+          <div style="font-size:10px;color:var(--gr3);">Balance</div><div style="font-size:12px;font-weight:700;text-align:right;" id="bm_bal">£0.00</div>
+        </div>
+      </div>
+      <div class="fr"><div class="f"><label>Channel</label><select class="fs" id="bm_channel" onchange="toggleRover()"><option>TCL</option><option>Rover</option></select></div><div class="f"><label>Payment method</label><select class="fs" id="bm_pay"><option value="">Select</option><option>Digital</option><option>Cash</option></select></div></div>
+      <div id="bm_rover_row" style="display:none;">
+        <div class="fr"><div class="f"><label>Rover Commission %</label><input class="fi" type="number" id="bm_rpct" value="15" oninput="calcRover()"></div><div class="f"><label>Commission £ (adjustable)</label><input class="fi" type="number" id="bm_ramt" step="0.01" oninput="syncRoverAmt()"></div></div>
+      </div>
+      <div class="bk-flow" id="bk_status_flow">
+        <div class="bk-flow-label">Booking Progress</div>
+        <span class="bk-flow-step" id="bsf_quoted">Quoted</span>
+        <span class="bk-flow-arr">›</span>
+        <span class="bk-flow-step" id="bsf_booked">Booked</span>
+        <span class="bk-flow-arr">›</span>
+        <span class="bk-flow-step" id="bsf_prepaid">Prepaid</span>
+        <span class="bk-flow-arr">›</span>
+        <span class="bk-flow-step" id="bsf_fullypaid">Fully Paid</span>
+        <span class="bk-flow-step" id="bsf_cancelled" style="display:none;background:var(--rdl);color:var(--rd);border-color:var(--rd);">✕ Cancelled</span>
+        <span class="bk-flow-step" id="bsf_completed" style="display:none;background:var(--gnl);color:var(--gn);border-color:var(--gn);">✓ Completed</span>
+      </div>
+      <div class="f"><label>Status</label><select class="fs" id="bm_status" onchange="updateStatusFlow()"><option>Quoted</option><option>Booked</option><option>Prepaid</option><option>Fully Paid</option><option>Credit</option><option>Cancelled</option><option>Completed</option></select></div>
+      <div id="bm_status_warn" style="display:none;background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--or);margin-bottom:9px;"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;margin-bottom:11px;"><input type="checkbox" id="bm_priv" style="width:13px;height:13px;accent-color:var(--gr);">Private booking</label>
+      <div class="fsec">Post-Stay Review</div>
+      <div class="fr">
+        <div class="f"><label>Rating (1–5 ⭐)</label><select class="fs" id="bm_rating"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+        <div class="f"><label>Feedback</label><input class="fi" id="bm_feedback" placeholder="Owner's comments..."></div>
+      </div>
+      <div class="fsec">Workflow Checklist</div>
+      <div id="bm_workflow"></div>
+      <div class="fsec">Compatibility Reminder</div>
+      <div id="bm_overlap_wrap">
+        <div id="bm_overlap"></div>
+      </div>
+      <div class="fsec">Reminders Sent</div>
+      <div id="bm_reminders"></div>
+      <div class="srow">
+        <button class="sbtn2" id="bkBtn" onclick="saveBk()">Save Booking</button>
+        <button class="sbtn2 rd" id="bkDelBtn" style="display:none;" onclick="confirmDeleteBk()">Delete</button>
+        <span class="smsg" id="bkStatus"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- EDIT HISTORY MODAL -->
+<div class="modal" id="editModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl">Edit Record</div><button class="mcl" onclick="document.getElementById('editModal').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy" id="editModalBody"></div>
+  </div>
+</div>
+<!-- TEMPLATE MODAL -->
+<div class="modal" id="copyTplPanel" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl" id="ctpl_title">Use Template</div><button class="mcl" onclick="document.getElementById('copyTplPanel').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="ctpl_idx">
+      <div id="ctpl_fields"></div>
+      <div class="f" style="margin-top:6px;">
+        <label>Message preview</label>
+        <textarea class="fta" id="ctpl_preview" style="min-height:170px;font-size:11px;background:var(--gr5);color:var(--bk);" readonly></textarea>
+      </div>
+      <div class="srow" style="margin-top:10px;">
+        <button class="sbtn2" id="ctpl_copybtn" onclick="doCopyTpl()" style="flex:1;">Copy</button>
+        <button class="sbtn2 grey" onclick="document.getElementById('copyTplPanel').classList.remove('open')" style="flex:1;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="tplModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl" id="tplMTitle">New Template</div><button class="mcl" onclick="document.getElementById('tplModal').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="tpl_eidx">
+      <div class="f"><label>Template name <span class="req">*</span></label><input class="fi" id="tpl_name" placeholder="e.g. Booking confirmation"></div>
+      <div class="f"><label>Category <span class="req">*</span></label><select class="fs" id="tpl_cat"><option value="">Select category...</option><option>Payment</option><option>Review</option><option>Arrival</option><option>Departure</option><option>Meet &amp; Greet</option><option>First Touch</option><option>Require Info</option><option>Reject</option><option>Others</option></select></div>
+      <div class="f"><label>Content</label>
+        <div class="tpl-bts"><button class="tplb or" onclick="saveTplHub()">Save</button><button class="tplb" onclick="redoTplHub()">Redo</button></div>
+        <textarea class="fta" id="tpl_content" style="min-height:160px;font-size:11px;"></textarea>
+      </div>
+      <div class="srow"><button class="sbtn2" onclick="saveTplHub()">Save &amp; Sync</button><span class="smsg" id="tplHubStatus"></span></div>
+    </div>
+  </div>
+</div>
+<!-- ACTIVITY MODAL -->
+<div class="modal" id="actModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl" id="actMTitle">New Activity</div><button class="mcl" onclick="document.getElementById('actModal').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="act_eidx">
+      <div class="f"><label>Title <span class="req">*</span></label><input class="fi" id="act_title" placeholder="e.g. Oldbury Court field walk"></div>
+      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Out of house (outdoor)</option><option>Out of house (indoor)</option><option>In house (for fun)</option><option>In house (practical)</option><option>In house (game)</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
+<div class="f"><label>Energy level</label><select class="fs" id="act_energy"><option value="">Select...</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select></div>
+<div class="f"><label>Weather suitability</label><select class="fs" id="act_weather"><option value="">Select...</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select></div>
+      <div class="fr"><div class="f"><label>Duration (mins)</label><input class="fi" type="number" id="act_dur"></div><div class="f"><label>Distance from home (mins drive)</label><input class="fi" type="number" id="act_dist"></div></div>
+      <div class="f"><label>Location</label><input class="fi" id="act_location" placeholder="e.g. Oldbury Court Estate, BS16 2JP"></div>
+      <div class="f"><label>Google Maps URL</label><input class="fi" id="act_maps" placeholder="https://maps.google.com/..."></div>
+      <div class="f"><label>Cost (£) if any</label><input class="fi" type="number" id="act_cost" placeholder="0" step="0.01"></div>
+      <div class="f"><label>Notes</label><textarea class="fta" id="act_notes"></textarea></div>
+      <div class="srow"><button class="sbtn2" onclick="saveAct()">Save Activity</button><span class="smsg" id="actStatus"></span></div>
+    </div>
+  </div>
+</div>
+<!-- RESTORE CONFIRM -->
+<div class="confirm" id="restoreConfirm">
+  <div class="cbox">
+    <h3>Restore default?</h3>
+    <p>This replaces your saved template with the original factory default.<br><br>Type <strong>RESTORE</strong> to confirm.</p>
+    <input class="fi" id="restoreInput" placeholder="Type RESTORE" style="margin-bottom:11px;">
+    <div class="cbts"><button class="ccan" onclick="document.getElementById('restoreConfirm').classList.remove('open')">Cancel</button><button class="cok" onclick="doRestore()">Restore</button></div>
+  </div>
+</div>
+<!-- CREATE SHEET STRUCTURE CONFIRM -->
+<div class="confirm" id="sheetConfirm">
+  <div class="cbox">
+    <h3>Create sheet structure?</h3>
+    <p>This will add new tabs and headers to your Google Sheet.<br><br><strong>Existing data will not be deleted.</strong> However if you have existing Dogs data, column positions will change. Back up your sheet first.<br><br>Type <strong>CREATE SHEET STRUCTURE</strong> to proceed.</p>
+    <input class="fi" id="sheetInput" placeholder="Type CREATE SHEET STRUCTURE" style="margin-bottom:11px;">
+    <div class="cbts"><button class="ccan" onclick="document.getElementById('sheetConfirm').classList.remove('open')">Cancel</button><button class="cok rd" onclick="doCreateSheet()">Create</button></div>
+  </div>
+</div>
+<!-- DELETE BOOKING CONFIRM -->
+<div class="confirm" id="deleteBkConfirm">
+  <div class="cbox">
+    <h3>Delete booking?</h3>
+    <p>This permanently removes the booking record. Type <strong>DELETE</strong> to confirm.</p>
+    <input class="fi" id="deleteBkInput" placeholder="Type DELETE" style="margin-bottom:11px;">
+    <div class="cbts"><button class="ccan" onclick="document.getElementById('deleteBkConfirm').classList.remove('open')">Cancel</button><button class="cok" onclick="doDeleteBk()">Delete</button></div>
+  </div>
+</div>
+<!-- GENERIC CONFIRM -->
+<div class="confirm" id="confirmDlg">
+  <div class="cbox"><h3 id="cfmTitle">Confirm</h3><p id="cfmMsg">Are you sure?</p>
+    <div class="cbts"><button class="ccan" onclick="document.getElementById('confirmDlg').classList.remove('open')">Cancel</button><button class="cok" id="cfmOk">Confirm</button></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
