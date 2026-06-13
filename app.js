@@ -181,14 +181,14 @@ function computePendingActions(){
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
   const missingLogs=[];
   allDogs.forEach(d=>{
-    const bks=bookings.filter(b=>(b.customerId&&b.customerId===d.cid||b.dog.toLowerCase()===d.name.toLowerCase())&&active.includes(b.status)&&b.sd<=today);
+    const bks=bookings.filter(b=>!b.priv&&bkMatchesDog(b,d)&&active.includes(b.status)&&b.sd<=today);
     const missingSet=new Set();
     bks.forEach(bk=>{const endD=bk.ed&&bk.ed<today?bk.ed:yesterday;if(bk.sd>endD)return;let dt=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');while(dt<=end){const ds=dt.toISOString().slice(0,10);if(!dailyLogSet.has(d.cid+'_'+ds))missingSet.add(ds);dt.setUTCDate(dt.getUTCDate()+1);}});
     if(missingSet.size)missingLogs.push({dog:d,dates:[...missingSet].sort()});
   });
-  const pendingCompletion=bookings.filter(b=>b.ed&&b.ed<today&&!['Cancelled','Canceled','Completed'].includes(b.status));
+  const pendingCompletion=bookings.filter(b=>!b.priv&&b.ed&&b.ed<today&&!['Cancelled','Canceled','Completed'].includes(b.status));
   const wfTasks=[];
-  bookings.filter(b=>!['Cancelled','Canceled','Completed'].includes(b.status)).forEach(b=>{
+  bookings.filter(b=>!b.priv&&!['Cancelled','Canceled','Completed'].includes(b.status)).forEach(b=>{
     bkWfPendingItems(b).forEach(item=>wfTasks.push({bk:b,...item}));
   });
   return{missingLogs,pendingCompletion,wfTasks};
@@ -307,7 +307,7 @@ function runAvailCheck(){
     }
     const dateStr=b.sd+(b.ed&&b.ed!==b.sd?' – '+b.ed:'');
     const timeStr=(b.st||'')+(b.et&&b.et!==b.st?' – '+b.et:'');
-    const bDogProf=allDogs.find(d=>(b.customerId&&d.cid===b.customerId)||d.name.toLowerCase()===(b.dog||'').toLowerCase());
+    const bDogProf=allDogs.find(d=>bkMatchesDog(b,d));
     const clickAttr=bDogProf?' onclick="toggleAvailPanel();openProfile(allDogs.find(d=>d.cid===\''+bDogProf.cid+'\'))" style="cursor:pointer;"':'';
     return'<div'+clickAttr+' style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--gr4);">'
       +'<span style="font-size:15px;flex-shrink:0;line-height:1.4;">'+flag+'</span>'
@@ -360,7 +360,7 @@ async function refreshBoard(){
     const bkRows=await readSheet(TABS.BK,'A1:AN').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
     const cr=await readSheet(TABS.COSTS,'A2:D').catch(()=>[]);costs=cr.map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A2:G').catch(()=>[]);actLogs=al.map(r=>({date:r[2]||'',activity:r[3]||'',dogs:r[1]||'',staff:r[4]||'',dur:r[5]||'',notes:r[6]||''}));
-    const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialLogs=tl.slice(1).map(r=>({dog:r[tlh['DogName']??1]||'',date:r[tlh['Date']??2]||'',mixedWith:r[tlh['MixedWith']??3]||'',obs:r[tlh['Observations']??4]||'',suitable:r[tlh['Suitable']??5]||''}));
+    const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialLogs=tl.slice(1).map(r=>({cid:r[tlh['CustomerID']??0]||'',dog:r[tlh['DogName']??1]||'',date:r[tlh['Date']??2]||'',mixedWith:r[tlh['MixedWith']??3]||'',obs:r[tlh['Observations']??4]||'',suitable:r[tlh['Suitable']??5]||''}));
     const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyLogSet=new Set(dl.slice(1).map(r=>(r[dlh['CustomerID']??0]||'')+'_'+(r[dlh['Date']??2]||'')));
     // Sync targets from sheet into localStorage
     syncTargetsFromSheet().catch(()=>{});
@@ -372,6 +372,8 @@ async function refreshBoard(){
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
+function bkMatchesDog(b,d){return b.customerId?b.customerId===d.cid:b.dog.toLowerCase()===(d.name||'').toLowerCase();}
+function dogMatchesCidOrName(cid,name,dCid,dName){return cid?cid===dCid:(name||'').toLowerCase()===(dName||'').toLowerCase();}
 function mapDog(r,i,h){const g=n=>r[h&&h[n]!==undefined?h[n]:(n==='CustomerID'?0:n==='Name'?1:n==='Breed'?2:n==='Gender'?3:n==='Birthday'?4:n==='BirthdayType'?5:n==='Weight'?6:n==='Neutered'?7:n==='ChipID'?8:n==='Rescue'?9:n==='Nervous'?10:n==='SepAnxiety'?11:n==='DogFriends'?12:n==='FoodType'?13:n==='FoodMeasure'?14:n==='DietNotes'?15:n==='Allergies'?16:n==='Medical'?17:n==='MedSchedule'?18:n==='Fears'?19:n==='Untouchable'?20:n==='Vaccination'?21:n==='Flea'?22:n==='Behaviour'?23:n==='WalkSchedule'?24:n==='CarSeat'?25:n==='SleepLocation'?26:n==='EscapeAttempts'?27:n==='ToiletTrained'?28:n==='AloneHours'?29:n==='TrainingCommands'?30:n==='PrevSitters'?31:n==='UpdateFrequency'?32:n==='UpdateCustom'?33:n==='Relationships'?34:n==='AdditionalNotes'?35:n==='Owner1'?36:n==='Phone1'?37:n==='Owner2'?38:n==='Phone2'?39:n==='Owner3'?40:n==='Phone3'?41:n==='Address'?42:n==='Postcode'?43:n==='Emergency'?44:n==='Vet'?45:n==='Insurance'?46:n==='MeetGreetDate'?47:n==='Referral'?48:n==='ReferralNotes'?49:n==='Service'?50:n==='Status'?51:n==='Remarks'?52:n==='Emoji'?99:n==='Jogging'?53:n==='VaccinationURL'?54:55)]||'';
   return{cid:g('CustomerID')||genId(g('Name')||'Dog'),name:g('Name'),breed:g('Breed'),gender:g('Gender'),birthday:g('Birthday'),bdayType:g('BirthdayType')||'exact',weight:g('Weight'),neut:g('Neutered'),chip:g('ChipID'),rescue:g('Rescue'),nervous:g('Nervous'),anxiety:g('SepAnxiety'),dogfriends:g('DogFriends'),food:g('FoodType'),foodMeasure:g('FoodMeasure'),dietNotes:g('DietNotes'),allerg:g('Allergies'),med:g('Medical'),medSchedule:g('MedSchedule'),fears:g('Fears'),notouch:g('Untouchable'),vacc:g('Vaccination'),flea:g('Flea'),behav:g('Behaviour'),walk:g('WalkSchedule'),car:g('CarSeat'),sleep:g('SleepLocation'),escape:g('EscapeAttempts'),toilet:g('ToiletTrained'),alone:g('AloneHours'),commands:g('TrainingCommands'),sitters:g('PrevSitters'),updates:g('UpdateFrequency'),updatesCustom:g('UpdateCustom'),rel:g('Relationships'),notes:g('AdditionalNotes'),owner:g('Owner1'),phone:g('Phone1'),owner2:g('Owner2'),phone2:g('Phone2'),owner3:g('Owner3'),phone3:g('Phone3'),addr:g('Address'),postcode:g('Postcode'),emergency:g('Emergency'),vet:g('Vet'),ins:g('Insurance'),meetgreet:g('MeetGreetDate'),referral:g('Referral'),refNotes:g('ReferralNotes'),svc:g('Service'),status:g('Status'),remarks:g('Remarks'),emoji:g('Emoji'),jog:g('Jogging'),vaccUrl:g('VaccinationURL'),photoUrl:g('PhotoURL'),rowIdx:i+2};}
 function mapBk(r,i,h){const gi=(n,fb)=>h&&h[n]!==undefined?h[n]:fb;return{id:r[gi('ID',2)]||'',dog:r[gi('DogName',1)]||'',customerId:r[gi('CustomerID',0)]||'',svc:r[gi('ServiceType',3)]||'',sd:r[gi('StartDate',4)]||'',st:r[gi('StartTime',5)]||'',ed:r[gi('EndDate',6)]||'',et:r[gi('EndTime',7)]||'',dropLoc:r[gi('DropoffLocation',8)]||'',pickLoc:r[gi('PickupLocation',9)]||'',rev:parseFloat(r[gi('Revenue',10)])||0,tips:parseFloat(r[gi('Tips',11)])||0,prepay:parseFloat(r[gi('Prepayment',12)])||0,finalPay:parseFloat(r[gi('FinalPayment',13)])||0,unit:parseFloat(r[gi('UnitCost',14)])||0,discNotes:r[gi('DiscountNotes',15)]||'',roverPct:parseFloat(r[gi('RoverCommissionPct',16)])||0,roverAmt:parseFloat(r[gi('RoverCommissionGBP',17)])||0,ch:r[gi('Channel',18)]||'TCL',pay:r[gi('Payment',19)]||'',status:r[gi('Status',20)]||'',priv:r[gi('Private',21)]==='Private',month:r[gi('Month',22)]||'',rating:r[gi('Rating',23)]||'',feedback:r[gi('Feedback',24)]||'',rem:[r[gi('Rem1',25)]||'',r[gi('Rem2',26)]||'',r[gi('Rem3',27)]||'',r[gi('Rem4',28)]||'',r[gi('Rem5',29)]||''],overlapAppr:r[gi('OverlapApprovals',30)]||'',
@@ -385,7 +387,7 @@ function renderBoard(){
   let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)):allDogs;
   const active=[],week=[],upcoming=[],other=[];
   dogs.forEach(d=>{
-    const dogBks=validBks.filter(b=>(b.customerId&&b.customerId===d.cid)||b.dog.toLowerCase()===d.name.toLowerCase());
+    const dogBks=validBks.filter(b=>bkMatchesDog(b,d));
     const activeBks=dogBks.filter(b=>b.sd<=today&&b.ed>=today);
     const activeBk=activeBks.length?activeBks.sort((a,b)=>a.sd.localeCompare(b.sd))[0]:null;
     if(activeBk){active.push({dog:d,bk:activeBk});return;}
@@ -546,7 +548,7 @@ async function filtHist(type,btn){
     if(type==='all'||type==='daily'){
       const loggedDates=new Set(flt.filter(({tab})=>tab===TABS.DAILY).map(({row})=>row[2]));
       const today=todayStr();const yD=new Date(today+'T12:00:00Z');yD.setUTCDate(yD.getUTCDate()-1);const yesterday=yD.toISOString().slice(0,10);
-      const bks=bookings.filter(b=>(b.customerId&&b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&!['Cancelled','Canceled'].includes(b.status)&&b.sd<today);
+      const bks=bookings.filter(b=>bkMatchesDog(b,curDog)&&!['Cancelled','Canceled'].includes(b.status)&&b.sd<today);
       const missingSet=new Set();
       bks.forEach(bk=>{const endD=bk.ed<today?bk.ed:yesterday;let d=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(!loggedDates.has(ds))missingSet.add(ds);d.setUTCDate(d.getUTCDate()+1);}});
       missingSet.forEach(ds=>flt.push({tab:'MISSING',row:[null,null,ds],ri:null}));
@@ -619,7 +621,7 @@ async function openAddPastLog(date){
     const row=rows.find(r=>(gd(r,'Date',2)===date&&gd(r,'CustomerID',0)===curDog.cid)||(r[0]===date&&r[15]===curDog.cid));
     if(row){Object.entries(km).forEach(([k,col])=>{sv[k]=parseState(dh[col]!==undefined?row[dh[col]]||'':'');});sv.notes=gd(row,'Notes',16);sv.priv=gd(row,'Private',17)==='Private';localStorage.setItem(lk,JSON.stringify(sv));}
     else{// No existing log — if there was a booking for this date, default tiles to 'todo'
-      const hadBooking=bookings.some(b=>(b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.sd<=date&&(b.ed||b.sd)>=date&&!['Cancelled','Canceled'].includes(b.status));
+      const hadBooking=bookings.some(b=>bkMatchesDog(b,curDog)&&b.sd<=date&&(b.ed||b.sd)>=date&&!['Cancelled','Canceled'].includes(b.status));
       if(hadBooking&&!keys.some(k=>sv[k])){keys.forEach(k=>{sv[k]='todo';});localStorage.setItem(lk,JSON.stringify(sv));}}
   }catch(e){}
   function tile(k,ico,lbl){const s=sv[k]||'';const sc=s?'done-'+s:'';const si=s==='yes'?' ✓':s==='refused'?' ✗':s==='todo'?' ○':s==='na'?' —':'';return'<div class="tile'+(sc?' '+sc:'')+'" id="ptl_'+k+'" data-lbl="'+lbl+'" onclick="togPastTile(\''+k+'\',\''+date+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+si+'</span></div>';}
@@ -653,7 +655,7 @@ function openHistAddLog(){
   const date=document.getElementById('hist_add_date').value||todayStr();
   const type=document.getElementById('hist_add_type').value;
   if(type==='daily'){
-    const hasBk=bookings.some(b=>(b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.sd<=date&&(b.ed||b.sd)>=date&&!['Cancelled','Canceled'].includes(b.status));
+    const hasBk=bookings.some(b=>bkMatchesDog(b,curDog)&&b.sd<=date&&(b.ed||b.sd)>=date&&!['Cancelled','Canceled'].includes(b.status));
     if(!hasBk&&!confirm('⚠️ No booking on this date for '+curDog.name+'. Add daily log anyway?'))return;
     openAddPastLog(date);
   }else{
@@ -662,7 +664,7 @@ function openHistAddLog(){
 }
 function openAddHistEntry(type,date){
   if(!curDog)return;
-  const hasBk=bookings.some(b=>(b.customerId===curDog.cid||b.dog.toLowerCase()===curDog.name.toLowerCase())&&b.sd<=date&&(b.ed||b.sd)>=date&&!['Cancelled','Canceled'].includes(b.status));
+  const hasBk=bookings.some(b=>bkMatchesDog(b,curDog)&&b.sd<=date&&(b.ed||b.sd)>=date&&!['Cancelled','Canceled'].includes(b.status));
   const warn=hasBk?'':'<div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:7px 9px;font-size:9px;color:var(--or);margin-bottom:10px;">⚠️ No booking on this date for '+curDog.name+'</div>';
   const df='<div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div>';
   const prv='<label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv">Private</label>';
@@ -717,7 +719,7 @@ function buildConsent(dog){
 function setConsent(k,v,btn){if(!curDog)return;const already=(curDog[k]||'')=== v;curDog[k]=already?'':v;btn.closest('.cfld').querySelectorAll('.ctb').forEach(b=>b.className='ctb');if(!already)btn.classList.add(v==='Yes'?'yes':'no');}
 async function saveConsent(){const st=document.getElementById('consentStatus');if(!curDog)return;const vals=[curDog.cid,curDog.name,todayStr(),...CF.map(f=>curDog[f.k]||'')];try{await appendRow(TABS.CONSENT,vals);st.textContent='Consent saved!';st.className='smsg ok';setTimeout(()=>st.className='smsg',3000);}catch(e){st.textContent=e.message;st.className='smsg err';}}
 function buildServices(dog){
-  const el=document.getElementById('servicesList');const recs=bookings.filter(r=>(r.customerId&&r.customerId===dog.cid||r.dog.toLowerCase()===dog.name.toLowerCase())).sort((a,b)=>b.sd.localeCompare(a.sd));
+  const el=document.getElementById('servicesList');const recs=bookings.filter(r=>bkMatchesDog(r,dog)).sort((a,b)=>b.sd.localeCompare(a.sd));
   if(!recs.length){el.innerHTML='<div class="hload">No bookings yet</div>';return;}
   const sc={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
   el.innerHTML=recs.map(r=>{
@@ -1245,7 +1247,7 @@ async function markBookingsQuotedFromQuote(){
     for(const dogName of dogs){
       if(!dogName)continue;
       const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
-      const existing=bookings.find(b=>(b.customerId===customerId||b.dog.toLowerCase()===dogName.toLowerCase())&&b.sd===sd&&(b.ed||b.sd)===(ed||sd)&&!['Cancelled','Canceled'].includes(b.status));
+      const existing=bookings.find(b=>(customerId?b.customerId===customerId:b.dog.toLowerCase()===dogName.toLowerCase())&&b.sd===sd&&(b.ed||b.sd)===(ed||sd)&&!['Cancelled','Canceled'].includes(b.status));
       if(existing){
         if(!existing.status){
           const vals=[existing.customerId,dogName,existing.id,existing.svc,existing.sd,existing.st,existing.ed,existing.et,existing.dropLoc,existing.pickLoc,existing.rev,existing.tips,existing.prepay,existing.finalPay,existing.unit,existing.discNotes,existing.roverPct,existing.roverAmt,existing.ch,existing.pay,'Quoted',existing.priv?'Private':'',existing.month,existing.rating,existing.feedback,...existing.rem,existing.overlapAppr];
@@ -1334,7 +1336,7 @@ function wfAutoLogs(bk){
 }
 function wfAutoCompat(bk){
   if(!bk||!bk.dog)return null;
-  return trialLogs.some(t=>t.dog.toLowerCase()===bk.dog.toLowerCase()&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd));
+  return trialLogs.some(t=>(bk.customerId&&t.cid?t.cid===bk.customerId:t.dog.toLowerCase()===bk.dog.toLowerCase())&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd));
 }
 function wfStepValue(bk,key){
   const sv=bk.wf||{};
@@ -1352,19 +1354,24 @@ function wfCompletion(bk){
 async function toggleWfStep(eid,key,checked){
   const bk=bookings.find(b=>b.id===eid);if(!bk)return;
   if(!bk.wf)bk.wf={};
+  const prev=bk.wf[key];
   if(key==='review')bk.wf.review=checked?'done':'';
   else bk.wf[key]=checked?'1':'';
-  if(key==='logs'||key==='compat'){
-    // store explicit override even when matching auto value, so it sticks
+  try{await updateRow(TABS.BK,bk.ri,bkRowVals(bk));}catch(e){
+    bk.wf[key]=prev;
+    alert('Could not save to Google Sheet (check internet connection): '+e.message+'\nThe change was NOT saved — please try again.');
   }
-  try{await updateRow(TABS.BK,bk.ri,bkRowVals(bk));}catch(e){}
   renderWfChecklist();updateStatusFlow();updatePendingBadge();
 }
 async function setWfReviewNA(eid,isNA){
   const bk=bookings.find(b=>b.id===eid);if(!bk)return;
   if(!bk.wf)bk.wf={};
+  const prev=bk.wf.review;
   bk.wf.review=isNA?'na':'';
-  try{await updateRow(TABS.BK,bk.ri,bkRowVals(bk));}catch(e){}
+  try{await updateRow(TABS.BK,bk.ri,bkRowVals(bk));}catch(e){
+    bk.wf.review=prev;
+    alert('Could not save to Google Sheet (check internet connection): '+e.message+'\nThe change was NOT saved — please try again.');
+  }
   renderWfChecklist();updateStatusFlow();updatePendingBadge();
 }
 function renderWfChecklist(){
@@ -1394,19 +1401,50 @@ function renderOverlapCheck(){
   const eid=document.getElementById('bm_eid')?.value;
   const qStart=new Date(sd+'T'+st);const qEnd=new Date(ed+'T'+et);
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
+  const dogObj=allDogs.find(d=>d.name===dog);
   const overlaps=bookings.filter(b=>{
     if(b.id===eid)return false;
     if(!active.includes(b.status)||!b.sd)return false;
-    if(b.dog.toLowerCase()===dog.toLowerCase())return false;
+    if(dogObj&&b.customerId&&b.customerId===dogObj.cid)return false;
+    if((!dogObj||!b.customerId)&&b.dog.toLowerCase()===dog.toLowerCase())return false;
     const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
     return bS<qEnd&&bE>qStart;
   });
   if(!overlaps.length){c.innerHTML='<div style="font-size:9px;color:var(--gn);">✅ No other dogs booked during this period.</div>';return;}
-  const seen=new Set();const names=overlaps.filter(b=>{const k=b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
-  const dogObj=allDogs.find(d=>d.name===dog);
-  const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log compatibility in Trial-Log</button>':'';
-  c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">⚠️ Other dogs staying during this period — please log compatibility in the Trial-Log:</div>'+
-    names.map(b=>'<div style="font-size:11px;padding:3px 0;">• '+b.dog+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</div>').join('')+logBtn;
+  const seen=new Set();const names=overlaps.filter(b=>{const k=b.customerId||b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+  const dogEsc=(dog||'').replace(/'/g,"\\'");
+  const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log full Trial-Log entry</button>':'';
+  c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">⚠️ Other dogs staying during this period — log how they got on:</div>'+
+    names.map(b=>{
+      const mEsc=b.dog.replace(/'/g,"\\'");
+      return '<div style="padding:5px 0;border-bottom:1px solid var(--gr4);">'
+        +'<div style="font-size:11px;font-weight:600;color:var(--bk);">'+b.dog+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</div>'
+        +'<div style="display:flex;gap:8px;margin-top:3px;align-items:center;flex-wrap:wrap;">'
+        +'<label style="display:flex;align-items:center;gap:4px;font-size:10px;cursor:pointer;"><input type="checkbox" onchange="if(this.checked)logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',true,\'\');" style="width:13px;height:13px;accent-color:var(--gn);">👍 Happy together</label>'
+        +'<button type="button" class="sbtn2" style="font-size:9px;padding:3px 8px;" onclick="toggleCompatNotes(this)">⚠️ Didn\'t get on</button>'
+        +'</div>'
+        +'<div class="compatNotes" style="display:none;margin-top:4px;"><textarea class="fta" style="min-height:40px;font-size:10px;" placeholder="What happened?"></textarea><button type="button" class="sbtn2" style="font-size:9px;margin-top:3px;" onclick="logCompatNotes(this,\''+dogEsc+'\',\''+mEsc+'\')">Save</button></div>'
+        +'</div>';
+    }).join('')+logBtn;
+}
+function toggleCompatNotes(btn){
+  const box=btn.parentElement.nextElementSibling;
+  box.style.display=box.style.display==='none'?'block':'none';
+}
+async function logCompatResult(dog,mixedDog,happy,notes){
+  const dogObj=allDogs.find(d=>d.name===dog);if(!dogObj)return;
+  const today=todayStr();const suitable=happy?'Suitable':'Not Suitable';const obs=notes||(happy?'Happy together':'');
+  try{
+    await appendRow(TABS.TRIAL,[dogObj.cid,dog,today,mixedDog,obs,suitable,'']);
+    trialLogs.push({cid:dogObj.cid,dog,date:today,mixedWith:mixedDog,obs,suitable});
+  }catch(e){alert('Could not save to Google Sheet (check internet connection): '+e.message+'\nPlease try again.');return;}
+  renderOverlapCheck();renderWfChecklist();updatePendingBadge();
+}
+function logCompatNotes(btn,dog,mixedDog){
+  const ta=btn.previousElementSibling;
+  const obs=ta.value.trim();
+  if(!obs){alert('Please add notes about what happened.');return;}
+  logCompatResult(dog,mixedDog,false,obs);
 }
 function updateDogIdHint(){const n=document.getElementById('bm_dog').value;const d=allDogs.find(x=>x.name===n);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
 function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;const isCancelled=v==='Cancelled';const isCompleted=v==='Completed';steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';el.style.opacity='';if(isCancelled){el.style.opacity='0.3';return;}if(isCompleted){el.classList.add('fsdone');return;}if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});const cancelEl=document.getElementById('bsf_cancelled');const completeEl=document.getElementById('bsf_completed');if(cancelEl)cancelEl.style.display=isCancelled?'inline-block':'none';if(completeEl)completeEl.style.display=isCompleted?'inline-block':'none';
