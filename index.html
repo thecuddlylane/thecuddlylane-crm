@@ -417,7 +417,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
   <button class="hdr-back" id="backBtn" onclick="goBack()">&#8592; Back</button>
   <div id="hdrTitle"><div class="hdr-logo">THE CUDDLY LANE</div><div class="hdr-sub" id="hdrSub">Staff Portal</div></div>
   <div class="hsp"></div>
-  <button class="hbtn or" onclick="refreshBoard()" id="refreshBtn" title="Refresh data">&#8635;</button>
+  <button class="hbtn or" onclick="refreshBoard()" id="refreshBtn" title="Sync with Google Sheet">&#8635; Sync</button>
   <button class="hbtn" onclick="toggleSetup()">Settings</button>
 </div>
 <!-- SETTINGS -->
@@ -438,7 +438,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v37 · Build 38</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v39 · Build 40</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -1114,8 +1114,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div id="bm_overlap_wrap">
         <div id="bm_overlap"></div>
       </div>
-      <div class="fsec">Reminders Sent</div>
-      <div id="bm_reminders"></div>
       <div class="srow">
         <button class="sbtn2" id="bkBtn" onclick="saveBk()">Save Booking</button>
         <button class="sbtn2 rd" id="bkDelBtn" style="display:none;" onclick="confirmDeleteBk()">Delete</button>
