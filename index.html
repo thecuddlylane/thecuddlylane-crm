@@ -438,7 +438,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v39 · Build 40</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · App v41 · Build 47</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -967,7 +967,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <input type="hidden" id="reg_eid"><input type="hidden" id="reg_ridx">
     <div class="fsec">Dog Details</div>
     <div class="fr"><div class="f"><label>Name <span class="req">*</span></label><input class="fi" id="reg_name"></div><div class="f"><label>Breed</label><input class="fi" id="reg_breed"></div></div>
-    <div class="fr"><div class="f"><label>Gender</label><select class="fs" id="reg_gender"><option value="">Select</option><option>Male</option><option>Female</option></select></div><div class="f"><label>Birthday</label>
+    <div class="fr"><div class="f"><label>Gender &amp; Neuter Status</label><select class="fs" id="reg_gender_status"><option value="">Select</option><option>Male – Intact</option><option>Male – Neutered</option><option>Female – Intact</option><option>Female – Spayed</option></select></div><div class="f"><label>Birthday</label>
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
         <select class="fs" id="reg_bday_type" onchange="toggleBdayType()" style="font-size:10px;padding:5px 22px 5px 7px;width:auto;"><option value="exact">Exact date</option><option value="approx">Month &amp; year only</option></select>
         <input class="fi" type="date" id="reg_bday" style="flex:1;display:none;">
@@ -975,7 +975,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <input class="fi" type="number" id="reg_bday_y" placeholder="Year e.g. 2022" style="flex:1;display:none;font-size:11px;">
       </div>
     </div></div>
-    <div class="fr"><div class="f"><label>Weight (kg)</label><input class="fi" id="reg_weight"></div><div class="f"><label>Spayed/Neutered</label><select class="fs" id="reg_neut"><option value="">Select</option><option>Yes</option><option>No</option></select></div></div>
+    <div class="fr"><div class="f"><label>Weight (kg)</label><input class="fi" id="reg_weight"></div></div>
     <div class="fr"><div class="f"><label>Microchip ID</label><input class="fi" id="reg_chip"></div><div class="f"><label>Rescue dog?</label><select class="fs" id="reg_rescue"><option value="">Select</option><option>Yes</option><option>No</option></select></div></div>
     <div class="f"><label>Nervous level (1–5)</label>
       <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
@@ -1018,9 +1018,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Toilet trained outdoors only?</label><input class="fi" id="reg_toilet" placeholder="e.g. Yes, always outdoors"></div>
     <div class="f"><label>How long can the dog be left alone? (hours)</label><input class="fi" id="reg_alone" placeholder="e.g. 3 hours max" type="text"></div>
     <div class="f"><label>Training commands to keep up with</label><textarea class="fta" id="reg_commands" style="min-height:48px;" placeholder="e.g. Sit, stay, come, paw"></textarea></div>
+    <div class="f"><label>Motivation</label><input class="fi" id="reg_motivation" placeholder="e.g. Food driven, toy driven, ball driven, praise driven"></div>
     <div class="f"><label>Has the dog stayed with other sitters?</label><input class="fi" id="reg_sitters" placeholder="e.g. Yes — Rover sitter in 2024, no issues"></div>
-    <div class="f"><label>How often should we send updates? </label><select class="fs" id="reg_updates"><option value="">Select</option><option>Daily</option><option>More frequently</option><option>Only if something happens</option><option>Custom</option></select></div>
-    <div class="f" id="reg_updates_custom_wrap" style="display:none;"><label>Custom update frequency</label><input class="fi" id="reg_updates_custom" placeholder="e.g. Every 2 hours during first stay"></div>
+    <div class="f"><label>How often should we send updates?</label><input class="fi" id="reg_updates" placeholder="e.g. Daily, every 2 hours during first stay, only if something happens"></div>
     <div class="f"><label>Dog relationships</label><input class="fi" id="reg_rel" placeholder="e.g. Same family as Obi"></div>
     <div class="f"><label>Additional notes</label><textarea class="fta" id="reg_notes" style="min-height:56px;"></textarea></div>
     <div class="fsec">Owner Details</div>
@@ -1077,6 +1077,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="fr"><div class="f"><label>Per Unit Cost Before Discount (£)</label><input class="fi" type="number" id="bm_unit" placeholder="0" step="0.01"></div><div class="f"><label>Discount notes</label><input class="fi" id="bm_disc_notes" placeholder="e.g. 10% loyalty"></div></div>
       <div class="fr"><div class="f"><label>Revenue + Tips owed (£)</label><input class="fi" type="number" id="bm_rev" oninput="calcBal()" placeholder="0"></div><div class="f"><label>Tips (£)</label><input class="fi" type="number" id="bm_tips" placeholder="0" oninput="calcBal()"></div></div>
       <div class="fr"><div class="f"><label>Prepayment received (£)</label><input class="fi" type="number" id="bm_prepay" oninput="calcBal()" placeholder="0"></div><div class="f"><label>Final payment received (£)</label><input class="fi" type="number" id="bm_final" oninput="calcBal()" placeholder="0"></div></div>
+      <div class="fr"><div class="f"><label>Prepayment reference</label><input class="fi" id="bm_prepay_ref" placeholder="e.g. bank transfer ref"></div><div class="f"><label>Final payment reference</label><input class="fi" id="bm_final_ref" placeholder="e.g. bank transfer ref"></div></div>
       <div style="background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);padding:9px 11px;margin-bottom:9px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
           <div style="font-size:10px;color:var(--gr3);">Total owed</div><div style="font-size:12px;font-weight:700;color:var(--gr);text-align:right;" id="bm_owed">£0.00</div>
@@ -1085,6 +1086,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         </div>
       </div>
       <div class="fr"><div class="f"><label>Channel</label><select class="fs" id="bm_channel" onchange="toggleRover()"><option>TCL</option><option>Rover</option></select></div><div class="f"><label>Payment method</label><select class="fs" id="bm_pay"><option value="">Select</option><option>Digital</option><option>Cash</option></select></div></div>
+      <div class="f"><label>Booking Reference</label><input class="fi" id="bm_ref" placeholder="e.g. bank transfer ref, Rover booking ID"></div>
       <div id="bm_rover_row" style="display:none;">
         <div class="fr"><div class="f"><label>Rover Commission %</label><input class="fi" type="number" id="bm_rpct" value="15" oninput="calcRover()"></div><div class="f"><label>Commission £ (adjustable)</label><input class="fi" type="number" id="bm_ramt" step="0.01" oninput="syncRoverAmt()"></div></div>
       </div>
