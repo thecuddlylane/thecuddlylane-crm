@@ -361,7 +361,7 @@ async function refreshBoard(){
     // Sync activities library from sheet so sheet edits show in app
     syncActsFromSheet(true).catch(()=>{});
     // Sync dog photo URLs from Rates sheet so photos work across devices
-    readSheet(TABS.RATES,'A2:C').then(rr=>{let changed=false;rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);if(r[1]&&localStorage.getItem('dog_photo_'+cid)!==r[1]){localStorage.setItem('dog_photo_'+cid,r[1]);changed=true;}});if(changed){renderBoard();if(curDog){const photo=curDog.photoUrl||localStorage.getItem('dog_photo_'+curDog.cid);if(photo){const w=document.getElementById('profPhotoWrap');let img=w&&w.querySelector('img.pl');if(img){img.src=photo;img.style.display='block';}}}}}).catch(()=>{});
+    readSheet(TABS.RATES,'A2:C').then(rr=>{let changed=false;rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);const norm=gdriveDirect(r[1]||'');if(norm&&localStorage.getItem('dog_photo_'+cid)!==norm){localStorage.setItem('dog_photo_'+cid,norm);changed=true;}});if(changed){renderBoard();if(curDog){const photo=resolvePhotoUrl(curDog);if(photo){const w=document.getElementById('profPhotoWrap');let img=w&&w.querySelector('img.pl');if(img){img.onerror=()=>{img.style.display='none';};img.src=photo;img.style.display='block';}}}}}).catch(()=>{});
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();updatePendingBadge();
     await syncCurrentScreen();
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
@@ -413,14 +413,14 @@ function renderCards(entries,c,cls){
   if(!entries.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
   const scMap={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
   entries.forEach(({dog,bk})=>{
-    const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
+    const photo=resolvePhotoUrl(dog);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
     const vaccExpired=dog.vacc?(()=>{try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);return vd<cutoff;}catch(e){return false;}})():false;
     // Birthday month celebration
     const bdMonth=dog.birthday?parseInt(dog.birthday.split('-')[1]):0;const isBdayMo=bdMonth&&bdMonth===(new Date().getMonth()+1);
     // Booking info strip
     const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+bk.svc+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="" onerror="this.style.display=\'none\'">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
@@ -432,11 +432,11 @@ function waLink(ph){if(!ph)return'';const n=ph.replace(/[^0-9]/g,'');return'<a h
 // ==================== PROFILE ====================
 function openProfile(dog){
   curDog=dog;histCache={};
-  const photo=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid);
+  const photo=resolvePhotoUrl(dog);
   document.getElementById('profName').textContent=dog.name;document.getElementById('profMeta').textContent=[dog.breed,dog.weight?dog.weight+'kg':'',calcAge(dog.birthday)].filter(Boolean).join(' - ');document.getElementById('profId').textContent=dog.cid;document.getElementById('profEmoji').textContent='';
   const wrap=document.getElementById('profPhotoWrap');let img=wrap.querySelector('img.pl');
   if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';wrap.appendChild(img);}
-  img.style.display=photo?'block':'none';if(photo)img.src=photo;
+  img.onerror=()=>{img.style.display='none';};img.style.display=photo?'block':'none';if(photo)img.src=photo;updateCopyPhotoBtn();
   buildTodayLog();buildSummary(dog);buildProfInfo(dog);buildConsent(dog);buildServices(dog);
   document.getElementById('histList').innerHTML='<div class="hload">Loading...</div>';
   document.querySelectorAll('.hfb').forEach(b=>b.classList.remove('active'));
@@ -829,7 +829,7 @@ async function registerDog(){
       if(targetRi)await updateRow(TABS.DOGS,targetRi,vals);else await appendRow(TABS.DOGS,vals);
     }else await appendRow(TABS.DOGS,vals);
     const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);syncPhotoToSheet(cid,pd);}catch(e){}
-    if(!eid){allDogs.push(mapDog(vals,allDogs.length));refreshDogDropdowns();}else if(curDog){const idx=allDogs.findIndex(d=>d.cid===eid);if(idx>=0){allDogs[idx]=mapDog(vals,idx);curDog=allDogs[idx];}}
+    const dh=mkHdr(dogsHdrRow);if(!eid){allDogs.push(mapDog(vals,allDogs.length,dh));refreshDogDropdowns();}else if(curDog){const idx=allDogs.findIndex(d=>d.cid===eid);if(idx>=0){allDogs[idx]=mapDog(vals,idx,dh);curDog=allDogs[idx];}}
     st.textContent=eid?'Profile updated!':'Registered! ID: '+cid;st.className='smsg ok';
     setTimeout(()=>{goBack();renderBoard();if(eid&&curDog){buildProfInfo(curDog);buildSummary(curDog);}},1800);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Save Changes':'Register Dog';}
@@ -838,15 +838,19 @@ function compressPhoto(file,cb){const r=new FileReader();r.onload=ev=>{const img
 function trigPh(){document.getElementById('profPhotoInput').click();}
 function handlePh(e){const f=e.target.files[0];if(!f||!curDog)return;compressPhoto(f,data=>{try{localStorage.setItem('dog_photo_'+curDog.cid,data);}catch(err){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=data;img.style.display='block';syncPhotoToSheet(curDog.cid,data);});}
 function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,data=>{document.getElementById('regPhotoImg').src=data;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=data;});}
-function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w800';}catch(e){}return url;}
+function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://lh3.googleusercontent.com/d/'+m[1];}catch(e){}return url;}
+function resolvePhotoUrl(dog){const raw=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid)||'';return raw?gdriveDirect(raw):'';}
+
 function syncPhotoToSheet(cid,url){if(!cid||!url)return;const key='photo_'+cid;const ts=new Date().toISOString();readSheet(TABS.RATES,'A2:C').then(rr=>{const idx=rr.findIndex(r=>r[0]===key);if(idx>=0)updateRow(TABS.RATES,idx+2,[key,url,ts]).catch(()=>{});else appendRow(TABS.RATES,[key,url,ts]).catch(()=>{});}).catch(()=>{});}
-function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=direct;img.style.display='block';
+function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.onerror=()=>{img.style.display='none';};img.src=direct;img.style.display='block';
   // Save URL to dog record in Dogs sheet so it's visible on all devices
-  curDog.photoUrl=direct;
+  curDog.photoUrl=direct;updateCopyPhotoBtn();
   if(curDog.rowIdx){updateRow(TABS.DOGS,curDog.rowIdx,Object.values(mapDogToRow(curDog))).catch(()=>{});}
   syncPhotoToSheet(curDog.cid,direct);
 }else{_regPhotoUrl=direct;document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
 function promptGdriveUrl(context){const url=prompt('Paste your Google Drive photo link:\n(File > Share > Copy link)');if(url)setPhotoFromUrl(url,context);}
+function copyPhotoUrl(){const url=curDog?.photoUrl||localStorage.getItem('dog_photo_'+(curDog?.cid||''));if(!url){alert('No photo URL stored for this dog.');return;}navigator.clipboard.writeText(url).then(()=>alert('Photo URL copied!')).catch(()=>{prompt('Copy this URL:',url);});}
+function updateCopyPhotoBtn(){const url=curDog?.photoUrl||localStorage.getItem('dog_photo_'+(curDog?.cid||''));const btn=document.getElementById('copyPhotoUrlBtn');if(btn)btn.style.display=(url&&url.startsWith('http'))?'block':'none';}
 
 // ==================== QUOTE ====================
 // ==================== MULTI-SERVICE QUOTE ====================
@@ -1274,7 +1278,7 @@ async function markBookingsQuotedFromQuote(){
         const id=nextBkId();const month=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'});
         const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dogName,id,svc:svcLabel,sd,st:mainLine.st2||'09:00',ed:ed||sd,et:mainLine.et||'18:00',dropLoc:'',pickLoc:'',rev:0,tips:0,prepay:0,finalPay:0,unit:0,discNotes:'',roverPct:0,roverAmt:0,ch:'TCL',pay:'',status:'Quoted',priv:false,month,rating:'',feedback:'',rem:['','','','','']}),TABS.BK.h);
         await appendRow(TABS.BK,vals);
-        bookings.push(mapBk(vals,bookings.length));changed=true;
+        bookings.push(mapBk(vals,bookings.length,mkHdr(bkHdrRow)));changed=true;
       }
     }
     if(changed){renderBoard();updatePendingBadge();}
@@ -1303,7 +1307,7 @@ async function createBookingsFromQuote(){
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
       const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
       const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dogName,id,svc:svcLabel,sd,st,ed,et,dropLoc:'',pickLoc:'',rev,tips:0,prepay:prepayAmt,finalPay:0,unit:0,discNotes:'',roverPct:0,roverAmt:0,ch:'TCL',pay:'',status:'Booked',priv:false,month,rating:'',feedback:'',rem:['','','','','']}),TABS.BK.h);
-      try{await appendRow(TABS.BK,vals);const mv=[...vals];mv[1]=dogName;bookings.push(mapBk(mv,bookings.length));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
+      try{await appendRow(TABS.BK,vals);const mv=[...vals];mv[1]=dogName;bookings.push(mapBk(mv,bookings.length,mkHdr(bkHdrRow)));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
   if(created){renderBoard();alert(created+' booking'+(created>1?'s':'')+' created with revenue pre-filled. Check Bookings to adjust.');}
@@ -1491,7 +1495,7 @@ async function saveBk(){
   const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dog,id,svc:document.getElementById('bm_svc').value,sd,st:document.getElementById('bm_st').value,ed:document.getElementById('bm_ed').value,et:document.getElementById('bm_et').value,dropLoc:gv('bm_drop_loc'),pickLoc:gv('bm_pick_loc'),rev,tips,prepay:pre,finalPay:fin,unit,discNotes:document.getElementById('bm_disc_notes').value,roverPct:rPct,roverAmt:rAmt,ch,pay:document.getElementById('bm_pay').value,status:document.getElementById('bm_status').value,priv,month,rating:gv('bm_rating'),feedback:gv('bm_feedback'),rem:rems,wf:existingWf,bookingRef:gv('bm_ref'),prepayRef:gv('bm_prepay_ref'),finalPayRef:gv('bm_final_ref')}),TABS.BK.h);
   try{
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
-    const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length);if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
+    const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
     st.textContent='Saved!';st.className='smsg ok';setTimeout(()=>{document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();renderBoard();updatePendingBadge();},1400);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';}
 }
