@@ -49,6 +49,7 @@ const WF_STEPS=[
   {k:'review',l:'Review logged (or marked N/A)'}
 ];
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
+let _bkSaving=false;
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
 
@@ -114,10 +115,10 @@ async function doCreateSheet(){
   const s=document.getElementById('cfgStatus');s.textContent='Creating structure...';
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
-    {n:TABS.DOGS,h:['CustomerID','Name','Breed','Gender','Birthday','BirthdayType','Weight','Neutered','ChipID','Rescue','Nervous','SepAnxiety','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','Jogging','VaccinationURL','PhotoURL','GenderStatus','Motivation']},
-    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_Prep','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','BookingRef','PrepaymentRef','FinalPaymentRef']},
+    {n:TABS.DOGS,h:['CustomerID','DogName','Breed','GenderStatus','Birthday','BirthdayType','Weight','ChipID','Rescue','Nervous','SepAnxiety','Jogging','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','Motivation','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','VaccinationURL','PhotoURL']},
+    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_Prep','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','WF_DailyLogs','WF_Compat','BookingRef','PrepaymentRef','FinalPaymentRef']},
     {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','BeforeSleep','Game','Bowl','Room','Garment','Notes','Private']},
-    {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','NextStep','Private']},
+    {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','','NextStep','Private']},
     {n:TABS.FIGHT,h:['CustomerID','DogName','Date','Time','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
     {n:TABS.TRANSPORT,h:['CustomerID','DogName','Date','Transporter','Vehicle','Plate','JourneyType','Time','Notes','Private','From','To']},
     {n:TABS.TRIAL,h:['CustomerID','DogName','Date','MixedWith','Observations','Suitable','Private']},
@@ -350,11 +351,11 @@ async function refreshBoard(){
   document.getElementById('todayCards').innerHTML='<div class="empty"><p>Loading...</p></div>';
   try{
     const dogRows=await readSheet(TABS.DOGS,'A1:BG');const dh=mkHdr(dogRows[0]||[]);dogsHdrRow=dogRows[0]||[];allDogs=dogRows.slice(1).map((r,i)=>mapDog(r,i,dh)).filter(d=>d.name.trim());
-    const bkRows=await readSheet(TABS.BK,'A1:AO').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bkHdrRow=bkRows[0]||[];bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
-    const cr=await readSheet(TABS.COSTS,'A1:D').catch(()=>[]);costsHdrRow=cr[0]||[];costs=cr.slice(1).map((r,i)=>({date:r[0]||'',cat:r[1]||'',amount:parseFloat(r[2])||0,notes:r[3]||'',ri:i+2}));
-    const al=await readSheet(TABS.ACTLOG,'A1:G').catch(()=>[]);actlogHdrRow=al[0]||[];actLogs=al.slice(1).map(r=>({date:r[2]||'',activity:r[3]||'',dogs:r[1]||'',staff:r[4]||'',dur:r[5]||'',notes:r[6]||''}));
-    const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialHdrRow=tl[0]||[];trialLogs=tl.slice(1).map(r=>({cid:r[tlh['CustomerID']??0]||'',dog:r[tlh['DogName']??1]||'',date:r[tlh['Date']??2]||'',mixedWith:r[tlh['MixedWith']??3]||'',obs:r[tlh['Observations']??4]||'',suitable:r[tlh['Suitable']??5]||''}));
-    const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyHdrRow=dl[0]||[];dailyLogSet=new Set(dl.slice(1).map(r=>(r[dlh['CustomerID']??0]||'')+'_'+(r[dlh['Date']??2]||'')));
+    const bkRows=await readSheet(TABS.BK,'A1:AZ').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bkHdrRow=bkRows[0]||[];bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
+    const cr=await readSheet(TABS.COSTS,'A1:D').catch(()=>[]);costsHdrRow=cr[0]||[];const ch=mkHdr(cr[0]||[]);costs=cr.slice(1).map((r,i)=>({date:r[ch['Date']??-1]||'',cat:r[ch['Category']??-1]||'',amount:parseFloat(r[ch['Amount']??-1])||0,notes:r[ch['Notes']??-1]||'',ri:i+2}));
+    const al=await readSheet(TABS.ACTLOG,'A1:G').catch(()=>[]);actlogHdrRow=al[0]||[];const alh=mkHdr(al[0]||[]);actLogs=al.slice(1).map(r=>({date:r[alh['Date']??-1]||'',activity:r[alh['Activity']??-1]||'',dogs:r[alh['DogName']??-1]||'',staff:r[alh['Staff']??-1]||'',dur:r[alh['Duration']??-1]||'',notes:r[alh['Notes']??-1]||''}));
+    const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialHdrRow=tl[0]||[];trialLogs=tl.slice(1).map((r,i)=>{const rv=n=>tlh[n]!==undefined?r[tlh[n]]||'':'';return{cid:rv('CustomerID'),dog:rv('DogName'),date:rv('Date'),mixedWith:rv('MixedWith'),obs:rv('Observations'),suitable:rv('Suitable'),ri:i+2};});
+    const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyHdrRow=dl[0]||[];dailyLogSet=new Set(dl.slice(1).map(r=>(dlh['CustomerID']!==undefined?r[dlh['CustomerID']]||'':'')+'_'+(dlh['Date']!==undefined?r[dlh['Date']]||'':'')));
     const [hlR,ftR,trR,acR]=await Promise.all([readSheet(TABS.HEALTH,'A1:Z1').catch(()=>[]),readSheet(TABS.FIGHT,'A1:Z1').catch(()=>[]),readSheet(TABS.TRANSPORT,'A1:Z1').catch(()=>[]),readSheet(TABS.ACTS,'A1:Z1').catch(()=>[])]);healthHdrRow=hlR[0]||[];fightHdrRow=ftR[0]||[];transportHdrRow=trR[0]||[];actsHdrRow=acR[0]||[];
     // Sync targets from sheet into localStorage
     syncTargetsFromSheet().catch(()=>{});
@@ -381,13 +382,47 @@ async function syncCurrentScreen(){
 }
 function bkMatchesDog(b,d){return b.customerId?b.customerId===d.cid:b.dog.toLowerCase()===(d.name||'').toLowerCase();}
 function dogMatchesCidOrName(cid,name,dCid,dName){return cid?cid===dCid:(name||'').toLowerCase()===(dName||'').toLowerCase();}
-function mapDog(r,i,h){const g=n=>r[h&&h[n]!==undefined?h[n]:(n==='CustomerID'?0:n==='Name'?1:n==='Breed'?2:n==='Gender'?3:n==='Birthday'?4:n==='BirthdayType'?5:n==='Weight'?6:n==='Neutered'?7:n==='ChipID'?8:n==='Rescue'?9:n==='Nervous'?10:n==='SepAnxiety'?11:n==='DogFriends'?12:n==='FoodType'?13:n==='FoodMeasure'?14:n==='DietNotes'?15:n==='Allergies'?16:n==='Medical'?17:n==='MedSchedule'?18:n==='Fears'?19:n==='Untouchable'?20:n==='Vaccination'?21:n==='Flea'?22:n==='Behaviour'?23:n==='WalkSchedule'?24:n==='CarSeat'?25:n==='SleepLocation'?26:n==='EscapeAttempts'?27:n==='ToiletTrained'?28:n==='AloneHours'?29:n==='TrainingCommands'?30:n==='PrevSitters'?31:n==='UpdateFrequency'?32:n==='UpdateCustom'?33:n==='Relationships'?34:n==='AdditionalNotes'?35:n==='Owner1'?36:n==='Phone1'?37:n==='Owner2'?38:n==='Phone2'?39:n==='Owner3'?40:n==='Phone3'?41:n==='Address'?42:n==='Postcode'?43:n==='Emergency'?44:n==='Vet'?45:n==='Insurance'?46:n==='MeetGreetDate'?47:n==='Referral'?48:n==='ReferralNotes'?49:n==='Service'?50:n==='Status'?51:n==='Remarks'?52:n==='Emoji'?99:n==='Jogging'?53:n==='VaccinationURL'?54:55)]||'';
-  return{cid:g('CustomerID')||genId(g('Name')||'Dog'),name:g('Name'),breed:g('Breed'),gender:g('Gender'),birthday:g('Birthday'),bdayType:g('BirthdayType')||'exact',weight:g('Weight'),neut:g('Neutered'),genderStatus:g('GenderStatus'),chip:g('ChipID'),rescue:g('Rescue'),nervous:g('Nervous'),anxiety:g('SepAnxiety'),dogfriends:g('DogFriends'),food:g('FoodType'),foodMeasure:g('FoodMeasure'),dietNotes:g('DietNotes'),allerg:g('Allergies'),med:g('Medical'),medSchedule:g('MedSchedule'),fears:g('Fears'),notouch:g('Untouchable'),vacc:g('Vaccination'),flea:g('Flea'),behav:g('Behaviour'),walk:g('WalkSchedule'),car:g('CarSeat'),sleep:g('SleepLocation'),escape:g('EscapeAttempts'),toilet:g('ToiletTrained'),alone:g('AloneHours'),commands:g('TrainingCommands'),sitters:g('PrevSitters'),updates:g('UpdateFrequency'),rel:g('Relationships'),notes:g('AdditionalNotes'),owner:g('Owner1'),phone:g('Phone1'),owner2:g('Owner2'),phone2:g('Phone2'),owner3:g('Owner3'),phone3:g('Phone3'),addr:g('Address'),postcode:g('Postcode'),emergency:g('Emergency'),vet:g('Vet'),ins:g('Insurance'),meetgreet:g('MeetGreetDate'),referral:g('Referral'),refNotes:g('ReferralNotes'),svc:g('Service'),status:g('Status'),remarks:g('Remarks'),emoji:g('Emoji'),jog:g('Jogging'),vaccUrl:g('VaccinationURL'),photoUrl:g('PhotoURL'),motivation:g('Motivation'),rowIdx:i+2};}
-function mapBk(r,i,h){const gi=(n,fb)=>h&&h[n]!==undefined?h[n]:fb;return{id:r[gi('ID',2)]||'',dog:r[gi('DogName',1)]||'',customerId:r[gi('CustomerID',0)]||'',svc:r[gi('ServiceType',3)]||'',sd:r[gi('StartDate',4)]||'',st:r[gi('StartTime',5)]||'',ed:r[gi('EndDate',6)]||'',et:r[gi('EndTime',7)]||'',dropLoc:r[gi('DropoffLocation',8)]||'',pickLoc:r[gi('PickupLocation',9)]||'',rev:parseFloat(r[gi('Revenue',10)])||0,tips:parseFloat(r[gi('Tips',11)])||0,prepay:parseFloat(r[gi('Prepayment',12)])||0,finalPay:parseFloat(r[gi('FinalPayment',13)])||0,unit:parseFloat(r[gi('UnitCost',14)])||0,discNotes:r[gi('DiscountNotes',15)]||'',roverPct:parseFloat(r[gi('RoverCommissionPct',16)])||0,roverAmt:parseFloat(r[gi('RoverCommissionGBP',17)])||0,ch:r[gi('Channel',18)]||'TCL',pay:r[gi('Payment',19)]||'',status:r[gi('Status',20)]||'',priv:r[gi('Private',21)]==='Private',month:r[gi('Month',22)]||'',rating:r[gi('Rating',23)]||'',feedback:r[gi('Feedback',24)]||'',rem:[r[gi('Rem1',25)]||'',r[gi('Rem2',26)]||'',r[gi('Rem3',27)]||'',r[gi('Rem4',28)]||'',r[gi('Rem5',29)]||''],
-  wf:{whatsapp:r[gi('WF_WhatsApp',30)]||'',prep:r[gi('WF_Prep',31)]||'',docsReceived:r[gi('WF_DocsReceived',32)]||'',consentSigned:r[gi('WF_ConsentSigned',33)]||'',dropoff:r[gi('WF_DropoffReminder',34)]||'',pickup:r[gi('WF_PickupReminder',35)]||'',finalpay:r[gi('WF_FinalPayReminder',36)]||'',reviewReq:r[gi('WF_ReviewRequest',37)]||'',review:r[gi('WF_Review',38)]||''},
-  bookingRef:r[gi('BookingRef',39)]||'',prepayRef:r[gi('PrepaymentRef',40)]||'',finalPayRef:r[gi('FinalPaymentRef',41)]||'',
-  ri:i+2};}
-function bkFieldMap(bk){const rem=bk.rem||['','','','','']; const wf=bk.wf||{};return{CustomerID:bk.customerId,DogName:bk.dog,ID:bk.id,ServiceType:bk.svc,StartDate:bk.sd,StartTime:bk.st,EndDate:bk.ed,EndTime:bk.et,DropoffLocation:bk.dropLoc,PickupLocation:bk.pickLoc,Revenue:bk.rev,Tips:bk.tips,Prepayment:bk.prepay,FinalPayment:bk.finalPay,UnitCost:bk.unit,DiscountNotes:bk.discNotes,RoverCommissionPct:bk.roverPct,RoverCommissionGBP:bk.roverAmt,Channel:bk.ch,Payment:bk.pay,Status:bk.status,Private:bk.priv?'Private':'',Month:bk.month,Rating:bk.rating,Feedback:bk.feedback,Rem1:rem[0]||'',Rem2:rem[1]||'',Rem3:rem[2]||'',Rem4:rem[3]||'',Rem5:rem[4]||'',WF_WhatsApp:wf.whatsapp||'',WF_Prep:wf.prep||'',WF_DocsReceived:wf.docsReceived||'',WF_ConsentSigned:wf.consentSigned||'',WF_DropoffReminder:wf.dropoff||'',WF_PickupReminder:wf.pickup||'',WF_FinalPayReminder:wf.finalpay||'',WF_ReviewRequest:wf.reviewReq||'',WF_Review:wf.review||'',BookingRef:bk.bookingRef||'',PrepaymentRef:bk.prepayRef||'',FinalPaymentRef:bk.finalPayRef||''};}
+function mapDog(r,i,h){
+  const g=n=>(h&&h[n]!==undefined)?( r[h[n]]||''):'';
+  return{cid:g('CustomerID')||genId(g('DogName')||g('Name')||'Dog'),
+    name:g('DogName')||g('Name'),
+    breed:g('Breed'),gender:g('GenderStatus'),birthday:g('Birthday'),bdayType:g('BirthdayType')||'exact',
+    weight:g('Weight'),neut:g('GenderStatus'),genderStatus:g('GenderStatus'),chip:g('ChipID'),
+    rescue:g('Rescue'),nervous:g('Nervous'),anxiety:g('SepAnxiety'),dogfriends:g('DogFriends'),
+    food:g('FoodType'),foodMeasure:g('FoodMeasure'),dietNotes:g('DietNotes'),allerg:g('Allergies'),
+    med:g('Medical'),medSchedule:g('MedSchedule'),fears:g('Fears'),notouch:g('Untouchable'),
+    vacc:g('Vaccination'),flea:g('Flea'),behav:g('Behaviour'),walk:g('WalkSchedule'),car:g('CarSeat'),
+    sleep:g('SleepLocation'),escape:g('EscapeAttempts'),toilet:g('ToiletTrained'),alone:g('AloneHours'),
+    commands:g('TrainingCommands'),sitters:g('PrevSitters'),updates:g('UpdateFrequency'),
+    rel:g('Relationships'),notes:g('AdditionalNotes'),owner:g('Owner1'),phone:g('Phone1'),
+    owner2:g('Owner2'),phone2:g('Phone2'),owner3:g('Owner3'),phone3:g('Phone3'),
+    addr:g('Address'),postcode:g('Postcode'),emergency:g('Emergency'),vet:g('Vet'),ins:g('Insurance'),
+    meetgreet:g('MeetGreetDate'),referral:g('Referral'),refNotes:g('ReferralNotes'),svc:g('Service'),
+    status:g('Status'),remarks:g('Remarks'),emoji:'',jog:g('Jogging'),vaccUrl:g('VaccinationURL'),
+    photoUrl:g('PhotoURL'),motivation:g('Motivation'),rowIdx:i+2};
+}
+function mapBk(r,i,h){
+  const gi=n=>h&&h[n]!==undefined?h[n]:null;
+  const rv=n=>{const idx=gi(n);return idx!==null?r[idx]||'':'';}
+  return{id:rv('ID'),dog:rv('DogName'),customerId:rv('CustomerID'),svc:rv('ServiceType'),
+    sd:rv('StartDate'),st:rv('StartTime'),ed:rv('EndDate'),et:rv('EndTime'),
+    dropLoc:rv('DropoffLocation'),pickLoc:rv('PickupLocation'),
+    rev:parseFloat(rv('Revenue'))||0,tips:parseFloat(rv('Tips'))||0,
+    prepay:parseFloat(rv('Prepayment'))||0,finalPay:parseFloat(rv('FinalPayment'))||0,
+    unit:parseFloat(rv('UnitCost'))||0,discNotes:rv('DiscountNotes'),
+    roverPct:parseFloat(rv('RoverCommissionPct'))||0,roverAmt:parseFloat(rv('RoverCommissionGBP'))||0,
+    ch:rv('Channel')||'TCL',pay:rv('Payment'),status:rv('Status'),
+    priv:rv('Private')==='Private',month:rv('Month'),rating:rv('Rating'),feedback:rv('Feedback'),
+    rem:[rv('Rem1'),rv('Rem2'),rv('Rem3'),rv('Rem4'),rv('Rem5')],
+    wf:{whatsapp:rv('WF_WhatsApp'),prep:rv('WF_Prep'),docsReceived:rv('WF_DocsReceived'),
+      consentSigned:rv('WF_ConsentSigned'),dropoff:rv('WF_DropoffReminder'),
+      pickup:rv('WF_PickupReminder'),finalpay:rv('WF_FinalPayReminder'),
+      reviewReq:rv('WF_ReviewRequest'),review:rv('WF_Review'),
+      dailyLogs:rv('WF_DailyLogs'),compat:rv('WF_Compat')},
+    bookingRef:rv('BookingRef'),prepayRef:rv('PrepaymentRef'),finalPayRef:rv('FinalPaymentRef'),
+    ri:i+2};
+}
+function bkFieldMap(bk){const rem=bk.rem||['','','','','']; const wf=bk.wf||{};return{CustomerID:bk.customerId,DogName:bk.dog,ID:bk.id,ServiceType:bk.svc,StartDate:bk.sd,StartTime:bk.st,EndDate:bk.ed,EndTime:bk.et,DropoffLocation:bk.dropLoc,PickupLocation:bk.pickLoc,Revenue:bk.rev,Tips:bk.tips,Prepayment:bk.prepay,FinalPayment:bk.finalPay,UnitCost:bk.unit,DiscountNotes:bk.discNotes,RoverCommissionPct:bk.roverPct,RoverCommissionGBP:bk.roverAmt,Channel:bk.ch,Payment:bk.pay,Status:bk.status,Private:bk.priv?'Private':'',Month:bk.month,Rating:bk.rating,Feedback:bk.feedback,Rem1:rem[0]||'',Rem2:rem[1]||'',Rem3:rem[2]||'',Rem4:rem[3]||'',Rem5:rem[4]||'',WF_WhatsApp:wf.whatsapp||'',WF_Prep:wf.prep||'',WF_DocsReceived:wf.docsReceived||'',WF_ConsentSigned:wf.consentSigned||'',WF_DropoffReminder:wf.dropoff||'',WF_PickupReminder:wf.pickup||'',WF_FinalPayReminder:wf.finalpay||'',WF_ReviewRequest:wf.reviewReq||'',WF_Review:wf.review||'',WF_DailyLogs:wf.dailyLogs||'',WF_Compat:wf.compat||'',BookingRef:bk.bookingRef||'',PrepaymentRef:bk.prepayRef||'',FinalPaymentRef:bk.finalPayRef||''};}
 function bkRowVals(bk){return rowFromMap(bkHdrRow,bkFieldMap(bk),TABS.BK.h);}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
@@ -504,7 +539,7 @@ async function saveLog(){
   if(document.getElementById('inc_fight')?.classList.contains('open')){const sel=document.getElementById('if_others');const oth=sel?Array.from(sel.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.FIGHT,rowFromMap(fightHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,Time:gv('if_time'),Owner:curDog.owner||'',OtherDogs:oth,Issue:gv('if_issue'),Importance:gv('if_imp'),Injuries:gv('if_inj'),Treatment:gv('if_treat'),Prevention:gv('if_prev'),Private:priv},TABS.FIGHT.h)));}
   if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,rowFromMap(transportHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,Transporter:gv('it_name'),Vehicle:gv('it_vehicle'),Plate:gv('it_plate'),JourneyType:gv('it_type'),Time:gv('it_time'),Notes:gv('it_notes'),Private:priv,From:gv('it_from'),To:gv('it_to')},TABS.TRANSPORT.h)));
   if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,rowFromMap(trialHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,MixedWith:oth2,Observations:gv('itr_obs'),Suitable:gv('itr_suit'),Private:priv},TABS.TRIAL.h)));}
-  try{await Promise.all(saves);histCache={};_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
+  try{await Promise.all(saves);histCache={};dailyLogSet.add(curDog.cid+'_'+today);_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
 }
 function buildSummary(dog){
   const alerts=[],notes=[];
@@ -598,7 +633,7 @@ function buildEditFlds(tab,date,lr,ri,h={}){
   if(tab===TABS.DAILY){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','daily')";}
   else if(tab===TABS.HEALTH){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Category</label><input class="fi" id="ef_cat" value="'+g('Category')+'"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue" value="'+g('Issue')+'"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc">'+g('Description')+'</textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next" value="'+g('NextStep')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','health')";}
   else if(tab===TABS.FIGHT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_time" value="'+g('Time')+'"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue">'+g('Issue')+'</textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev" value="'+g('Prevention')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','fight')";}
-  else if(tab===TABS.TRANSPORT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g('Transporter')+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g('Vehicle')+'"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g('From')+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g('To')+'" placeholder="Drop-off location"></div></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
+  else if(tab===TABS.TRANSPORT){const jtypeVal=g('JourneyType');const jtypeOpts=['Drop-off','Pick-up','Both'].map(o=>'<option'+(o===jtypeVal?' selected':'')+'>'+o+'</option>').join('');flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g('Transporter')+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g('Vehicle')+'"></div><div class="f"><label>Plate</label><input class="fi" id="ef_plate" value="'+g('Plate')+'"></div></div><div class="fr"><div class="f"><label>Journey type</label><select class="fs" id="ef_jtype">'+jtypeOpts+'</select></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_ttime" value="'+g('Time')+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g('From')+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g('To')+'" placeholder="Drop-off location"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
   else if(tab===TABS.TRIAL){const suitVal=g('Suitable');const suitOpts=['Suitable','Partial','Not Suitable'].map(o=>'<option'+(o===suitVal?' selected':'')+'>'+o+'</option>').join('');flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+suitOpts+'</select></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g('Observations')+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
   else if(tab===TABS.ACTLOG){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Duration (mins)</label><input class="fi" id="ef_dur" value="'+g('DurationMins')+'"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div>';fn="doEdit('"+ri+"','"+tab+"','actlog')";}
   return info+flds+'<div class="srow"><button class="sbtn2" onclick="'+fn+'">Save Changes</button><span class="smsg" id="editStatus"></span></div>';
@@ -608,7 +643,7 @@ async function doEdit(riStr,tabStr,type){
   if(type==='daily')vals=rowFromMap(dailyHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Notes:gv('ef_notes'),Private:priv},TABS.DAILY.h);
   else if(type==='health')vals=rowFromMap(healthHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Owner:curDog.owner||'',Issue:gv('ef_issue'),Category:gv('ef_cat'),Location:'',Importance:'',Description:gv('ef_desc'),RootCause:'',NextStep:gv('ef_next'),Private:priv},TABS.HEALTH.h);
   else if(type==='fight')vals=rowFromMap(fightHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Time:gv('ef_time'),Owner:curDog.owner||'',OtherDogs:'',Issue:gv('ef_issue'),Importance:'',Injuries:'',Treatment:'',Prevention:gv('ef_prev'),Private:priv},TABS.FIGHT.h);
-  else if(type==='transport')vals=rowFromMap(transportHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Transporter:gv('ef_trn'),Vehicle:gv('ef_trv'),Plate:'',JourneyType:'',Time:'',Notes:gv('ef_notes'),Private:priv,From:gv('ef_from'),To:gv('ef_to')},TABS.TRANSPORT.h);
+  else if(type==='transport')vals=rowFromMap(transportHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Transporter:gv('ef_trn'),Vehicle:gv('ef_trv'),Plate:gv('ef_plate'),JourneyType:gv('ef_jtype'),Time:gv('ef_ttime'),Notes:gv('ef_notes'),Private:priv,From:gv('ef_from'),To:gv('ef_to')},TABS.TRANSPORT.h);
   else if(type==='trial')vals=rowFromMap(trialHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,MixedWith:'',Observations:gv('ef_obs'),Suitable:gv('ef_suit'),Private:priv},TABS.TRIAL.h);
   else if(type==='actlog')vals=rowFromMap(actlogHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Activity:'',Staff:'',Duration:gv('ef_dur'),Notes:gv('ef_notes')},TABS.ACTLOG.h);
   st.textContent='Saving...';const tm={daily:TABS.DAILY,health:TABS.HEALTH,fight:TABS.FIGHT,transport:TABS.TRANSPORT,trial:TABS.TRIAL,actlog:TABS.ACTLOG};
@@ -680,7 +715,7 @@ function openAddHistEntry(type,date){
   let flds='';
   if(type==='health')flds=df+'<div class="fr"><div class="f"><label>Category</label><input class="fi" id="ef_cat"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc"></textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next"></div>'+prv;
   else if(type==='fight')flds='<div class="fr">'+df+'<div class="f"><label>Time</label><input class="fi" type="time" id="ef_time"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue"></textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev"></div>'+prv;
-  else if(type==='transport')flds='<div class="fr">'+df+'<div class="f"><label>Transporter</label><input class="fi" id="ef_trn"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv"></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from"></div><div class="f"><label>To</label><input class="fi" id="ef_to"></div></div>'+prv;
+  else if(type==='transport'){const jtypeOpts2=['Drop-off','Pick-up','Both'].map(o=>'<option>'+o+'</option>').join('');flds='<div class="fr">'+df+'<div class="f"><label>Transporter</label><input class="fi" id="ef_trn"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv"></div><div class="f"><label>Plate</label><input class="fi" id="ef_plate"></div></div><div class="fr"><div class="f"><label>Journey type</label><select class="fs" id="ef_jtype">'+jtypeOpts2+'</select></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_ttime"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from"></div><div class="f"><label>To</label><input class="fi" id="ef_to"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes"></div>'+prv;}
   else if(type==='trial'){const opts=['Suitable','Partial','Not Suitable'].map(o=>'<option>'+o+'</option>').join('');const dogOpts=allDogs.filter(d=>d.cid!==curDog.cid).map(d=>'<option value="'+d.name+'">').join('');flds='<div class="fr">'+df+'<div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+opts+'</select></div></div><div class="f"><label>Mixed with (dog names)</label><input class="fi" id="ef_mixed" list="mixedDogList" placeholder="e.g. Bertie, Daisy (comma-separated)"><datalist id="mixedDogList">'+dogOpts+'</datalist></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs"></textarea></div>'+prv;}
   else return;
   document.getElementById('editModalBody').innerHTML=warn+flds+ss;
@@ -693,7 +728,7 @@ async function doAdd(type){
   let vals=[];
   if(type==='health')vals=rowFromMap(healthHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Owner:curDog.owner||'',Issue:gv('ef_issue'),Category:gv('ef_cat'),Location:'',Importance:'',Description:gv('ef_desc'),RootCause:'',NextStep:gv('ef_next'),Private:priv},TABS.HEALTH.h);
   else if(type==='fight')vals=rowFromMap(fightHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Time:gv('ef_time'),Owner:curDog.owner||'',OtherDogs:'',Issue:gv('ef_issue'),Importance:'',Injuries:'',Treatment:'',Prevention:gv('ef_prev'),Private:priv},TABS.FIGHT.h);
-  else if(type==='transport')vals=rowFromMap(transportHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Transporter:gv('ef_trn'),Vehicle:gv('ef_trv'),Plate:'',JourneyType:'',Time:'',Notes:gv('ef_notes'),Private:priv,From:gv('ef_from'),To:gv('ef_to')},TABS.TRANSPORT.h);
+  else if(type==='transport')vals=rowFromMap(transportHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,Transporter:gv('ef_trn'),Vehicle:gv('ef_trv'),Plate:gv('ef_plate'),JourneyType:gv('ef_jtype'),Time:gv('ef_ttime'),Notes:gv('ef_notes'),Private:priv,From:gv('ef_from'),To:gv('ef_to')},TABS.TRANSPORT.h);
   else if(type==='trial')vals=rowFromMap(trialHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:date,MixedWith:gv('ef_mixed'),Observations:gv('ef_obs'),Suitable:gv('ef_suit'),Private:priv},TABS.TRIAL.h);
   else{st.textContent='Unknown type';st.className='smsg err';return;}
   try{await appendRow(tm[type],vals);histCache={};st.textContent='Added!';st.className='smsg ok';setTimeout(()=>{document.getElementById('editModal').classList.remove('open');if(curDog)filtHist(document.querySelector('.hfb.active')?.dataset?.type||'all');},1600);}
@@ -904,7 +939,7 @@ function addSvcLine(){
   const rateEl=document.getElementById('ml_rate');const manualRate=parseFloat(rateEl?.value)||0;
   const r=getRates();const autoRate=subDef?r[subDef.rk]||0:0;
   const line={svc,sub,rka:subDef?.rka||null,dogs,sd,ed:isDate?document.getElementById('ml_ed')?.value||'':sd,st2:document.getElementById('ml_st')?.value||'09:00',et:document.getElementById('ml_et')?.value||'18:00',rate:manualRate||autoRate,qty};
-  _svcLines.push(line);renderSvcLines();calcMultiQ();
+  _svcLines.push(line);renderSvcLines();calcMultiQ();autoGenPayRef();
   if(rateEl)rateEl.value='';const qtyEl=document.getElementById('ml_qty');if(qtyEl)qtyEl.value='1';
 }
 function addExtraCost(){document.getElementById('ml_extra_wrap').style.display=document.getElementById('ml_extra_wrap').style.display==='none'?'block':'none';}
@@ -952,8 +987,8 @@ function calcMultiQ(){
         const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));
         const exHrs=hrs-nights*24;
         const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;
-        let d=new Date(l.sd+'T12:00:00');const endD=new Date(l.ed+'T12:00:00');
-        while(d<endD){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
+        let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
+        for(let ni=0;ni<nights;ni++){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
         const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:r.board_hol;
         const mainAmt=(sN*stdR)+(hN*holR);
         amt=mainAmt;
@@ -1012,8 +1047,10 @@ function calcMultiQ(){
       const em='\uD83E\uDEB1';const allDogStr=dogs.join(' & ');
       if(l.sd&&l.ed){
         const holDates2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
-        let d2=new Date(l.sd+'T12:00:00');const endD2=new Date(l.ed+'T12:00:00');
-        while(d2<endD2){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
+        const dropDt2=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt2=new Date(l.ed+'T'+(l.et||'18:00'));
+        const hrs2=(pickDt2-dropDt2)/3600000;const nights2a=Math.max(1,Math.floor(hrs2/24));
+        let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
+        for(let ni=0;ni<nights2a;ni++){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
         const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:r.board_hol;
         const nights2=sN2+hN2;const mainAmt2=(sN2*stdR2)+(hN2*holR2);amt=mainAmt2;
         let dp2=em+' Dog Sit ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
@@ -1102,9 +1139,20 @@ function buildQDogMS(){
   c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);return'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
 }
 function _syncDogsToLines(){const ordered=_mainDog?[_mainDog,..._selDogs.filter(n=>n!==_mainDog)]:[..._selDogs];_svcLines.forEach(l=>{if(l.svc!=='extra'&&l.svc!=='taxi')l.dogs=[...ordered];});}
-function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';_syncDogsToLines();buildQDogMS();buildMainDogBtns();calcMultiQ();}
+function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';_syncDogsToLines();buildQDogMS();buildMainDogBtns();calcMultiQ();
+  const dogData=allDogs.find(d=>d.name===(_mainDog||_selDogs[0]||''));if(dogData){const ownerEl=document.getElementById('q_owner');if(ownerEl&&!ownerEl.value)ownerEl.value=dogData.owner||'';}
+  autoGenPayRef();
+}
 function buildMainDogBtns(){const w=document.getElementById('q_main_dog_wrap');const c=document.getElementById('q_main_dog_btns');if(!w||!c)return;if(_selDogs.length<=1){w.style.display='none';_mainDog=_selDogs[0]||'';return;}w.style.display='block';c.innerHTML=_selDogs.map((n,i)=>'<button class="main-dog-pill'+(_mainDog===n?' active':'')+'" onclick="setMainDog('+i+')">* '+n+'</button>').join('');}
-function setMainDog(i){_mainDog=_selDogs[i];_syncDogsToLines();buildMainDogBtns();calcMultiQ();}
+function setMainDog(i){_mainDog=_selDogs[i];_syncDogsToLines();buildMainDogBtns();calcMultiQ();autoGenPayRef();}
+function autoGenPayRef(){
+  const names=(_selDogs.length?_selDogs:[_mainDog]).filter(Boolean).map(n=>n.replace(/\s+/g,'')).join('');
+  const lines=_svcLines.filter(l=>l.sd);
+  const d=lines.length?new Date(lines[0].sd+'T12:00:00'):new Date();
+  const mm=String(d.getMonth()+1).padStart(2,'0');const yy=String(d.getFullYear()).slice(-2);
+  const ref=names+mm+yy;
+  const el=document.getElementById('q_payref');if(el&&!el._userEdited)el.value=ref;
+}
 function _computeDogRevMap(){
   const r=getRates();const map={};
   const add=(name,a)=>{if(name&&a>0)map[name]=Math.round(((map[name]||0)+a)*100)/100;};
@@ -1116,8 +1164,8 @@ function _computeDogRevMap(){
       const drop=new Date(l.sd+'T'+(l.st2||'09:00')),pick=new Date(l.ed+'T'+(l.et||'18:00'));
       const hrs=(pick-drop)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
       const hd=getHolDates(l.sd,l.ed);let hN=0,sN=0;
-      let d=new Date(l.sd+'T12:00:00');const eD=new Date(l.ed+'T12:00:00');
-      while(d<eD){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
+      let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
+      for(let ni=0;ni<nights;ni++){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
       let mAmt=(sN*r.board_std)+(hN*r.board_hol);
       if(exHrs>0){const bn=sN>0?r.board_std:r.board_hol;mAmt+=exHrs<8?Math.round(bn*0.5*100)/100:bn;}
       add(main,mAmt);addDogs.forEach(dog=>add(dog,(sN*r.board_add)+(hN*r.board_addh)));
@@ -1130,8 +1178,10 @@ function _computeDogRevMap(){
       add(main,mr);addDogs.forEach(dog=>add(dog,ar));
     }else if(l.svc==='dogsit'&&l.sd&&l.ed){
       const hd2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
-      let d2=new Date(l.sd+'T12:00:00');const eD2=new Date(l.ed+'T12:00:00');
-      while(d2<eD2){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
+      const dropDtDs=new Date(l.sd+'T'+(l.st2||'09:00')),pickDtDs=new Date(l.ed+'T'+(l.et||'18:00'));
+      const hrsDs=(pickDtDs-dropDtDs)/3600000;const nightsDs=Math.max(1,Math.floor(hrsDs/24));
+      let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
+      for(let ni=0;ni<nightsDs;ni++){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
       add(main,(sN2*r.board_std)+(hN2*r.board_hol));
     }else if(l.rate){const qty=l.qty||1;add(main,(l.rate||0)*qty);}
   });
@@ -1286,6 +1336,7 @@ async function markBookingsQuotedFromQuote(){
 }
 async function createBookingsFromQuote(){
   if(!_svcLines.length){alert('Complete the quote first');return;}
+  if(_bkSaving)return;_bkSaving=true;
   calcMultiQ();
   const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training',extra:'Extra'};
   const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
@@ -1310,6 +1361,7 @@ async function createBookingsFromQuote(){
       try{await appendRow(TABS.BK,vals);const mv=[...vals];mv[1]=dogName;bookings.push(mapBk(mv,bookings.length,mkHdr(bkHdrRow)));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
   }
+  _bkSaving=false;
   if(created){renderBoard();alert(created+' booking'+(created>1?'s':'')+' created with revenue pre-filled. Check Bookings to adjust.');}
 }
 function quoteFromBk(){
@@ -1348,15 +1400,30 @@ function openBkModal(editId=null,fromProf=false){
 // ==================== WORKFLOW CHECKLIST (stored on Bookings sheet) ====================
 function wfAutoLogs(bk){
   if(!bk||!bk.sd)return null;
+  if(bk.wf&&bk.wf.dailyLogs)return true;
   const today=todayStr();const endD=bk.ed&&bk.ed<today?bk.ed:(()=>{const y=new Date(today+'T12:00:00Z');y.setUTCDate(y.getUTCDate()-1);return y.toISOString().slice(0,10);})();
-  if(bk.sd>endD)return true; // booking hasn't started or is today only
+  if(bk.sd>endD)return true;
   let d=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');
   while(d<=end){const ds=d.toISOString().slice(0,10);if(!dailyLogSet.has(bk.customerId+'_'+ds))return false;d.setUTCDate(d.getUTCDate()+1);}
   return true;
 }
 function wfAutoCompat(bk){
   if(!bk||!bk.dog)return null;
-  return trialLogs.some(t=>(bk.customerId&&t.cid?t.cid===bk.customerId:t.dog.toLowerCase()===bk.dog.toLowerCase())&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd));
+  if(bk.wf&&bk.wf.compat)return true;
+  const bkCid=bk.customerId||'';const bkDog=(bk.dog||'').toLowerCase();
+  return trialLogs.some(t=>{
+    const tDog=(t.dog||'').toLowerCase();const tCid=t.cid||'';
+    const mixedParts=(t.mixedWith||'').split(/[,;]+/).map(s=>s.trim().toLowerCase());
+    const isPrimary=bkCid?tCid===bkCid:tDog===bkDog;
+    const isMixed=mixedParts.some(m=>m===bkDog||(bkCid&&m.includes(bkCid.toLowerCase())));
+    return (isPrimary||isMixed)&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd);
+  });
+}
+async function persistAutoWf(bk,key){
+  if(!bk||!bk.ri)return;
+  const updated={...bk.wf,[key]:'auto'};
+  const vals=rowFromMap(bkHdrRow,bkFieldMap({...bk,wf:updated}),TABS.BK.h);
+  try{await updateRow(TABS.BK,bk.ri,vals);bk.wf[key]='auto';const idx=bookings.findIndex(b=>b.id===bk.id);if(idx>=0)bookings[idx].wf[key]='auto';}catch(e){}
 }
 function wfStepValue(bk,key){
   const sv=bk.wf||{};
@@ -1399,6 +1466,9 @@ function renderWfChecklist(){
   const eid=document.getElementById('bm_eid')?.value;
   if(!eid){c.innerHTML='<div style="font-size:9px;color:var(--gr3);">Save the booking first to track its workflow checklist.</div>';return;}
   const bk=bookings.find(b=>b.id===eid);if(!bk)return;
+  // Persist auto-computed WF fields if newly true
+  const autoLogsVal=wfAutoLogs(bk);if(autoLogsVal===true&&!bk.wf?.dailyLogs)persistAutoWf(bk,'dailyLogs').catch(()=>{});
+  const autoCompatVal=wfAutoCompat(bk);if(autoCompatVal===true&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
   const rows=WF_STEPS.map(s=>{
     const v=wfStepValue(bk,s.k);
     const auto=(s.k==='logs'||s.k==='compat')&&(bk.wf?.[s.k]===undefined||bk.wf?.[s.k]==='');
@@ -1434,39 +1504,45 @@ function renderOverlapCheck(){
   const seen=new Set();const names=overlaps.filter(b=>{const k=b.customerId||b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
   const dogEsc=(dog||'').replace(/'/g,"\\'");
   const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log full Trial-Log entry</button>':'';
+  const bk=dogObj?bookings.find(b=>b.id===eid):null;
   c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">⚠️ Other dogs staying during this period — log how they got on:</div>'+
     names.map(b=>{
       const mixedLabel=(b.customerId?b.customerId+' ':'') +b.dog;
       const mEsc=mixedLabel.replace(/'/g,"\\'");
+      const existingLog=trialLogs.find(t=>{
+        const tDog=(t.dog||'').toLowerCase();const tCid=t.cid||'';
+        const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
+        const isPrimary=dogObj?tCid===dogObj.cid:false;
+        const isMixed=mixedParts.some(m=>m.includes((b.dog||'').toLowerCase())||(b.customerId&&m.includes(b.customerId.toLowerCase())));
+        return (isPrimary||isMixed)&&t.date>=(bk?bk.sd:sd)&&t.date<=(bk?bk.ed||bk.sd:ed||sd);
+      });
+      const curResult=existingLog?.suitable||'';
+      const opts=[{v:'Friends',e:'🥰'},{v:'Good',e:'😊'},{v:'Ignore',e:'😐'},{v:'Not Good',e:'😒'},{v:'Fight',e:'😡'},{v:'Did not meet',e:'🚶'}];
+      const btns=opts.map(o=>{
+        const sel=curResult===o.v;
+        const col=o.v==='Friends'||o.v==='Good'?'var(--gn)':o.v==='Ignore'?'var(--gr2)':o.v==='Did not meet'?'var(--or)':'var(--rd)';
+        return '<button type="button" style="font-size:9px;padding:3px 7px;border-radius:99px;border:1.5px solid '+(sel?col:'var(--gr4)')+';background:'+(sel?col:'transparent')+';color:'+(sel?'#fff':'var(--gr2)')+';cursor:pointer;" onclick="logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',\''+o.v+'\',\'\')">'+o.e+' '+o.v+'</button>';
+      }).join('');
       return '<div style="padding:5px 0;border-bottom:1px solid var(--gr4);">'
         +'<div style="font-size:11px;font-weight:600;color:var(--bk);">'+b.dog+(b.customerId?' <span style="font-size:9px;color:var(--gr3);">'+b.customerId+'</span>':'')+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</div>'
-        +'<div style="display:flex;gap:8px;margin-top:3px;align-items:center;flex-wrap:wrap;">'
-        +'<label style="display:flex;align-items:center;gap:4px;font-size:10px;cursor:pointer;"><input type="checkbox" onchange="if(this.checked)logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',true,\'\');" style="width:13px;height:13px;accent-color:var(--gn);">👍 Happy together</label>'
-        +'<button type="button" class="sbtn2" style="font-size:9px;padding:3px 8px;" onclick="logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',\'no_meet\',\'\')">🚶 Didn\'t meet</button>'
-        +'<button type="button" class="sbtn2" style="font-size:9px;padding:3px 8px;" onclick="toggleCompatNotes(this)">⚠️ Didn\'t get on</button>'
-        +'</div>'
-        +'<div class="compatNotes" style="display:none;margin-top:4px;"><textarea class="fta" style="min-height:40px;font-size:10px;" placeholder="What happened?"></textarea><button type="button" class="sbtn2" style="font-size:9px;margin-top:3px;" onclick="logCompatNotes(this,\''+dogEsc+'\',\''+mEsc+'\')">Save</button></div>'
+        +'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">'+btns+'</div>'
         +'</div>';
     }).join('')+logBtn;
 }
-function toggleCompatNotes(btn){
-  const box=btn.parentElement.nextElementSibling;
-  box.style.display=box.style.display==='none'?'block':'none';
-}
-async function logCompatResult(dog,mixedDog,happy,notes){
-  const dogObj=allDogs.find(d=>d.name===dog);if(!dogObj)return;
-  const today=todayStr();const suitable=happy===true?'Suitable':happy===false?'Not Suitable':'No interaction';const obs=notes||(happy===true?'Happy together':happy===false?'':'Didn\'t meet');
+async function logCompatResult(dogName,mixedLabel,result,notes){
+  const dogObj=allDogs.find(d=>d.name===dogName);if(!dogObj)return;
+  const today=todayStr();
+  const suitMap={'Friends':'Friends','Good':'Good','Ignore':'Ignore','Not Good':'Not Good','Fight':'Fight','Did not meet':'Did not meet'};
+  const suitable=suitMap[result]||result;
+  const obs=notes||(result==='Friends'?'Happy together':result==='Fight'?'Fought':result==='Did not meet'?'Did not meet':'');
+  const row=rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dogObj.name,Date:today,MixedWith:mixedLabel,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
   try{
-    await appendRow(TABS.TRIAL,rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dog,Date:today,MixedWith:mixedDog,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h));
-    trialLogs.push({cid:dogObj.cid,dog,date:today,mixedWith:mixedDog,obs,suitable});
-  }catch(e){alert('Could not save to Google Sheet (check internet connection): '+e.message+'\nPlease try again.');return;}
+    await appendRow(TABS.TRIAL,row);
+    trialLogs.push({cid:dogObj.cid,dog:dogObj.name,date:today,mixedWith:mixedLabel,obs,suitable,ri:trialLogs.length+2});
+    const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
+    if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
+  }catch(e){alert('Error saving: '+e.message);}
   renderOverlapCheck();renderWfChecklist();updatePendingBadge();
-}
-function logCompatNotes(btn,dog,mixedDog){
-  const ta=btn.previousElementSibling;
-  const obs=ta.value.trim();
-  if(!obs){alert('Please add notes about what happened.');return;}
-  logCompatResult(dog,mixedDog,false,obs);
 }
 function updateDogIdHint(){const n=document.getElementById('bm_dog').value;const d=allDogs.find(x=>x.name===n);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
 function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;const isCancelled=v==='Cancelled';const isCompleted=v==='Completed';steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';el.style.opacity='';if(isCancelled){el.style.opacity='0.3';return;}if(isCompleted){el.classList.add('fsdone');return;}if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});const cancelEl=document.getElementById('bsf_cancelled');const completeEl=document.getElementById('bsf_completed');if(cancelEl)cancelEl.style.display=isCancelled?'inline-block':'none';if(completeEl)completeEl.style.display=isCompleted?'inline-block':'none';
@@ -1485,6 +1561,7 @@ function calcRover(){const rev=parseFloat(document.getElementById('bm_rev').valu
 function toggleRover(){const isR=document.getElementById('bm_channel').value==='Rover';document.getElementById('bm_rover_row').style.display=isR?'grid':'none';if(isR)calcRover();}
 async function saveBk(){
   const dog=document.getElementById('bm_dog').value;if(!dog){alert('Select a dog');return;}
+  if(_bkSaving)return;_bkSaving=true;
   const btn=document.getElementById('bkBtn');const st=document.getElementById('bkStatus');btn.disabled=true;btn.textContent='Saving...';
   const eid=document.getElementById('bm_eid').value;let ri=parseInt(document.getElementById('bm_ridx').value)||null;
   if(eid&&!ri){const existing=bookings.find(b=>b.id===eid);if(existing?.ri)ri=existing.ri;}
@@ -1499,7 +1576,7 @@ async function saveBk(){
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
     const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
     st.textContent='Saved!';st.className='smsg ok';setTimeout(()=>{document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();renderBoard();updatePendingBadge();},1400);
-  }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';}
+  }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';_bkSaving=false;}
 }
 function confirmDeleteBk(){const eid=document.getElementById('bm_eid').value;const ri=parseInt(document.getElementById('bm_ridx').value)||null;_delBkId=eid;_delBkRi=ri;document.getElementById('deleteBkInput').value='';document.getElementById('deleteBkConfirm').classList.add('open');}
 async function doDeleteBk(){
