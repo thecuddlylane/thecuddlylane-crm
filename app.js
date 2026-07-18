@@ -1523,19 +1523,19 @@ function renderOverlapCheck(){
     names.map(b=>{
       const mixedLabel=(b.customerId?b.customerId+' ':'') +b.dog;
       const mEsc=mixedLabel.replace(/'/g,"\\'");
-      const existingLog=trialLogs.find(t=>{
-        const tDog=(t.dog||'').toLowerCase();const tCid=t.cid||'';
+      const existingLog=[...trialLogs].reverse().find(t=>{
+        const tCid=t.cid||'';
         const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
-        const isPrimary=dogObj?tCid===dogObj.cid:false;
-        const isMixed=mixedParts.some(m=>m.includes((b.dog||'').toLowerCase())||(b.customerId&&m.includes(b.customerId.toLowerCase())));
-        return (isPrimary||isMixed)&&t.date>=(bk?bk.sd:sd)&&t.date<=todayStr();
+        const matchesPrimary=dogObj?tCid===dogObj.cid:(t.dog||'').toLowerCase()===(dog||'').toLowerCase();
+        const matchesMixed=mixedParts.some(m=>m.includes((b.dog||'').toLowerCase())||(b.customerId&&m.includes(b.customerId.toLowerCase())));
+        return matchesPrimary&&matchesMixed;
       });
       const curResult=existingLog?.suitable||'';
       const opts=[{v:'Friends',e:'🥰'},{v:'Good',e:'😊'},{v:'Ignore',e:'😐'},{v:'Not Good',e:'😒'},{v:'Fight',e:'😡'},{v:'Did not meet',e:'🚶'}];
       const btns=opts.map(o=>{
         const sel=curResult===o.v;
         const col=o.v==='Friends'||o.v==='Good'?'var(--gn)':o.v==='Ignore'?'var(--gr2)':o.v==='Did not meet'?'var(--or)':'var(--rd)';
-        return '<button type="button" style="font-size:9px;padding:3px 7px;border-radius:99px;border:1.5px solid '+(sel?col:'var(--gr4)')+';background:'+(sel?col:'transparent')+';color:'+(sel?'#fff':'var(--gr2)')+';cursor:pointer;" onclick="logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',\''+o.v+'\',\'\')">'+o.e+' '+o.v+'</button>';
+        return '<button type="button" style="font-size:9px;padding:3px 7px;border-radius:99px;border:1.5px solid '+(sel?col:'var(--gr4)')+';background:'+(sel?col:'transparent')+';color:'+(sel?'#fff':'var(--gr2)')+';cursor:pointer;" onclick="logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',\''+o.v+'\',\'\',\''+sd+'\')">'+o.e+' '+o.v+'</button>';
       }).join('');
       return '<div style="padding:5px 0;border-bottom:1px solid var(--gr4);">'
         +'<div style="font-size:11px;font-weight:600;color:var(--bk);">'+b.dog+(b.customerId?' <span style="font-size:9px;color:var(--gr3);">'+b.customerId+'</span>':'')+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</div>'
@@ -1543,24 +1543,40 @@ function renderOverlapCheck(){
         +'</div>';
     }).join('')+logBtn;
 }
-async function logCompatResult(dogName,mixedLabel,result,notes){
+async function logCompatResult(dogName,mixedLabel,result,notes,logDate){
   const dogObj=allDogs.find(d=>d.name===dogName);if(!dogObj)return;
-  const today=todayStr();
+  const today=logDate||todayStr();
   const suitMap={'Friends':'Friends','Good':'Good','Ignore':'Ignore','Not Good':'Not Good','Fight':'Fight','Did not meet':'Did not meet'};
   const suitable=suitMap[result]||result;
   const obs=notes||(result==='Friends'?'Happy together':result==='Fight'?'Fought':result==='Did not meet'?'Did not meet':'');
-  const entry={cid:dogObj.cid,dog:dogObj.name,date:today,mixedWith:mixedLabel,obs,suitable,ri:trialLogs.length+2};
-  trialLogs.push(entry);
-  renderOverlapCheck();renderWfChecklist();
   const row=rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dogObj.name,Date:today,MixedWith:mixedLabel,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
-  try{
-    await appendRow(TABS.TRIAL,row);
-    const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
-    if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
-  }catch(e){
-    const idx=trialLogs.indexOf(entry);if(idx>=0)trialLogs.splice(idx,1);
+  const existing=trialLogs.find(t=>t.cid===dogObj.cid&&(t.mixedWith||'').trim().toLowerCase()===(mixedLabel||'').trim().toLowerCase()&&t.date===today);
+  if(existing){
+    const prevSuitable=existing.suitable;const prevObs=existing.obs;
+    existing.suitable=suitable;existing.obs=obs;
     renderOverlapCheck();renderWfChecklist();
-    alert('Error saving: '+e.message);
+    try{
+      await updateRow(TABS.TRIAL,existing.ri,row);
+      const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
+      if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
+    }catch(e){
+      existing.suitable=prevSuitable;existing.obs=prevObs;
+      renderOverlapCheck();renderWfChecklist();
+      alert('Error saving: '+e.message);
+    }
+  }else{
+    const entry={cid:dogObj.cid,dog:dogObj.name,date:today,mixedWith:mixedLabel,obs,suitable,ri:trialLogs.length+2};
+    trialLogs.push(entry);
+    renderOverlapCheck();renderWfChecklist();
+    try{
+      await appendRow(TABS.TRIAL,row);
+      const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
+      if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
+    }catch(e){
+      const idx=trialLogs.indexOf(entry);if(idx>=0)trialLogs.splice(idx,1);
+      renderOverlapCheck();renderWfChecklist();
+      alert('Error saving: '+e.message);
+    }
   }
   updatePendingBadge();
 }
