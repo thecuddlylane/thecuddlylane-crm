@@ -1403,7 +1403,13 @@ function openBkModal(editId=null,fromProf=false){
     ['bm_rev','bm_tips','bm_prepay','bm_final','bm_unit','bm_disc_notes','bm_drop_loc','bm_pick_loc','bm_rating','bm_feedback','bm_ref','bm_prepay_ref','bm_final_ref'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('bm_rpct').value='15';document.getElementById('bm_sd').value=todayStr();document.getElementById('bm_ed').value=todayStr();document.getElementById('bm_channel').value='TCL';document.getElementById('bm_pay').value='';document.getElementById('bm_status').value='Quoted';document.getElementById('bm_priv').checked=false;
   }
-  calcBal();toggleRover();updateStatusFlow();renderOverlapCheck();renderWfChecklist();modal.classList.add('open');
+  calcBal();toggleRover();updateStatusFlow();renderOverlapCheck();renderWfChecklist();switchBkTab(1);modal.classList.add('open');
+}
+function switchBkTab(n){
+  document.getElementById('bkTab1').style.display=n===1?'':'none';
+  document.getElementById('bkTab2').style.display=n===2?'':'none';
+  document.getElementById('bkTabBtn1').classList.toggle('bk-tab-active',n===1);
+  document.getElementById('bkTabBtn2').classList.toggle('bk-tab-active',n===2);
 }
 // ==================== WORKFLOW CHECKLIST (stored on Bookings sheet) ====================
 function wfAutoLogs(bk){
@@ -1522,7 +1528,7 @@ function renderOverlapCheck(){
         const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
         const isPrimary=dogObj?tCid===dogObj.cid:false;
         const isMixed=mixedParts.some(m=>m.includes((b.dog||'').toLowerCase())||(b.customerId&&m.includes(b.customerId.toLowerCase())));
-        return (isPrimary||isMixed)&&t.date>=(bk?bk.sd:sd)&&t.date<=(bk?bk.ed||bk.sd:ed||sd);
+        return (isPrimary||isMixed)&&t.date>=(bk?bk.sd:sd)&&t.date<=todayStr();
       });
       const curResult=existingLog?.suitable||'';
       const opts=[{v:'Friends',e:'🥰'},{v:'Good',e:'😊'},{v:'Ignore',e:'😐'},{v:'Not Good',e:'😒'},{v:'Fight',e:'😡'},{v:'Did not meet',e:'🚶'}];
