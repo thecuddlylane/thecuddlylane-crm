@@ -37,7 +37,9 @@ const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\
 let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],trialLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='',dailyLogSet=new Set(),dogsHdrRow=[],bkHdrRow=[],dailyHdrRow=[],trialHdrRow=[],actlogHdrRow=[],costsHdrRow=[],healthHdrRow=[],fightHdrRow=[],transportHdrRow=[],actsHdrRow=[];
 const WF_STEPS=[
   {k:'whatsapp',l:'WhatsApp group created'},
-  {k:'prep',l:'Docs requested / Consent sent / Packing list sent'},
+  {k:'docsReq',l:'Send docs request'},
+  {k:'consentSent',l:'Send consent'},
+  {k:'packingList',l:'Send packing list'},
   {k:'docsReceived',l:'Docs received'},
   {k:'consentSigned',l:'Consent signed'},
   {k:'finalpay',l:'Final payment reminder sent'},
@@ -116,7 +118,7 @@ async function doCreateSheet(){
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
     {n:TABS.DOGS,h:['CustomerID','DogName','Breed','GenderStatus','Birthday','BirthdayType','Weight','ChipID','Rescue','Nervous','SepAnxiety','Jogging','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','Motivation','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','VaccinationURL','PhotoURL']},
-    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_Prep','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','WF_DailyLogs','WF_Compat','BookingRef','PrepaymentRef','FinalPaymentRef']},
+    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_PackingList','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','WF_DailyLogs','WF_Compat','WF_DocsReq','WF_ConsentSent','BookingRef','PrepaymentRef','FinalPaymentRef']},
     {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','BeforeSleep','Game','Bowl','Room','Garment','Notes','Private']},
     {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','','NextStep','Private']},
     {n:TABS.FIGHT,h:['CustomerID','DogName','Date','Time','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
@@ -158,10 +160,16 @@ function bkWfPendingItems(bk){
   const items=[];
   if(bk.status==='Prepaid'){
     if(!wfStepValue(bk,'whatsapp'))items.push({key:'whatsapp',label:'WhatsApp group created'});
-    if(!wfStepValue(bk,'prep'))items.push({key:'prep',label:'Send Docs request / Consent / Packing list'});
+    if(!wfStepValue(bk,'docsReq'))items.push({key:'docsReq',label:'Send docs request'});
+    if(!wfStepValue(bk,'consentSent'))items.push({key:'consentSent',label:'Send consent'});
   }
-  if(wfStepValue(bk,'prep')){
+  if(bk.sd&&today>=addDays(bk.sd,-14)){
+    if(!wfStepValue(bk,'packingList'))items.push({key:'packingList',label:'Send packing list'});
+  }
+  if(wfStepValue(bk,'docsReq')){
     if(!wfStepValue(bk,'docsReceived'))items.push({key:'docsReceived',label:'Docs received'});
+  }
+  if(wfStepValue(bk,'consentSent')){
     if(!wfStepValue(bk,'consentSigned'))items.push({key:'consentSigned',label:'Consent signed'});
   }
   if(bk.sd&&today>=addDays(bk.sd,-2)){
@@ -188,7 +196,7 @@ function computePendingActions(){
     bks.forEach(bk=>{const endD=bk.ed&&bk.ed<today?bk.ed:yesterday;if(bk.sd>endD)return;let dt=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');while(dt<=end){const ds=dt.toISOString().slice(0,10);if(!dailyLogSet.has(d.cid+'_'+ds))missingSet.add(ds);dt.setUTCDate(dt.getUTCDate()+1);}});
     if(missingSet.size)missingLogs.push({dog:d,dates:[...missingSet].sort()});
   });
-  const pendingCompletion=bookings.filter(b=>!b.priv&&b.ed&&b.ed<today&&!['Cancelled','Canceled','Completed'].includes(b.status));
+  const pendingCompletion=bookings.filter(b=>!b.priv&&b.ed&&b.ed<today&&!['Cancelled','Canceled','Completed'].includes(b.status)&&!wfCompletion(b).allDone);
   const wfTasks=[];
   bookings.filter(b=>!b.priv&&!['Cancelled','Canceled','Completed'].includes(b.status)).forEach(b=>{
     bkWfPendingItems(b).forEach(item=>wfTasks.push({bk:b,...item}));
@@ -414,7 +422,7 @@ function mapBk(r,i,h){
     ch:rv('Channel')||'TCL',pay:rv('Payment'),status:rv('Status'),
     priv:rv('Private')==='Private',month:rv('Month'),rating:rv('Rating'),feedback:rv('Feedback'),
     rem:[rv('Rem1'),rv('Rem2'),rv('Rem3'),rv('Rem4'),rv('Rem5')],
-    wf:{whatsapp:rv('WF_WhatsApp'),prep:rv('WF_Prep'),docsReceived:rv('WF_DocsReceived'),
+    wf:{whatsapp:rv('WF_WhatsApp'),docsReq:rv('WF_DocsReq'),consentSent:rv('WF_ConsentSent'),packingList:rv('WF_PackingList'),docsReceived:rv('WF_DocsReceived'),
       consentSigned:rv('WF_ConsentSigned'),dropoff:rv('WF_DropoffReminder'),
       pickup:rv('WF_PickupReminder'),finalpay:rv('WF_FinalPayReminder'),
       reviewReq:rv('WF_ReviewRequest'),review:rv('WF_Review'),
@@ -422,7 +430,7 @@ function mapBk(r,i,h){
     bookingRef:rv('BookingRef'),prepayRef:rv('PrepaymentRef'),finalPayRef:rv('FinalPaymentRef'),
     ri:i+2};
 }
-function bkFieldMap(bk){const rem=bk.rem||['','','','','']; const wf=bk.wf||{};return{CustomerID:bk.customerId,DogName:bk.dog,ID:bk.id,ServiceType:bk.svc,StartDate:bk.sd,StartTime:bk.st,EndDate:bk.ed,EndTime:bk.et,DropoffLocation:bk.dropLoc,PickupLocation:bk.pickLoc,Revenue:bk.rev,Tips:bk.tips,Prepayment:bk.prepay,FinalPayment:bk.finalPay,UnitCost:bk.unit,DiscountNotes:bk.discNotes,RoverCommissionPct:bk.roverPct,RoverCommissionGBP:bk.roverAmt,Channel:bk.ch,Payment:bk.pay,Status:bk.status,Private:bk.priv?'Private':'',Month:bk.month,Rating:bk.rating,Feedback:bk.feedback,Rem1:rem[0]||'',Rem2:rem[1]||'',Rem3:rem[2]||'',Rem4:rem[3]||'',Rem5:rem[4]||'',WF_WhatsApp:wf.whatsapp||'',WF_Prep:wf.prep||'',WF_DocsReceived:wf.docsReceived||'',WF_ConsentSigned:wf.consentSigned||'',WF_DropoffReminder:wf.dropoff||'',WF_PickupReminder:wf.pickup||'',WF_FinalPayReminder:wf.finalpay||'',WF_ReviewRequest:wf.reviewReq||'',WF_Review:wf.review||'',WF_DailyLogs:wf.dailyLogs||'',WF_Compat:wf.compat||'',BookingRef:bk.bookingRef||'',PrepaymentRef:bk.prepayRef||'',FinalPaymentRef:bk.finalPayRef||''};}
+function bkFieldMap(bk){const rem=bk.rem||['','','','','']; const wf=bk.wf||{};return{CustomerID:bk.customerId,DogName:bk.dog,ID:bk.id,ServiceType:bk.svc,StartDate:bk.sd,StartTime:bk.st,EndDate:bk.ed,EndTime:bk.et,DropoffLocation:bk.dropLoc,PickupLocation:bk.pickLoc,Revenue:bk.rev,Tips:bk.tips,Prepayment:bk.prepay,FinalPayment:bk.finalPay,UnitCost:bk.unit,DiscountNotes:bk.discNotes,RoverCommissionPct:bk.roverPct,RoverCommissionGBP:bk.roverAmt,Channel:bk.ch,Payment:bk.pay,Status:bk.status,Private:bk.priv?'Private':'',Month:bk.month,Rating:bk.rating,Feedback:bk.feedback,Rem1:rem[0]||'',Rem2:rem[1]||'',Rem3:rem[2]||'',Rem4:rem[3]||'',Rem5:rem[4]||'',WF_WhatsApp:wf.whatsapp||'',WF_PackingList:wf.packingList||'',WF_DocsReq:wf.docsReq||'',WF_ConsentSent:wf.consentSent||'',WF_DocsReceived:wf.docsReceived||'',WF_ConsentSigned:wf.consentSigned||'',WF_DropoffReminder:wf.dropoff||'',WF_PickupReminder:wf.pickup||'',WF_FinalPayReminder:wf.finalpay||'',WF_ReviewRequest:wf.reviewReq||'',WF_Review:wf.review||'',WF_DailyLogs:wf.dailyLogs||'',WF_Compat:wf.compat||'',BookingRef:bk.bookingRef||'',PrepaymentRef:bk.prepayRef||'',FinalPaymentRef:bk.finalPayRef||''};}
 function bkRowVals(bk){return rowFromMap(bkHdrRow,bkFieldMap(bk),TABS.BK.h);}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
