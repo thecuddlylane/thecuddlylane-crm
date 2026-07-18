@@ -1543,14 +1543,20 @@ async function logCompatResult(dogName,mixedLabel,result,notes){
   const suitMap={'Friends':'Friends','Good':'Good','Ignore':'Ignore','Not Good':'Not Good','Fight':'Fight','Did not meet':'Did not meet'};
   const suitable=suitMap[result]||result;
   const obs=notes||(result==='Friends'?'Happy together':result==='Fight'?'Fought':result==='Did not meet'?'Did not meet':'');
+  const entry={cid:dogObj.cid,dog:dogObj.name,date:today,mixedWith:mixedLabel,obs,suitable,ri:trialLogs.length+2};
+  trialLogs.push(entry);
+  renderOverlapCheck();renderWfChecklist();
   const row=rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dogObj.name,Date:today,MixedWith:mixedLabel,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
   try{
     await appendRow(TABS.TRIAL,row);
-    trialLogs.push({cid:dogObj.cid,dog:dogObj.name,date:today,mixedWith:mixedLabel,obs,suitable,ri:trialLogs.length+2});
     const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
     if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
-  }catch(e){alert('Error saving: '+e.message);}
-  renderOverlapCheck();renderWfChecklist();updatePendingBadge();
+  }catch(e){
+    const idx=trialLogs.indexOf(entry);if(idx>=0)trialLogs.splice(idx,1);
+    renderOverlapCheck();renderWfChecklist();
+    alert('Error saving: '+e.message);
+  }
+  updatePendingBadge();
 }
 function updateDogIdHint(){const n=document.getElementById('bm_dog').value;const d=allDogs.find(x=>x.name===n);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
 function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;const isCancelled=v==='Cancelled';const isCompleted=v==='Completed';steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';el.style.opacity='';if(isCancelled){el.style.opacity='0.3';return;}if(isCompleted){el.classList.add('fsdone');return;}if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});const cancelEl=document.getElementById('bsf_cancelled');const completeEl=document.getElementById('bsf_completed');if(cancelEl)cancelEl.style.display=isCancelled?'inline-block':'none';if(completeEl)completeEl.style.display=isCompleted?'inline-block':'none';
@@ -1829,13 +1835,7 @@ async function syncTplsFromSheet(){
   try{
     const rows=await readSheet(TABS.TPLS,'A2:D');
     const sheetTpls=rows.map(r=>({name:r[0]||'',cat:r[1]||'',content:r[2]||'',_updated:r[3]||''})).filter(t=>t.name);
-    // Push any local-only templates up to the sheet first (one-time migration).
-    // This prevents templates that were never synced from being wiped on read-back.
-    const localOnly=msgTpls.filter(t=>t.name&&!sheetTpls.some(s=>s.name===t.name));
-    for(const t of localOnly){await appendRow(TABS.TPLS,[t.name,t.cat||'',t.content||'',new Date().toISOString()]).catch(()=>{});}
-    // Sheet is now the single source of truth — full replace from sheet.
-    const allSheetTpls=localOnly.length?[...sheetTpls,...localOnly]:sheetTpls;
-    if(allSheetTpls.length){msgTpls=allSheetTpls;saveMsgTpls();}
+    msgTpls=sheetTpls;saveMsgTpls();
     renderTplHub();
   }catch(e){el.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
 }
