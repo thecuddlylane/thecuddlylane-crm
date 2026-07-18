@@ -1550,17 +1550,17 @@ async function logCompatResult(dogName,mixedLabel,result,notes,logDate){
   const suitable=suitMap[result]||result;
   const obs=notes||(result==='Friends'?'Happy together':result==='Fight'?'Fought':result==='Did not meet'?'Did not meet':'');
   const row=rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dogObj.name,Date:today,MixedWith:mixedLabel,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
-  const existing=trialLogs.find(t=>t.cid===dogObj.cid&&(t.mixedWith||'').trim().toLowerCase()===(mixedLabel||'').trim().toLowerCase()&&t.date===today);
+  const existing=trialLogs.find(t=>t.cid===dogObj.cid&&(t.mixedWith||'').trim().toLowerCase()===(mixedLabel||'').trim().toLowerCase());
   if(existing){
-    const prevSuitable=existing.suitable;const prevObs=existing.obs;
-    existing.suitable=suitable;existing.obs=obs;
+    const prevSuitable=existing.suitable;const prevObs=existing.obs;const prevDate=existing.date;
+    existing.suitable=suitable;existing.obs=obs;existing.date=today;
     renderOverlapCheck();renderWfChecklist();
     try{
       await updateRow(TABS.TRIAL,existing.ri,row);
       const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
       if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
     }catch(e){
-      existing.suitable=prevSuitable;existing.obs=prevObs;
+      existing.suitable=prevSuitable;existing.obs=prevObs;existing.date=prevDate;
       renderOverlapCheck();renderWfChecklist();
       alert('Error saving: '+e.message);
     }
