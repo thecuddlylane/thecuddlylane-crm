@@ -1433,20 +1433,23 @@ function wfAutoCompat(bk){
   const bkCid=bk.customerId||'';const bkDog=(bk.dog||'').toLowerCase();
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
   const qStart=new Date(bk.sd+'T00:00');const qEnd=new Date((bk.ed||bk.sd)+'T23:59');
-  const hasOverlaps=bookings.some(b=>{
+  const overlapBks=bookings.filter(b=>{
     if(b.id===bk.id||!active.includes(b.status)||!b.sd)return false;
     if(bkCid&&b.customerId===bkCid)return false;
     if(!bkCid&&(b.dog||'').toLowerCase()===bkDog)return false;
     const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
     return bS<qEnd&&bE>qStart;
   });
-  if(!hasOverlaps)return true;
-  return trialLogs.some(t=>{
-    const tDog=(t.dog||'').toLowerCase();const tCid=t.cid||'';
-    const mixedParts=(t.mixedWith||'').split(/[,;]+/).map(s=>s.trim().toLowerCase());
-    const isPrimary=bkCid?tCid===bkCid:tDog===bkDog;
-    const isMixed=mixedParts.some(m=>m===bkDog||(bkCid&&m.includes(bkCid.toLowerCase())));
-    return (isPrimary||isMixed)&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd);
+  if(!overlapBks.length)return false;
+  return overlapBks.every(b=>{
+    const mixedDog=(b.dog||'').toLowerCase();const mixedCid=b.customerId||'';
+    return trialLogs.some(t=>{
+      const tCid=t.cid||'';
+      const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
+      const matchesPrimary=bkCid?tCid===bkCid:(t.dog||'').toLowerCase()===bkDog;
+      const matchesMixed=mixedParts.some(m=>m.includes(mixedDog)||(mixedCid&&m.includes(mixedCid.toLowerCase())));
+      return matchesPrimary&&matchesMixed&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd);
+    });
   });
 }
 async function persistAutoWf(bk,key){
