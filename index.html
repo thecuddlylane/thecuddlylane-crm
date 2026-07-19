@@ -280,6 +280,7 @@ body{
 .bc-tr{background:var(--cnl);color:var(--cn);border:1px solid var(--orl);}
 .bc-tp{background:var(--gnl);color:var(--gn);border:1px solid #86EFAC;}
 .bc-ac{background:var(--pul);color:var(--pu);border:1px solid #C4B5FD;}
+.bc-an{background:var(--skl);color:var(--sk);border:1px solid #38BDF8;}
 /* TABLES */
 .tw{overflow-x:auto;margin-top:8px;border-radius:var(--r);border:1px solid var(--gr4);}
 table{width:100%;border-collapse:collapse;font-size:10px;}
@@ -441,7 +442,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v47b5</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v48b4</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -680,6 +681,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="bc bc-tr" onclick="showScreen('sc-training')"><div class="bci"><div class="bc-ico">📚</div><div class="bc-t">Staff Training</div><div class="bc-d">CPD &amp; Bristol export</div></div></div>
     <div class="bc bc-tp" onclick="showScreen('sc-templates')"><div class="bci"><div class="bc-ico">✉️</div><div class="bc-t">Templates</div><div class="bc-d">Shared message library</div></div></div>
     <div class="bc bc-ac" onclick="showScreen('sc-activities')"><div class="bci"><div class="bc-ico">🎯</div><div class="bc-t">Activities</div><div class="bc-d">Library &amp; smart picker</div></div></div>
+    <div class="bc bc-an" onclick="showScreen('sc-analysis')"><div class="bci"><div class="bc-ico">🔍</div><div class="bc-t">Analysis</div><div class="bc-d">Revenue, stay &amp; LTV trends</div></div></div>
   </div>
   <div style="padding:0 13px 18px;">
     <div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r2);padding:11px;">
@@ -760,7 +762,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="kpi"><div class="kpi-l">Cash Received</div><div class="kpi-v" id="kpi_rev">£0</div><div class="kpi-s" id="kpi_rev_s"></div></div>
       <div class="kpi"><div class="kpi-l">Achievement</div><div class="kpi-v" id="kpi_pct">0%</div><div class="kpi-s">vs target</div></div>
       <div class="kpi"><div class="kpi-l">Total Costs</div><div class="kpi-v" id="kpi_cost">£0</div><div class="kpi-s" id="kpi_cost_s"></div></div>
-      <div class="kpi"><div class="kpi-l">Net Profit</div><div class="kpi-v" id="kpi_net">£0</div><div class="kpi-s">After all costs</div></div>
+      <div class="kpi"><div class="kpi-l">Net Profit</div><div class="kpi-v" id="kpi_net" style="color:var(--gn);">£0</div><div class="kpi-s" id="kpi_net_s">After all costs</div></div>
     </div>
     <div class="fsec">Revenue &amp; Cost Trends</div>
     <div class="chart-w">
@@ -770,11 +772,31 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <div class="leg"><div class="leg-d" style="background:#FED7AA;border:1px solid #F97316;"></div>Rev Target</div>
         <div class="leg"><div class="leg-d" style="background:#1E40AF;"></div>Costs</div>
         <div class="leg"><div class="leg-d" style="background:#7DD3FC;border:1px solid #0284C7;"></div>Cost Target</div>
+        <div class="leg"><div class="leg-d" style="background:#16A34A;"></div>Net Profit</div>
+        <div class="leg"><div class="leg-d" style="background:#DCFCE7;border:1px solid #16A34A;"></div>Net Target</div>
       </div>
     </div>
     <div class="fsec">Monthly Targets &amp; Actuals</div>
-    <div class="tw" style="margin-bottom:11px;"><table><thead><tr><th>Month</th><th>Rev Target</th><th>Cost Target</th><th>Cash In</th><th>Actual Cost</th><th>Net</th></tr></thead><tbody id="plTbl"></tbody></table></div>
+    <div class="tw" style="margin-bottom:11px;"><table><thead><tr><th>Month</th><th>Rev Target</th><th>Cost Target</th><th>Net Target</th><th>Cash In</th><th>Actual Cost</th><th>Net</th></tr></thead><tbody id="plTbl"></tbody></table></div>
     <div class="srow"><button class="sbtn2" onclick="saveTargets()">Save Targets</button><span class="smsg" id="tgtStatus"></span></div>
+    <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- ANALYSIS -->
+<div class="screen" id="sc-analysis">
+  <div class="pg">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:7px;">
+      <div><div class="pg-t">Analysis</div><div class="pg-s">Trends &amp; insights</div></div>
+      <select class="fs" id="anYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="renderAnalysis()"><option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
+    </div>
+    <div class="fsec">Revenue by Service</div>
+    <div id="anRevBreakdown" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Average Stay Length <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding only)</span></div>
+    <div id="anAvgStay" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Occupancy Rate <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding nights / month)</span></div>
+    <div id="anOccupancy" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(All time · Top 10)</span></div>
+    <div id="anLTV" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div style="height:18px;"></div>
   </div>
 </div>

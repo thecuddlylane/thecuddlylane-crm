@@ -146,9 +146,9 @@ function showScreen(id,push=true){
   if(push)_stk.push(id);
   const isRoot=['sc-board','sc-quote','sc-business'].includes(id);
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
-  const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
+  const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -201,12 +201,14 @@ function computePendingActions(){
   bookings.filter(b=>!b.priv&&!['Cancelled','Canceled','Completed'].includes(b.status)).forEach(b=>{
     bkWfPendingItems(b).forEach(item=>wfTasks.push({bk:b,...item}));
   });
-  return{missingLogs,pendingCompletion,wfTasks};
+  const tm=localStorage.getItem('tcl_train_month')||'';const[tmMonth,tmHas]=tm.split(':');
+  const noTrainingThisMonth=tmMonth===today.slice(0,7)&&tmHas==='0';
+  return{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth};
 }
 function updatePendingBadge(){
   const b=document.getElementById('pendingBadge');if(!b)return;
-  const{missingLogs,pendingCompletion,wfTasks}=computePendingActions();
-  const n=missingLogs.length+pendingCompletion.length+wfTasks.length;
+  const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth}=computePendingActions();
+  const n=missingLogs.length+pendingCompletion.length+wfTasks.length+(noTrainingThisMonth?1:0);
   if(n){b.textContent=n;b.style.display='block';}else b.style.display='none';
 }
 function togglePendingPanel(){
@@ -220,8 +222,8 @@ async function quickToggleWf(bkId,key,checked){
 }
 function renderPendingPanel(){
   const el=document.getElementById('pending_results');if(!el)return;
-  const{missingLogs,pendingCompletion,wfTasks}=computePendingActions();
-  if(!missingLogs.length&&!pendingCompletion.length&&!wfTasks.length){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
+  const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth}=computePendingActions();
+  if(!missingLogs.length&&!pendingCompletion.length&&!wfTasks.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
   let html='';
   if(wfTasks.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">To-Do by Booking</div>';
@@ -234,6 +236,10 @@ function renderPendingPanel(){
   if(pendingCompletion.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Bookings Awaiting Completion</div>';
     html+=pendingCompletion.map(b=>{const comp=wfCompletion(b);return'<div onclick="togglePendingPanel();openBkModal(\''+b.id+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+b.dog+'</div><div style="font-size:9px;color:var(--gr2);">'+b.svc+' · ended '+fmtDate(b.ed)+' · checklist '+comp.done+'/'+comp.total+'</div></div><span style="font-size:14px;">'+(comp.allDone?'✅':'📋')+'</span></div>';}).join('');
+  }
+  if(noTrainingThisMonth){
+    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Staff Training</div>';
+    html+='<div onclick="togglePendingPanel();showScreen(\'sc-training\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">No training logged this month</div><div style="font-size:9px;color:var(--gr2);">Log CPD or training activity for '+new Date().toLocaleString('en-GB',{month:'long',year:'numeric'})+'</div></div><span style="font-size:14px;">📚</span></div>';
   }
   el.innerHTML=html;
 }
@@ -1425,6 +1431,16 @@ function wfAutoCompat(bk){
   if(!bk||!bk.dog)return null;
   if(bk.wf&&bk.wf.compat)return true;
   const bkCid=bk.customerId||'';const bkDog=(bk.dog||'').toLowerCase();
+  const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
+  const qStart=new Date(bk.sd+'T00:00');const qEnd=new Date((bk.ed||bk.sd)+'T23:59');
+  const hasOverlaps=bookings.some(b=>{
+    if(b.id===bk.id||!active.includes(b.status)||!b.sd)return false;
+    if(bkCid&&b.customerId===bkCid)return false;
+    if(!bkCid&&(b.dog||'').toLowerCase()===bkDog)return false;
+    const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
+    return bS<qEnd&&bE>qStart;
+  });
+  if(!hasOverlaps)return true;
   return trialLogs.some(t=>{
     const tDog=(t.dog||'').toLowerCase();const tCid=t.cid||'';
     const mixedParts=(t.mixedWith||'').split(/[,;]+/).map(s=>s.trim().toLowerCase());
@@ -1519,23 +1535,25 @@ function renderOverlapCheck(){
   const dogEsc=(dog||'').replace(/'/g,"\\'");
   const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log full Trial-Log entry</button>':'';
   const bk=dogObj?bookings.find(b=>b.id===eid):null;
+  const bkSd=bk?bk.sd:sd;const bkEd=bk?bk.ed||bk.sd:ed||sd;
   c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">⚠️ Other dogs staying during this period — log how they got on:</div>'+
     names.map(b=>{
       const mixedLabel=(b.customerId?b.customerId+' ':'') +b.dog;
       const mEsc=mixedLabel.replace(/'/g,"\\'");
+      const overlapEnd=(b.ed||b.sd)<bkEd?(b.ed||b.sd):bkEd;
       const existingLog=[...trialLogs].reverse().find(t=>{
         const tCid=t.cid||'';
         const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
         const matchesPrimary=dogObj?tCid===dogObj.cid:(t.dog||'').toLowerCase()===(dog||'').toLowerCase();
         const matchesMixed=mixedParts.some(m=>m.includes((b.dog||'').toLowerCase())||(b.customerId&&m.includes(b.customerId.toLowerCase())));
-        return matchesPrimary&&matchesMixed;
+        return matchesPrimary&&matchesMixed&&t.date>=bkSd&&t.date<=bkEd;
       });
       const curResult=existingLog?.suitable||'';
       const opts=[{v:'Friends',e:'🥰'},{v:'Good',e:'😊'},{v:'Ignore',e:'😐'},{v:'Not Good',e:'😒'},{v:'Fight',e:'😡'},{v:'Did not meet',e:'🚶'}];
       const btns=opts.map(o=>{
         const sel=curResult===o.v;
         const col=o.v==='Friends'||o.v==='Good'?'var(--gn)':o.v==='Ignore'?'var(--gr2)':o.v==='Did not meet'?'var(--or)':'var(--rd)';
-        return '<button type="button" style="font-size:9px;padding:3px 7px;border-radius:99px;border:1.5px solid '+(sel?col:'var(--gr4)')+';background:'+(sel?col:'transparent')+';color:'+(sel?'#fff':'var(--gr2)')+';cursor:pointer;" onclick="logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',\''+o.v+'\',\'\',\''+sd+'\')">'+o.e+' '+o.v+'</button>';
+        return '<button type="button" style="font-size:9px;padding:3px 7px;border-radius:99px;border:1.5px solid '+(sel?col:'var(--gr4)')+';background:'+(sel?col:'transparent')+';color:'+(sel?'#fff':'var(--gr2)')+';cursor:pointer;" onclick="logCompatResult(\''+dogEsc+'\',\''+mEsc+'\',\''+o.v+'\',\'\',\''+overlapEnd+'\',\''+bkSd+'\',\''+bkEd+'\')">'+o.e+' '+o.v+'</button>';
       }).join('');
       return '<div style="padding:5px 0;border-bottom:1px solid var(--gr4);">'
         +'<div style="font-size:11px;font-weight:600;color:var(--bk);">'+b.dog+(b.customerId?' <span style="font-size:9px;color:var(--gr3);">'+b.customerId+'</span>':'')+' ('+fmtDate(b.sd)+' – '+fmtDate(b.ed)+')</div>'
@@ -1543,14 +1561,14 @@ function renderOverlapCheck(){
         +'</div>';
     }).join('')+logBtn;
 }
-async function logCompatResult(dogName,mixedLabel,result,notes,logDate){
+async function logCompatResult(dogName,mixedLabel,result,notes,logDate,bookingStart,bookingEnd){
   const dogObj=allDogs.find(d=>d.name===dogName);if(!dogObj)return;
   const today=logDate||todayStr();
   const suitMap={'Friends':'Friends','Good':'Good','Ignore':'Ignore','Not Good':'Not Good','Fight':'Fight','Did not meet':'Did not meet'};
   const suitable=suitMap[result]||result;
   const obs=notes||(result==='Friends'?'Happy together':result==='Fight'?'Fought':result==='Did not meet'?'Did not meet':'');
   const row=rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dogObj.name,Date:today,MixedWith:mixedLabel,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
-  const existing=trialLogs.find(t=>t.cid===dogObj.cid&&(t.mixedWith||'').trim().toLowerCase()===(mixedLabel||'').trim().toLowerCase());
+  const existing=trialLogs.find(t=>t.cid===dogObj.cid&&(t.mixedWith||'').trim().toLowerCase()===(mixedLabel||'').trim().toLowerCase()&&(!bookingStart||t.date>=bookingStart)&&(!bookingEnd||t.date<=bookingEnd));
   if(existing){
     const prevSuitable=existing.suitable;const prevObs=existing.obs;const prevDate=existing.date;
     existing.suitable=suitable;existing.obs=obs;existing.date=today;
@@ -1687,7 +1705,8 @@ function buildPLTable(yr){
   bookings.forEach(r=>{const ned=normDate(r.ed);if(!ned||!ned.startsWith(yr))return;const mo=new Date(ned+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=actualRev(r);if(active.includes(r.status))monthly[mo].rover+=(r.roverAmt||0);}});
   costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   document.getElementById('plTbl').innerHTML=MOS.map(m=>{const tgt=tgts[m];const act=monthly[m];const totalCost=act.cost+act.rover;const net=act.rev-totalCost;
-    return'<tr><td style="font-weight:700;">'+m+'</td><td><input class="pl-inp" type="number" id="tr_'+m+'" value="'+tgt.rev+'"></td><td><input class="pl-inp" type="number" id="tc_'+m+'" value="'+tgt.cost+'"></td><td style="color:var(--gn);font-weight:700;">'+fmtGBP(act.rev)+'</td><td style="color:var(--rd);">'+fmtGBP(totalCost)+(act.rover>0?'<br><span style="font-size:7px;color:var(--gr3);">incl '+fmtGBP(act.rover)+' Rover</span>':'')+'</td><td style="font-weight:700;'+(net>=0?'color:var(--gn)':'color:var(--rd)')+';">'+fmtGBP(net)+'</td></tr>';
+    const netTgt=tgt.rev-tgt.cost;
+    return'<tr><td style="font-weight:700;">'+m+'</td><td><input class="pl-inp" type="number" id="tr_'+m+'" value="'+tgt.rev+'"></td><td><input class="pl-inp" type="number" id="tc_'+m+'" value="'+tgt.cost+'"></td><td style="font-weight:700;color:var(--gn);">'+fmtGBP(netTgt)+'</td><td style="color:var(--gn);font-weight:700;">'+fmtGBP(act.rev)+'</td><td style="color:var(--rd);">'+fmtGBP(totalCost)+(act.rover>0?'<br><span style="font-size:7px;color:var(--gr3);">incl '+fmtGBP(act.rover)+' Rover</span>':'')+'</td><td style="font-weight:700;'+(net>=0?'color:var(--gn)':'color:var(--rd)')+';">'+fmtGBP(net)+'</td></tr>';
   }).join('');
 }
 async function saveTargets(){
@@ -1713,20 +1732,79 @@ function updatePL(){
   document.getElementById('kpi_rev').textContent=fmtGBP(totalRev);document.getElementById('kpi_rev_s').textContent='vs '+fmtGBP(revTgt)+' target';
   document.getElementById('kpi_pct').textContent=pct.toFixed(1)+'%';document.getElementById('kpi_cost').textContent=fmtGBP(totalCost);
   document.getElementById('kpi_cost_s').textContent='vs '+fmtGBP(costTgt)+' target'+(totalRover>0?' (incl '+fmtGBP(totalRover)+' Rover)':'');
-  document.getElementById('kpi_net').textContent=fmtGBP(net);buildPLTable(yr);drawChart(yr,tgts);
+  const netTgt=revTgt-costTgt;const netEl=document.getElementById('kpi_net');netEl.textContent=fmtGBP(net);netEl.style.color=net>=0?'var(--gn)':'var(--rd)';
+  const netDiff=net-netTgt;document.getElementById('kpi_net_s').textContent='vs '+fmtGBP(netTgt)+' target'+(netTgt>0?' ('+(netDiff>=0?'+':'')+fmtGBP(netDiff)+')':'');
+  buildPLTable(yr);drawChart(yr,tgts);
 }
 function drawChart(yr,tgts){
   const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0};});const active=['Prepaid','Fully Paid','Credit'];
   bookings.forEach(r=>{const ned=normDate(r.ed);if(!ned||!ned.startsWith(yr))return;const mo=new Date(ned+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=actualRev(r);if(active.includes(r.status))monthly[mo].cost+=(r.roverAmt||0);}});
   costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   const rd=MOS.map(m=>monthly[m].rev);const cd=MOS.map(m=>monthly[m].cost);const rt=MOS.map(m=>tgts[m].rev);const ct=MOS.map(m=>tgts[m].cost);
-  const maxV=Math.max(...rd,...cd,...rt,...ct,100);const W=560,H=190,PL=40,PR=14,PT=14,PB=26;const cW=W-PL-PR,cH=H-PT-PB;
+  const nd=MOS.map(m=>monthly[m].rev-monthly[m].cost);const nt=MOS.map(m=>tgts[m].rev-tgts[m].cost);
+  const maxV=Math.max(...rd,...cd,...rt,...ct,...nd,...nt,100);const W=560,H=190,PL=40,PR=14,PT=14,PB=26;const cW=W-PL-PR,cH=H-PT-PB;
   const xi=i=>PL+i*(cW/(MOS.length-1));const yi=v=>PT+cH-(v/maxV*cH);
   let g='';[0,.25,.5,.75,1].forEach(ratio=>{const yy=PT+cH-ratio*cH;g+='<line x1="'+PL+'" y1="'+yy+'" x2="'+(W-PR)+'" y2="'+yy+'" stroke="#E7E5E4" stroke-width="1"/>';if(ratio>0)g+='<text x="'+(PL-4)+'" y="'+(yy+3)+'" font-size="8" fill="#A8A29E" text-anchor="end">'+(maxV*ratio).toFixed(0)+'</text>';});
   const lbl=MOS.map((m,i)=>'<text x="'+xi(i)+'" y="'+(H-5)+'" font-size="8" fill="#A8A29E" text-anchor="middle">'+m+'</text>').join('');
   const poly=(pts,col,dash)=>'<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
   const dots=rd.map((v,i)=>'<circle cx="'+xi(i)+'" cy="'+yi(v)+'" r="3" fill="#F97316"/>').join('');
-  document.getElementById('plChart').innerHTML='<g font-family="system-ui,sans-serif">'+g+poly(rt.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#FED7AA','4,3')+poly(ct.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#7DD3FC','3,3')+poly(cd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#1E40AF')+poly(rd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#F97316')+dots+lbl+'</g>';
+  document.getElementById('plChart').innerHTML='<g font-family="system-ui,sans-serif">'+g+poly(nt.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#DCFCE7','4,3')+poly(rt.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#FED7AA','4,3')+poly(ct.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#7DD3FC','3,3')+poly(cd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#1E40AF')+poly(nd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#16A34A')+poly(rd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#F97316')+dots+lbl+'</g>';
+}
+
+// ==================== ANALYSIS ====================
+function renderAnalysis(){
+  const yr=document.getElementById('anYear')?.value||'2026';
+  const paid=['Prepaid','Fully Paid','Credit'];
+  const active=['Booked','Prepaid','Fully Paid','Credit','Completed'];
+
+  // 1. Revenue by service
+  const svcRev={};
+  bookings.filter(b=>b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status)).forEach(b=>{
+    const s=b.svc||'Other';svcRev[s]=(svcRev[s]||0)+actualRev(b);
+  });
+  const totalRev=Object.values(svcRev).reduce((a,v)=>a+v,0);
+  const svcCols={'Boarding':'#F97316','DayCare':'#EAB308','Walking':'#22C55E','Drop-in':'#8B5CF6','Dog Sit':'#06B6D4','Pet Taxi':'#EC4899','Training':'#6366F1','Other':'#A8A29E'};
+  const svcSorted=Object.entries(svcRev).sort((a,b)=>b[1]-a[1]);
+  const revHtml=totalRev>0?svcSorted.map(([s,v])=>{
+    const pct=(v/totalRev*100).toFixed(1);const col=svcCols[s]||'#A8A29E';
+    return'<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:3px;"><span>'+s+'</span><span style="color:'+col+';">'+fmtGBP(v)+' ('+pct+'%)</span></div><div style="height:6px;background:var(--gr4);border-radius:3px;"><div style="height:6px;background:'+col+';border-radius:3px;width:'+pct+'%;"></div></div></div>';
+  }).join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:7px;font-size:9px;color:var(--gr2);font-weight:700;">Total: '+fmtGBP(totalRev)+'</div>'
+    :'<div style="color:var(--gr3);font-size:11px;">No paid bookings for '+yr+'</div>';
+  document.getElementById('anRevBreakdown').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+revHtml+'</div>';
+
+  // 2. Average stay length (boarding paid stays)
+  const stays=bookings.filter(b=>b.sd&&b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{
+    const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);
+  }).filter(n=>n>0);
+  let stayHtml='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">';
+  if(stays.length){
+    const avg=(stays.reduce((s,v)=>s+v,0)/stays.length).toFixed(1);
+    const distrib={};stays.forEach(n=>{const k=n===1?'1 night':n<=3?'2–3 nights':n<=7?'4–7 nights':n<=14?'1–2 weeks':'2+ weeks';distrib[k]=(distrib[k]||0)+1;});
+    stayHtml+='<div style="display:flex;gap:10px;margin-bottom:10px;"><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--or);">'+avg+'</div><div style="font-size:9px;color:var(--gr2);">Avg nights</div></div><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--bl);">'+Math.max(...stays)+'</div><div style="font-size:9px;color:var(--gr2);">Longest</div></div><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--gn);">'+Math.min(...stays)+'</div><div style="font-size:9px;color:var(--gr2);">Shortest</div></div></div>';
+    stayHtml+='<div style="border-top:1px solid var(--gr4);padding-top:8px;">'+Object.entries(distrib).map(([k,v])=>'<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>'+k+'</span><span style="font-weight:700;">'+v+' stay'+(v>1?'s':'')+'</span></div>').join('')+'</div>';
+  }else{stayHtml+='<div style="color:var(--gr3);font-size:11px;">No boarding stays found for '+yr+'</div>';}
+  document.getElementById('anAvgStay').innerHTML=stayHtml+'</div>';
+
+  // 3. Occupancy rate (boarding nights / days in month)
+  const boardingDays={};MOS.forEach(m=>boardingDays[m]=new Set());
+  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{
+    let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');
+    while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}
+  });
+  const yrN=parseInt(yr);
+  document.getElementById('anOccupancy').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const occ=boardingDays[m].size;const pct=Math.round(occ/dim*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+dim+'d</div></div>';}).join('')+'</div></div>';
+
+  // 4. Customer LTV (all time, top 10)
+  const ltvMap={};
+  bookings.filter(b=>paid.includes(b.status)).forEach(b=>{
+    const key=b.customerId||b.dog;if(!key)return;
+    if(!ltvMap[key])ltvMap[key]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};
+    ltvMap[key].count++;ltvMap[key].total+=actualRev(b);
+    const ned=normDate(b.ed)||'';if(ned>ltvMap[key].lastDate)ltvMap[key].lastDate=ned;
+  });
+  const top10=Object.values(ltvMap).sort((a,b)=>b.total-a.total).slice(0,10);
+  const maxLtv=top10[0]?.total||1;
+  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;return'<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:2px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="font-size:8px;color:var(--gr3);">'+c.count+' booking'+(c.count>1?'s':'')+' · last: '+(c.lastDate||'–')+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
 }
 
 // ==================== TRAINING ====================
@@ -1758,7 +1836,11 @@ async function loadTraining(){
   try{
     const rows=await readSheet(TABS.TRAIN,'A2:I');
     trainRecords=rows.map((r,i)=>({ri:i+2,date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',link:r[7]||''}));
-    list.innerHTML=trainRecords.slice().reverse().map(r=>{
+    const curMonth=todayStr().slice(0,7);
+    const hasThisMonth=trainRecords.some(r=>r.date&&r.date.startsWith(curMonth));
+    localStorage.setItem('tcl_train_month',curMonth+':'+(hasThisMonth?'1':'0'));
+    updatePendingBadge();
+    list.innerHTML=trainRecords.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
       const rd=JSON.stringify([r.date,r.staff,r.cat,r.obj,r.prov,r.learnt,r.cpd,r.link]).replace(/'/g,"\\'");
       return '<div class="hi"><div class="hi-h"><span class="hi-d">'+r.date+'</span><span style="font-size:9px;font-weight:700;color:var(--gr);">'+r.staff+'</span>'+(r.cat?'<span class="htype hti">'+r.cat+'</span>':'')+'<button class="ebtn" style="margin-left:auto;" onclick="editTrainingRow('+r.ri+','+rd+')">Edit</button></div>'+(r.obj?'<div class="hsum">'+r.obj+'</div>':'')+(r.cpd?'<div style="font-size:8px;color:var(--gn);margin-top:2px;">CPD: '+r.cpd+' pts</div>':'')+(r.link?'<div style="font-size:8px;margin-top:2px;"><a href="'+r.link+'" target="_blank" style="color:var(--bl);">Link</a></div>':'')+'</div>';
     }).join('')||'<div class="hload">No records</div>';
