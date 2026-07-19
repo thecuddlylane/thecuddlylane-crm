@@ -442,7 +442,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v48b4</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v49b2</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -789,12 +789,26 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div><div class="pg-t">Analysis</div><div class="pg-s">Trends &amp; insights</div></div>
       <select class="fs" id="anYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="renderAnalysis()"><option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
     </div>
-    <div class="fsec">Revenue by Service</div>
+    <div class="fsec">Revenue by Service <span style="font-size:9px;font-weight:400;color:var(--gr3);">(stacked by month)</span></div>
     <div id="anRevBreakdown" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Bookings Count &amp; AOV</div>
+    <div id="anBkCount" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Service Type Distribution <span style="font-size:9px;font-weight:400;color:var(--gr3);">(by count)</span></div>
+    <div id="anSvcCount" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Rover vs Direct</div>
+    <div id="anChannel" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Breed Distribution <span style="font-size:9px;font-weight:400;color:var(--gr3);">(all registered dogs)</span></div>
+    <div id="anBreed" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Dog Age at Booking</div>
+    <div id="anAge" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Repeat vs New Customers</div>
+    <div id="anRepeat" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Average Stay Length <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding only)</span></div>
     <div id="anAvgStay" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
-    <div class="fsec">Occupancy Rate <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding nights / month)</span></div>
+    <div class="fsec">Occupancy Rate by Day <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding nights / total days in month)</span></div>
     <div id="anOccupancy" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
+    <div class="fsec">Occupancy Rate by Places <span style="font-size:9px;font-weight:400;color:var(--gr3);">(max 4 dogs/day · Boarding + Day Care)</span></div>
+    <div id="anOccPlaces" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(All time · Top 10)</span></div>
     <div id="anLTV" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div style="height:18px;"></div>

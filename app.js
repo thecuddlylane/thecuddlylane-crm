@@ -7,7 +7,7 @@ function fmtDateFull(d){if(!d)return'-';try{return new Date(d+'T12:00:00').toLoc
 function gv(id){const el=document.getElementById(id);return el?el.value||'':(console.warn('gv:',id),'');}
 function calcAge(b){if(!b)return'';try{const dob=new Date(b+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<1?Math.floor((now-dob)/2592000000)+'mo':y+'yr';}catch(e){return'';}}
 function defEmoji(d){const b=(d.breed||'').toLowerCase();if(b.includes('retriever')||b.includes('golden'))return'\u{1F9AE}';if(b.includes('husky'))return'\u{1F43A}';if(b.includes('collie'))return'\u{1F429}';if(b.includes('bulldog')||b.includes('pug')||b.includes('french'))return'\u{1F43E}';if(b.includes('shiba'))return'\u{1F98A}';if(b.includes('lab'))return'\u{1F415}';return'\u{1F436}';}
-function genId(n){return 'TCL-'+n.substring(0,2).toUpperCase()+String(Date.now()).slice(-4);}
+function genId(n){return 'TCL-'+n.substring(0,2).toUpperCase()+Date.now().toString(36).slice(-4).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();}
 const VL_A='=IFERROR(VLOOKUP(INDIRECT("A"&ROW()),Dogs!$A:$B,2,FALSE),"")';
 function mkHdr(row){const m={};(row||[]).forEach((v,i)=>{if(v)m[v]=i;});return m;}
 function rowFromMap(hdrRow,map,fallbackHdr){const h=(hdrRow&&hdrRow.length)?hdrRow:fallbackHdr;return h.map(name=>{const v=map[name];return v===undefined?'':v;});}
@@ -227,7 +227,7 @@ function renderPendingPanel(){
   let html='';
   if(wfTasks.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">To-Do by Booking</div>';
-    html+=wfTasks.map(({bk,key,label})=>'<label style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid var(--gr4);cursor:pointer;"><input type="checkbox" onclick="event.stopPropagation()" onchange="quickToggleWf(\''+bk.id+'\',\''+key+'\',this.checked)" style="width:13px;height:13px;accent-color:var(--gr);margin-top:2px;"><span style="flex:1;" onclick="togglePendingPanel();openBkModal(\''+bk.id+'\')"><div style="font-size:11px;font-weight:700;color:var(--bk);">'+label+'</div><div style="font-size:9px;color:var(--gr2);">'+bk.dog+' · '+bk.svc+' · '+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</div></span></label>').join('');
+    html+=wfTasks.map(({bk,key,label})=>'<label style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid var(--gr4);cursor:pointer;"><input type="checkbox" onclick="event.stopPropagation()" onchange="quickToggleWf(\''+bk.id+'\',\''+key+'\',this.checked)" style="width:13px;height:13px;accent-color:var(--gr);margin-top:2px;"><span style="flex:1;" onclick="togglePendingPanel();openBkModal(\''+bk.id+'\',false,'+bk.ri+')"><div style="font-size:11px;font-weight:700;color:var(--bk);">'+label+'</div><div style="font-size:9px;color:var(--gr2);">'+bk.dog+' · '+bk.svc+' · '+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</div></span></label>').join('');
   }
   if(missingLogs.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Missing Daily Logs</div>';
@@ -235,7 +235,7 @@ function renderPendingPanel(){
   }
   if(pendingCompletion.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Bookings Awaiting Completion</div>';
-    html+=pendingCompletion.map(b=>{const comp=wfCompletion(b);return'<div onclick="togglePendingPanel();openBkModal(\''+b.id+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+b.dog+'</div><div style="font-size:9px;color:var(--gr2);">'+b.svc+' · ended '+fmtDate(b.ed)+' · checklist '+comp.done+'/'+comp.total+'</div></div><span style="font-size:14px;">'+(comp.allDone?'✅':'📋')+'</span></div>';}).join('');
+    html+=pendingCompletion.map(b=>{const comp=wfCompletion(b);return'<div onclick="togglePendingPanel();openBkModal(\''+b.id+'\',false,'+b.ri+')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+b.dog+'</div><div style="font-size:9px;color:var(--gr2);">'+b.svc+' · ended '+fmtDate(b.ed)+' · checklist '+comp.done+'/'+comp.total+'</div></div><span style="font-size:14px;">'+(comp.allDone?'✅':'📋')+'</span></div>';}).join('');
   }
   if(noTrainingThisMonth){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Staff Training</div>';
@@ -781,7 +781,7 @@ function buildServices(dog){
   const sc={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
   el.innerHTML=recs.map(r=>{
     const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);const bal=paid-owed;
-    const oc="openBkModal('"+r.id+"',true)";
+    const oc="openBkModal('"+r.id+"',true,"+r.ri+")";
     return'<div class="sitem" onclick="'+oc+'"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px;"><span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:2px 5px;border-radius:99px;">'+r.svc+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(r.sd)+' - '+fmtDate(r.ed)+'</span>'+(r.priv?'<span class="ptag">Private</span>':'')+'</div><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:10px;font-weight:700;">'+fmtGBP(owed)+'</div><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></div>'+(bal<0?'<div style="font-size:9px;color:var(--rd);margin-top:2px;">'+fmtGBP(Math.abs(bal))+' outstanding</div>':bal>0?'<div style="font-size:9px;color:var(--gn);margin-top:2px;">'+fmtGBP(bal)+' credit</div>':'')+'</div>';
   }).join('');
 }
@@ -1394,8 +1394,8 @@ function quoteFromBk(){
 
 // ==================== BOOKINGS ====================
 function nextBkId(){let max=0;bookings.forEach(b=>{const m=(b.id||'').match(/^BK-BD-(\d+)$/);if(m)max=Math.max(max,parseInt(m[1],10));});const n=max+1;return'BK-BD-'+(n<10?'00'+n:n<100?'0'+n:''+n);}
-function openBkModal(editId=null,fromProf=false){
-  const modal=document.getElementById('bkModal');const ed=editId&&bookings.find(r=>r.id===editId);
+function openBkModal(editId=null,fromProf=false,editRi=null){
+  const modal=document.getElementById('bkModal');const ed=editId&&(editRi?bookings.find(r=>r.id===editId&&r.ri===editRi):bookings.find(r=>r.id===editId));
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
   document.getElementById('bkMTitle').textContent=ed?'Modify Booking':'Add Booking';document.getElementById('bkBtn').textContent=ed?'Modify Booking':'Save Booking';
   document.getElementById('bkDelBtn').style.display=ed?'block':'none';
@@ -1637,7 +1637,7 @@ async function doDeleteBk(){
   if(document.getElementById('deleteBkInput').value.trim()!=='DELETE'){alert('Type DELETE to confirm');return;}
   document.getElementById('deleteBkConfirm').classList.remove('open');
   if(_delBkRi){try{await clearRow(TABS.BK,_delBkRi);}catch(e){alert('Error: '+e.message);return;}}
-  bookings=bookings.filter(b=>b.id!==_delBkId);document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();
+  bookings=_delBkRi?bookings.filter(b=>b.ri!==_delBkRi):bookings.filter(b=>b.id!==_delBkId);document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();
 }
 function renderBk(){
   const sf=document.getElementById('bkSF').value;const vf=document.getElementById('bkVF').value;const search=(document.getElementById('bkSearch').value||'').toLowerCase();const from=document.getElementById('bkFrom').value;const to=document.getElementById('bkTo').value;const today=todayStr();
@@ -1649,7 +1649,7 @@ function renderBk(){
   const sc={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc','Cancelled':'sc','Completed':'sf'};
   document.getElementById('bkBody').innerHTML=recs.map(r=>{
     const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);const bal=paid-owed;
-    const oc="openBkModal('"+r.id+"')";
+    const oc="openBkModal('"+r.id+"',false,"+r.ri+")";
     return'<tr onclick="'+oc+'"><td>'+(r.priv?'🔒 ':'')+r.dog+'</td><td style="font-size:8px;">'+r.svc+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
   }).join('');
 }
@@ -1754,57 +1754,108 @@ function drawChart(yr,tgts){
 // ==================== ANALYSIS ====================
 function renderAnalysis(){
   const yr=document.getElementById('anYear')?.value||'2026';
+  const today=todayStr();
   const paid=['Prepaid','Fully Paid','Credit'];
   const active=['Booked','Prepaid','Fully Paid','Credit','Completed'];
+  const svcCols={Boarding:'#F97316',DayCare:'#EAB308',Walking:'#22C55E','Drop-in':'#8B5CF6','Dog Sit':'#06B6D4','Pet Taxi':'#EC4899',Training:'#6366F1',Other:'#A8A29E'};
+  const yBks=bookings.filter(b=>b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status));
+  const yrN=parseInt(yr);
 
-  // 1. Revenue by service
-  const svcRev={};
-  bookings.filter(b=>b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status)).forEach(b=>{
-    const s=b.svc||'Other';svcRev[s]=(svcRev[s]||0)+actualRev(b);
-  });
-  const totalRev=Object.values(svcRev).reduce((a,v)=>a+v,0);
-  const svcCols={'Boarding':'#F97316','DayCare':'#EAB308','Walking':'#22C55E','Drop-in':'#8B5CF6','Dog Sit':'#06B6D4','Pet Taxi':'#EC4899','Training':'#6366F1','Other':'#A8A29E'};
-  const svcSorted=Object.entries(svcRev).sort((a,b)=>b[1]-a[1]);
-  const revHtml=totalRev>0?svcSorted.map(([s,v])=>{
-    const pct=(v/totalRev*100).toFixed(1);const col=svcCols[s]||'#A8A29E';
-    return'<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:3px;"><span>'+s+'</span><span style="color:'+col+';">'+fmtGBP(v)+' ('+pct+'%)</span></div><div style="height:6px;background:var(--gr4);border-radius:3px;"><div style="height:6px;background:'+col+';border-radius:3px;width:'+pct+'%;"></div></div></div>';
-  }).join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:7px;font-size:9px;color:var(--gr2);font-weight:700;">Total: '+fmtGBP(totalRev)+'</div>'
-    :'<div style="color:var(--gr3);font-size:11px;">No paid bookings for '+yr+'</div>';
-  document.getElementById('anRevBreakdown').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+revHtml+'</div>';
+  // ── 1. Revenue by Service — stacked bar chart by month ──
+  const moSvcRev={};MOS.forEach(m=>moSvcRev[m]={});
+  yBks.forEach(b=>{const med=normDate(b.ed);if(!med)return;const mo=new Date(med+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(!moSvcRev[mo])return;const s=b.svc||'Other';moSvcRev[mo][s]=(moSvcRev[mo][s]||0)+actualRev(b);});
+  const allSvcsSet=new Set();MOS.forEach(m=>Object.keys(moSvcRev[m]).forEach(s=>allSvcsSet.add(s)));
+  const svcTotals={};[...allSvcsSet].forEach(s=>svcTotals[s]=MOS.reduce((sum,m)=>sum+(moSvcRev[m][s]||0),0));
+  const svcsOrd=[...allSvcsSet].sort((a,b)=>svcTotals[b]-svcTotals[a]);
+  {
+    const W=560,H=200,PL=40,PR=10,PT=14,PB=26,cW=W-PL-PR,cH=H-PT-PB;
+    const bStep=cW/MOS.length,bW=Math.floor(bStep*0.68);
+    const maxSt=Math.max(...MOS.map(m=>Object.values(moSvcRev[m]).reduce((s,v)=>s+v,0)),100);
+    let g='';
+    [0,.25,.5,.75,1].forEach(r=>{const yy=PT+cH-r*cH;g+=`<line x1="${PL}" y1="${yy}" x2="${W-PR}" y2="${yy}" stroke="#E7E5E4" stroke-width="1"/>`;if(r>0)g+=`<text x="${PL-4}" y="${yy+3}" font-size="7" fill="#A8A29E" text-anchor="end">${(maxSt*r).toFixed(0)}</text>`;});
+    MOS.forEach((m,i)=>{const x=PL+i*bStep+(bStep-bW)/2;let cumH=0;svcsOrd.forEach(s=>{const v=moSvcRev[m][s]||0;if(v<=0)return;const bH=Math.max(v/maxSt*cH,1);const y=PT+cH-cumH-bH;g+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW}" height="${bH.toFixed(1)}" fill="${svcCols[s]||'#A8A29E'}" rx="1"/>`;cumH+=bH;});g+=`<text x="${(x+bW/2).toFixed(1)}" y="${H-5}" font-size="7" fill="#A8A29E" text-anchor="middle">${m}</text>`;});
+    const leg=svcsOrd.map(s=>`<div class="leg"><div class="leg-d" style="background:${svcCols[s]||'#A8A29E'};"></div>${s}</div>`).join('');
+    document.getElementById('anRevBreakdown').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><svg viewBox="0 0 560 200" style="width:100%;display:block;"><g font-family="system-ui,sans-serif">'+g+'</g></svg><div class="legend" style="margin-top:6px;">'+leg+'</div></div>';
+  }
 
-  // 2. Average stay length (boarding paid stays)
-  const stays=bookings.filter(b=>b.sd&&b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{
-    const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);
-  }).filter(n=>n>0);
+  // ── 2. Bookings Count & AOV ──
+  const moBkCnt={};const moBkRev={};MOS.forEach(m=>{moBkCnt[m]=0;moBkRev[m]=0;});
+  yBks.forEach(b=>{const med=normDate(b.ed);if(!med)return;const mo=new Date(med+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(moBkCnt[mo]!==undefined){moBkCnt[mo]++;moBkRev[mo]+=actualRev(b);}});
+  const totalBks=yBks.length,totalRevY=yBks.reduce((s,b)=>s+actualRev(b),0),aov=totalBks>0?Math.round(totalRevY/totalBks):0;
+  const maxCnt=Math.max(...MOS.map(m=>moBkCnt[m]),1);
+  document.getElementById('anBkCount').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:flex;gap:8px;margin-bottom:10px;"><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--bl);">'+totalBks+'</div><div style="font-size:8px;color:var(--gr2);">Bookings</div></div><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--or);">'+fmtGBP(totalRevY)+'</div><div style="font-size:8px;color:var(--gr2);">Revenue</div></div><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--gn);">'+fmtGBP(aov)+'</div><div style="font-size:8px;color:var(--gr2);">Avg Order</div></div></div>'+MOS.map(m=>{const cnt=moBkCnt[m];const pct=cnt/maxCnt*100;const ov=cnt>0?fmtGBP(Math.round(moBkRev[m]/cnt))+'/bk':'-';return'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><div style="font-size:9px;color:var(--gr2);width:22px;flex-shrink:0;">'+m+'</div><div style="flex:1;height:14px;background:var(--gr4);border-radius:3px;position:relative;"><div style="height:14px;background:var(--bl);border-radius:3px;width:'+pct+'%;"></div><div style="position:absolute;top:0;left:'+Math.min(pct+2,55)+'%;font-size:8px;color:var(--gr);line-height:14px;">'+cnt+(cnt>0?' · '+ov:'')+'</div></div></div>';}).join('')+'</div>';
+
+  // ── 3. Service Type Distribution (count) ──
+  const svcCnt={};yBks.forEach(b=>{const s=b.svc||'Other';svcCnt[s]=(svcCnt[s]||0)+1;});
+  const totalSvcCnt=Object.values(svcCnt).reduce((s,v)=>s+v,0);
+  const svcCntSorted=Object.entries(svcCnt).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('anSvcCount').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(totalSvcCnt>0?svcCntSorted.map(([s,v])=>{const pct=(v/totalSvcCnt*100).toFixed(0);const col=svcCols[s]||'#A8A29E';return'<div style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+s+'</span><span>'+v+' ('+pct+'%)</span></div><div style="height:6px;background:var(--gr4);border-radius:3px;"><div style="height:6px;background:'+col+';border-radius:3px;width:'+pct+'%;"></div></div></div>';}).join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:6px;font-size:9px;color:var(--gr2);">Total: '+totalSvcCnt+' bookings</div>':'<div style="color:var(--gr3);font-size:11px;">No paid bookings for '+yr+'</div>')+'</div>';
+
+  // ── 4. Rover vs Direct ──
+  const chMap={};
+  yBks.forEach(b=>{const k=(b.ch||'TCL').toLowerCase().includes('rover')?'Rover':'Direct (TCL)';if(!chMap[k])chMap[k]={count:0,rev:0};chMap[k].count++;chMap[k].rev+=actualRev(b);});
+  const chCols={'Direct (TCL)':'#F97316',Rover:'#1E40AF'};
+  document.getElementById('anChannel').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">'+(Object.entries(chMap).sort((a,b)=>b[1].rev-a[1].rev).map(([ch,d])=>{const col=chCols[ch]||'#A8A29E';return'<div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid '+col+';"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">'+ch+'</div><div style="font-size:18px;font-weight:800;color:'+col+';">'+fmtGBP(d.rev)+'</div><div style="font-size:9px;color:var(--gr2);">'+d.count+' booking'+(d.count!==1?'s':'')+'</div><div style="font-size:8px;color:var(--gr3);margin-top:2px;">AOV: '+fmtGBP(Math.round(d.rev/d.count))+'</div></div>';}).join('')||'<div style="color:var(--gr3);font-size:11px;">No paid bookings for '+yr+'</div>')+'</div></div>';
+
+  // ── 5. Breed Distribution (all registered dogs) ──
+  const breedMap={};allDogs.forEach(d=>{const b=((d.breed||'').trim()||'Unknown');breedMap[b]=(breedMap[b]||0)+1;});
+  const breedSorted=Object.entries(breedMap).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const maxBreed=breedSorted[0]?.[1]||1,totalDogs=allDogs.length;
+  document.getElementById('anBreed').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(breedSorted.length?breedSorted.map(([b,v])=>'<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+b+'</span><span style="color:var(--sk);">'+v+' dog'+(v!==1?'s':'')+' ('+(v/totalDogs*100).toFixed(0)+'%)</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;"><div style="height:5px;background:var(--sk);border-radius:3px;width:'+(v/maxBreed*100).toFixed(0)+'%;"></div></div></div>').join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:6px;font-size:9px;color:var(--gr2);">'+totalDogs+' dogs total'+(Object.keys(breedMap).length>12?' · top 12 shown':'')+'</div>':'<div style="color:var(--gr3);font-size:11px;">No dogs registered</div>')+'</div>';
+
+  // ── 6. Dog Age at Booking ──
+  const dogBdays={};allDogs.forEach(d=>{if(d.birthday){const k=(d.cid||'')+'_'+(d.name||'').toLowerCase();dogBdays[k]=d.birthday;}});
+  const ageBuckets={'Puppy (<1yr)':0,'1–2 yrs':0,'3–5 yrs':0,'6–9 yrs':0,'10+ yrs':0,'Unknown':0};
+  const ageCols={'Puppy (<1yr)':'#F97316','1–2 yrs':'#EAB308','3–5 yrs':'#22C55E','6–9 yrs':'#0284C7','10+ yrs':'#8B5CF6','Unknown':'#A8A29E'};
+  yBks.forEach(b=>{const bday=dogBdays[(b.customerId||'')+'_'+(b.dog||'').toLowerCase()];if(!bday){ageBuckets['Unknown']++;return;}const ageYrs=(new Date((normDate(b.sd)||yr+'-01-01')+'T12:00:00Z')-new Date(normDate(bday)+'T12:00:00Z'))/(365.25*864e5);if(ageYrs<1)ageBuckets['Puppy (<1yr)']++;else if(ageYrs<3)ageBuckets['1–2 yrs']++;else if(ageYrs<6)ageBuckets['3–5 yrs']++;else if(ageYrs<10)ageBuckets['6–9 yrs']++;else ageBuckets['10+ yrs']++;});
+  const maxAge=Math.max(...Object.values(ageBuckets),1);
+  document.getElementById('anAge').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+['Puppy (<1yr)','1–2 yrs','3–5 yrs','6–9 yrs','10+ yrs','Unknown'].map(k=>{const v=ageBuckets[k];const col=ageCols[k];return'<div style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+k+'</span><span style="color:'+col+';">'+v+' booking'+(v!==1?'s':'')+'</span></div><div style="height:8px;background:var(--gr4);border-radius:3px;"><div style="height:8px;background:'+col+';border-radius:3px;width:'+(v/maxAge*100).toFixed(0)+'%;"></div></div></div>';}).join('')+'</div>';
+
+  // ── 7. Repeat vs New Customers ──
+  const firstBkYr={};
+  bookings.filter(b=>paid.includes(b.status)&&b.sd).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const by=(normDate(b.sd)||'').slice(0,4);if(!firstBkYr[k]||by<firstBkYr[k])firstBkYr[k]=by;});
+  const newCids=new Set(),repCids=new Set();
+  yBks.forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(firstBkYr[k]===yr)newCids.add(k);else if(firstBkYr[k]&&firstBkYr[k]<yr)repCids.add(k);});
+  const newRev=yBks.filter(b=>{const k=b.customerId||b.dog;return k&&firstBkYr[k]===yr;}).reduce((s,b)=>s+actualRev(b),0);
+  const repRev=yBks.filter(b=>{const k=b.customerId||b.dog;return k&&firstBkYr[k]&&firstBkYr[k]<yr;}).reduce((s,b)=>s+actualRev(b),0);
+  document.getElementById('anRepeat').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--gn);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🆕 New</div><div style="font-size:22px;font-weight:800;color:var(--gn);">'+newCids.size+'</div><div style="font-size:9px;color:var(--gr2);">customers</div><div style="font-size:10px;font-weight:700;color:var(--or);margin-top:4px;">'+fmtGBP(newRev)+'</div></div><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--bl);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🔄 Repeat</div><div style="font-size:22px;font-weight:800;color:var(--bl);">'+repCids.size+'</div><div style="font-size:9px;color:var(--gr2);">customers</div><div style="font-size:10px;font-weight:700;color:var(--or);margin-top:4px;">'+fmtGBP(repRev)+'</div></div></div></div>';
+
+  // ── 8. Average Stay Length — fixed order ──
+  const stays=bookings.filter(b=>b.sd&&b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);}).filter(n=>n>0);
   let stayHtml='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">';
   if(stays.length){
     const avg=(stays.reduce((s,v)=>s+v,0)/stays.length).toFixed(1);
-    const distrib={};stays.forEach(n=>{const k=n===1?'1 night':n<=3?'2–3 nights':n<=7?'4–7 nights':n<=14?'1–2 weeks':'2+ weeks';distrib[k]=(distrib[k]||0)+1;});
-    stayHtml+='<div style="display:flex;gap:10px;margin-bottom:10px;"><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--or);">'+avg+'</div><div style="font-size:9px;color:var(--gr2);">Avg nights</div></div><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--bl);">'+Math.max(...stays)+'</div><div style="font-size:9px;color:var(--gr2);">Longest</div></div><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--gn);">'+Math.min(...stays)+'</div><div style="font-size:9px;color:var(--gr2);">Shortest</div></div></div>';
-    stayHtml+='<div style="border-top:1px solid var(--gr4);padding-top:8px;">'+Object.entries(distrib).map(([k,v])=>'<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>'+k+'</span><span style="font-weight:700;">'+v+' stay'+(v>1?'s':'')+'</span></div>').join('')+'</div>';
+    const distrib={'1 night':0,'2–3 nights':0,'4–7 nights':0,'1–2 weeks':0,'2+ weeks':0};
+    stays.forEach(n=>{if(n===1)distrib['1 night']++;else if(n<=3)distrib['2–3 nights']++;else if(n<=7)distrib['4–7 nights']++;else if(n<=14)distrib['1–2 weeks']++;else distrib['2+ weeks']++;});
+    const maxD=Math.max(...Object.values(distrib),1);
+    stayHtml+='<div style="display:flex;gap:10px;margin-bottom:10px;"><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--or);">'+avg+'</div><div style="font-size:9px;color:var(--gr2);">Avg nights</div></div><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--bl);">'+Math.max(...stays)+'</div><div style="font-size:9px;color:var(--gr2);">Longest</div></div><div style="flex:1;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--gn);">'+Math.min(...stays)+'</div><div style="font-size:9px;color:var(--gr2);">Shortest</div></div></div><div style="border-top:1px solid var(--gr4);padding-top:8px;">'+Object.keys(distrib).map(k=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><div style="font-size:9px;color:var(--gr2);width:64px;flex-shrink:0;">'+k+'</div><div style="flex:1;height:10px;background:var(--gr4);border-radius:3px;"><div style="height:10px;background:var(--or);border-radius:3px;width:'+(distrib[k]/maxD*100).toFixed(0)+'%;"></div></div><div style="font-size:9px;font-weight:700;min-width:16px;text-align:right;">'+distrib[k]+'</div></div>').join('')+'</div>';
   }else{stayHtml+='<div style="color:var(--gr3);font-size:11px;">No boarding stays found for '+yr+'</div>';}
   document.getElementById('anAvgStay').innerHTML=stayHtml+'</div>';
 
-  // 3. Occupancy rate (boarding nights / days in month)
+  // ── 9. Occupancy Rate by Day ──
   const boardingDays={};MOS.forEach(m=>boardingDays[m]=new Set());
-  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{
-    let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');
-    while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}
-  });
-  const yrN=parseInt(yr);
+  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}});
   document.getElementById('anOccupancy').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const occ=boardingDays[m].size;const pct=Math.round(occ/dim*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+dim+'d</div></div>';}).join('')+'</div></div>';
 
-  // 4. Customer LTV (all time, top 10)
-  const ltvMap={};
-  bookings.filter(b=>paid.includes(b.status)).forEach(b=>{
-    const key=b.customerId||b.dog;if(!key)return;
-    if(!ltvMap[key])ltvMap[key]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};
-    ltvMap[key].count++;ltvMap[key].total+=actualRev(b);
-    const ned=normDate(b.ed)||'';if(ned>ltvMap[key].lastDate)ltvMap[key].lastDate=ned;
+  // ── 10. Occupancy Rate by Places (max 4 dogs/day, Boarding + DayCare) ──
+  const placesMo={};MOS.forEach(m=>placesMo[m]=0);
+  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)).forEach(b=>{
+    const svcL=(b.svc||'').toLowerCase();const isB=svcL.includes('boarding');const isDC=svcL.includes('daycare')||svcL.includes('day care');
+    if(!isB&&!isDC)return;
+    const nsd=normDate(b.sd);const ned=normDate(b.ed);if(!nsd||!ned)return;
+    if(isB){let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
+    else{const mo=new Date(ned+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}
   });
+  document.getElementById('anOccPlaces').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const cap=4*dim;const occ=placesMo[m];const pct=Math.round(occ/cap*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+cap+'</div></div>';}).join('')+'</div><div style="font-size:8px;color:var(--gr3);margin-top:8px;text-align:center;">Capacity = 4 dogs × days in month · counts Boarding nights + Day Care visits</div></div>';
+
+  // ── 11. Customer LTV — Top 10, with next booking date ──
+  const ltvMap={};
+  bookings.filter(b=>paid.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;ltvMap[k].total+=actualRev(b);const ned=normDate(b.ed)||'';if(ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});
+  const nextBk={};
+  bookings.filter(b=>b.sd&&normDate(b.sd)>today&&!['Cancelled','Canceled'].includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!nextBk[k]||nsd<nextBk[k])nextBk[k]=nsd;});
   const top10=Object.values(ltvMap).sort((a,b)=>b.total-a.total).slice(0,10);
   const maxLtv=top10[0]?.total||1;
-  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;return'<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:2px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="font-size:8px;color:var(--gr3);">'+c.count+' booking'+(c.count>1?'s':'')+' · last: '+(c.lastDate||'–')+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
+  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;const nxt=nextBk[c.cid||c.dog];return'<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:3px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="display:flex;gap:10px;font-size:8px;color:var(--gr3);"><span>'+c.count+' booking'+(c.count!==1?'s':'')+'</span><span>last: '+(c.lastDate||'–')+'</span>'+(nxt?'<span style="color:var(--gn);font-weight:700;">next: '+nxt+'</span>':'<span>no upcoming</span>')+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
 }
 
 // ==================== TRAINING ====================
