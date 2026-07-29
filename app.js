@@ -92,6 +92,8 @@ function pdel(){_pinE=_pinE.slice(0,-1);updPD();}
 function updPD(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('on',i<_pinE.length);}
 function skipPin(){document.getElementById('pinScreen').classList.remove('active');refreshBoard();}
 function onPinSuccess(){document.getElementById('pinScreen').classList.remove('active');refreshBoard();}
+// Allow typing the PIN on a physical keyboard (laptop browser): digits enter, Backspace deletes.
+document.addEventListener('keydown',e=>{const ps=document.getElementById('pinScreen');if(!ps||!ps.classList.contains('active'))return;if(e.key>='0'&&e.key<='9'){e.preventDefault();pk(e.key);}else if(e.key==='Backspace'){e.preventDefault();pdel();}});
 
 // ==================== CONFIG ====================
 function getSID(){return localStorage.getItem('tcl_sid')||'';}
@@ -168,12 +170,27 @@ async function doCreateSheet(){
 }
 
 // ==================== NAV ====================
-let _stk=['sc-board'];
-function switchSection(sec){document.querySelectorAll('.snav').forEach(b=>b.classList.remove('active'));document.getElementById('snav-'+sec).classList.add('active');const map={board:'sc-board',quote:'sc-quote',business:'sc-business'};_stk=[map[sec]];showScreen(map[sec],false);}
+let _stk=['sc-board'],_curSection='dogs',_curSubK='dogs';
+// Panel openers (reuse existing toggle logic; force-open only)
+function openPending(){const p=document.getElementById('pendingPanel');if(p&&(p.style.display==='none'||!p.style.display))togglePendingPanel();}
+function openAvail(){const p=document.getElementById('availPanel');if(p&&(p.style.display==='none'||!p.style.display))toggleAvailPanel();}
+function openSP(id){const e=document.getElementById('sp-'+id);if(e){e.classList.add('open');setTimeout(()=>{try{e.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}} ,60);}}
+// Section → ordered sub-tabs. sc = primary screen; after = optional panel to open on that screen.
+const SECTIONS={
+  dogs:[{k:'dogs',lbl:'🐾 Dogs',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'check',lbl:'🔎 Check Dates',sc:'sc-board',after:openAvail},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
+  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-board',after:openPending},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-quote',after:()=>openSP('rates')},{k:'hol',lbl:'🏝️ Holidays',sc:'sc-quote',after:()=>openSP('holidays')}],
+  business:[{k:'an',lbl:'🔍 Analysis',sc:'sc-analysis'},{k:'cost',lbl:'💸 Costs',sc:'sc-costs'},{k:'pl',lbl:'📈 P&L',sc:'sc-pl'},{k:'train',lbl:'📚 Training',sc:'sc-training'}]
+};
+const SECTION_ROOTS=new Set(Object.values(SECTIONS).flat().map(t=>t.sc));
+function renderSubTabs(){const bar=document.getElementById('subTabs');if(!bar)return;bar.innerHTML=(SECTIONS[_curSection]||[]).map(t=>'<button class="subtab'+(t.k===_curSubK?' active':'')+'" onclick="goSub(\''+t.k+'\')">'+t.lbl+'</button>').join('');}
+function _runTab(t){_curSubK=t.k;_stk=[t.sc];showScreen(t.sc,false);if(t.after)t.after();renderSubTabs();}
+function switchSection(sec){if(!SECTIONS[sec])return;_curSection=sec;document.querySelectorAll('.snav').forEach(b=>b.classList.remove('active'));document.getElementById('snav-'+sec)?.classList.add('active');_runTab(SECTIONS[sec][0]);}
+function goSub(k){const t=(SECTIONS[_curSection]||[]).find(x=>x.k===k);if(t)_runTab(t);}
+function goToTab(sec,k){if(!SECTIONS[sec])return;_curSection=sec;document.querySelectorAll('.snav').forEach(b=>b.classList.remove('active'));document.getElementById('snav-'+sec)?.classList.add('active');const t=SECTIONS[sec].find(x=>x.k===k)||SECTIONS[sec][0];_runTab(t);}
 function showScreen(id,push=true){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id)?.classList.add('active');document.getElementById('mainScroll').scrollTop=0;
   if(push)_stk.push(id);
-  const isRoot=['sc-board','sc-quote','sc-business'].includes(id);
+  const isRoot=SECTION_ROOTS.has(id)||id==='sc-business';
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-calendar':'Availability Calendar','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
@@ -502,7 +519,7 @@ function renderCards(entries,c,cls){
     c.appendChild(card);
   });
 }
-function dogOptLabel(d){return d.name+' - '+d.cid;}
+function dogOptLabel(d){return d.name+(d.breed?' · '+d.breed:'')+' · '+d.cid;}
 function refreshDogDropdowns(){const sel=document.getElementById('bm_dog');if(sel){const cur=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(cur)sel.value=cur;}buildQDogMS();}
 function filterBmDog(){const q=(document.getElementById('bm_dog_search')?.value||'').toLowerCase();const sel=document.getElementById('bm_dog');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(prev)sel.value=prev;}
 
@@ -1186,7 +1203,7 @@ function buildQDogMS(){
   if(!allDogs.length){c.innerHTML='<div style="padding:9px;font-size:10px;color:var(--gr3);">No dogs loaded - tap Refresh on the Board first</div>';return;}
   const q=(document.getElementById('q_dog_search')?.value||'').toLowerCase();
   const visible=allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q));
-  c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);return'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
+  c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);return'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+(d.breed?' <span style="color:var(--gr3);font-weight:400;">'+d.breed+'</span>':'')+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
 }
 function _syncDogsToLines(){const ordered=_mainDog?[_mainDog,..._selDogs.filter(n=>n!==_mainDog)]:[..._selDogs];_svcLines.forEach(l=>{if(l.svc!=='extra'&&l.svc!=='taxi')l.dogs=[...ordered];});}
 function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';_syncDogsToLines();buildQDogMS();buildMainDogBtns();calcMultiQ();
@@ -1426,7 +1443,7 @@ function quoteFromBk(){
   const dogData=allDogs.find(d=>d.name.toLowerCase()===(dog||'').toLowerCase());
   if(dogData)document.getElementById('q_owner').value=dogData.owner;
   if(actualPrepay>0){const apEl=document.getElementById('q_actual_prepay');if(apEl)apEl.value=actualPrepay.toFixed(2);}
-  document.getElementById('bkModal').classList.remove('open');switchSection('quote');
+  document.getElementById('bkModal').classList.remove('open');goToTab('customers','quote');
   renderSvcLines();buildQDogMS();buildMainDogBtns();calcMultiQ();
 }
 
@@ -1830,13 +1847,24 @@ function eventsOn(dateStr){
   return{arrivals:arrivals.sort(byT),departures:departures.sort(byT),daycare:daycare.sort((a,c)=>(a.drop||'').localeCompare(c.drop||'')),visits:visits.sort(byT)};
 }
 function _capCol(n){return n>=CAL_CAP?'var(--rd)':n===CAL_CAP-1?'var(--or)':n>0?'var(--gn)':'var(--gr3)';}
+// Light box background by occupancy: 1=green, 2=yellow, 3=orange, 4=red.
+function _capBg(n){return n>=CAL_CAP?'#FEE2E2':n===3?'#FFEDD5':n===2?'#FEF9C3':n===1?'#DCFCE7':'var(--wh)';}
+// Row indexes of each dog's first-ever booking (= "new"/non-returning). Set once per render.
+let _calNewRis=new Set();
+function _computeNewRis(){const first={};bookings.forEach(b=>{if(!CAL_ACTIVE.includes(b.status))return;const k=b.customerId||b.dog;if(!k)return;const sd=normDate(b.sd)||'';const c=first[k];if(!c||sd<c.sd||(sd===c.sd&&(b.ri||0)<c.ri))first[k]={sd,ri:b.ri||0};});_calNewRis=new Set(Object.values(first).map(f=>f.ri));}
+function openDogByCid(cid){if(!cid)return;const d=allDogs.find(x=>x.cid===cid);if(d){openProfile(d);showScreen('sc-profile');}}
+function _dogChip(b){const nw=_calNewRis.has(b.ri)?'<span style="color:var(--or);">🆕</span>':'';return'<span class="cal-dog" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')">'+(b.dog||'')+nw+'</span>';}
 function setCalView(v){_calView=v;renderCalendar();}
 function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*7);_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
 function calToday(){_calAnchor=todayStr();_calSelDay='';renderCalendar();}
 function _mondayOf(dateStr){const d=new Date(dateStr+'T12:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d;}
 function _dstr(d){return d.toISOString().slice(0,10);}
+const CAL_T0=6,CAL_T1=21;// week-view timeline window (06:00–21:00)
+function _hm(t){const p=(t||'').split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return(isNaN(h)?12:h)+((isNaN(m)?0:m)/60);}
+function _tpct(t){return Math.max(0,Math.min(100,((_hm(t)-CAL_T0)/(CAL_T1-CAL_T0))*100));}
 function renderCalendar(){
   const host=document.getElementById('sc-calendar');if(!host)return;
+  _computeNewRis();
   document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===_calView));
   document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calWeekHtml();
   if(_calView==='month'&&_calSelDay)document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(_calSelDay);
@@ -1848,19 +1876,20 @@ function _calMonthHtml(){
   const first=new Date(y,m,1);const start=_mondayOf(_dstr(first));const today=todayStr();
   let cells='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const inMo=d.getMonth()===m;
-    const occ=occupantsOn(ds).length;const ev=eventsOn(ds);
-    const col=_capCol(occ);const isToday=ds===today;
-    const chips=occupantsOn(ds).slice(0,3).map(b=>'<span style="font-size:7px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gr2);">'+(b.dog||'')+'</span>').join('');
-    const arrDep=(ev.arrivals.length?'<span style="color:var(--gn);">▲'+ev.arrivals.length+'</span> ':'')+(ev.departures.length?'<span style="color:var(--sk);">▼'+ev.departures.length+'</span>':'');
-    cells+='<div class="cal-cell'+(inMo?'':' out')+(isToday?' today':'')+(ds===_calSelDay?' sel':'')+'" data-d="'+ds+'" onclick="selCalDay(\''+ds+'\')">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:10px;font-weight:700;'+(inMo?'':'color:var(--gr3);')+'">'+d.getDate()+'</span>'+
-      (occ>0?'<span style="font-size:8px;font-weight:800;color:'+col+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+
-      chips+(occupantsOn(ds).length>3?'<span style="font-size:7px;color:var(--gr3);">+'+(occupantsOn(ds).length-3)+'</span>':'')+
-      '<div style="font-size:7px;margin-top:1px;">'+arrDep+'</div></div>';
+    const occs=occupantsOn(ds);const occ=occs.length;const ev=eventsOn(ds);const isToday=ds===today;
+    const bg=inMo?_capBg(occ):'var(--gr5)';
+    const names=occs.map(b=>_dogChip(b)).join('');
+    const newArr=ev.arrivals.some(a=>_calNewRis.has(a.b.ri));
+    const foot=(ev.arrivals.length?'<span style="color:var(--gn);font-weight:800;">▲'+ev.arrivals.length+'</span> ':'')+(ev.departures.length?'<span style="color:var(--sk);font-weight:800;">▼'+ev.departures.length+'</span>':'')+(newArr?' <span title="New (non-returning) dog" style="color:var(--or);font-weight:800;">🆕</span>':'');
+    cells+='<div class="cal-cell'+(inMo?'':' out')+(isToday?' today':'')+(ds===_calSelDay?' sel':'')+'" data-d="'+ds+'" onclick="selCalDay(\''+ds+'\')" style="background:'+bg+';">'+
+      '<div class="cal-cell-hd"><span style="font-weight:700;'+(inMo?'':'color:var(--gr3);')+'">'+d.getDate()+'</span>'+
+      (occ>0?'<span style="font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+
+      '<div class="cal-names">'+names+'</div>'+
+      '<div class="cal-foot">'+foot+'</div></div>';
   }
   const hdr=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-align:center;padding:2px 0;">'+d+'</div>').join('');
-  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;font-weight:800;">'+title+'</span>'+
-    '<span style="font-size:8px;color:var(--gr2);">▲ arrivals · ▼ departures · n/'+CAL_CAP+' places</span></div>'+
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;"><span style="font-size:14px;font-weight:800;">'+title+'</span>'+
+    '<span style="font-size:8px;color:var(--gr2);">▲ arrive · ▼ depart · 🆕 new dog · tap a day</span></div>'+
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">'+hdr+cells+'</div>'+
     '<div id="calDayDetail" style="margin-top:10px;"></div>';
 }
@@ -1872,15 +1901,16 @@ function _calDayDetailHtml(ds){
   let h='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:800;">'+dTitle+'</span>'+
     '<span style="font-size:10px;font-weight:800;color:'+_capCol(occ.length)+';">'+occ.length+'/'+CAL_CAP+' places'+(remaining>0?' · '+remaining+' free':' · FULL')+'</span></div>';
+  const lnk=b=>'<span class="cal-dog" onclick="openDogByCid(\''+(b.customerId||'')+'\')">'+(b.dog||'')+'</span>'+(_calNewRis.has(b.ri)?' 🆕':'');
   if(!ev.arrivals.length&&!ev.departures.length&&!ev.daycare.length&&!ev.visits.length&&!occ.length)h+='<div style="font-size:10px;color:var(--gr3);">No bookings this day.</div>';
-  ev.arrivals.forEach(a=>h+=row('🟢 Arrive',a.b.dog+' (boarding)','⬇ '+_fmtT(a.t),'var(--gn)'));
-  ev.departures.forEach(a=>h+=row('🔵 Depart',a.b.dog+' (boarding)','⬆ '+_fmtT(a.t),'var(--sk)'));
-  ev.daycare.forEach(a=>h+=row('☀️ Day care',a.b.dog,_fmtT(a.drop)+' → '+_fmtT(a.pick),'var(--or)'));
-  ev.visits.forEach(a=>h+=row('🐕 Visit',a.b.dog+' ('+(a.b.svc||'')+')',_fmtT(a.t),'var(--pu)'));
+  ev.arrivals.forEach(a=>h+=row('🟢 Arrive',lnk(a.b)+' (boarding)','⬇ '+_fmtT(a.t),'var(--gn)'));
+  ev.departures.forEach(a=>h+=row('🔵 Depart',lnk(a.b)+' (boarding)','⬆ '+_fmtT(a.t),'var(--sk)'));
+  ev.daycare.forEach(a=>h+=row('☀️ Day care',lnk(a.b),_fmtT(a.drop)+' → '+_fmtT(a.pick),'var(--or)'));
+  ev.visits.forEach(a=>h+=row('🐕 Visit',lnk(a.b)+' ('+(a.b.svc||'')+')',_fmtT(a.t),'var(--pu)'));
   // continuing stays (present but not arriving/departing today)
   const arrDepIds=new Set([...ev.arrivals,...ev.departures].map(x=>x.b.ri));
   const staying=occ.filter(b=>_svcKind(b)==='stay'&&!arrDepIds.has(b.ri));
-  if(staying.length)h+='<div style="font-size:9px;color:var(--gr2);margin-top:6px;">💤 Staying over: '+staying.map(b=>b.dog).join(', ')+'</div>';
+  if(staying.length)h+='<div style="font-size:9px;color:var(--gr2);margin-top:6px;">💤 Staying over: '+staying.map(b=>lnk(b)).join(', ')+'</div>';
   h+='</div>';
   return h;
 }
@@ -1888,20 +1918,29 @@ function _calWeekHtml(){
   const start=_mondayOf(_calAnchor);const today=todayStr();
   const end=new Date(start);end.setDate(start.getDate()+6);
   const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const axisBg='background:repeating-linear-gradient(90deg,var(--gr5),var(--gr5) calc(20% - 1px),var(--gr4) calc(20% - 1px),var(--gr4) 20%);';
+  const axisHdr='<div style="display:flex;font-size:7px;color:var(--gr3);padding-left:36%;"><span style="flex:1;">6</span><span style="flex:1;">9</span><span style="flex:1;">12</span><span style="flex:1;">15</span><span style="flex:1;">18</span><span style="width:0;">21</span></div>';
   let days='';
   for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const ev=eventsOn(ds);const occ=occupantsOn(ds).length;
-    const items=[];
-    ev.arrivals.forEach(a=>items.push({t:a.t,html:'<span style="color:var(--gn);font-weight:700;">'+a.t+'</span> 🟢 '+a.b.dog+' arrives'}));
-    ev.daycare.forEach(a=>items.push({t:a.drop,html:'<span style="color:var(--or);font-weight:700;">'+a.drop+'–'+a.pick+'</span> ☀️ '+a.b.dog+' day care'}));
-    ev.visits.forEach(a=>items.push({t:a.t,html:'<span style="color:var(--pu);font-weight:700;">'+(a.t||'')+'</span> 🐕 '+a.b.dog}));
-    ev.departures.forEach(a=>items.push({t:a.t,html:'<span style="color:var(--sk);font-weight:700;">'+a.t+'</span> 🔵 '+a.b.dog+' departs'}));
-    items.sort((a,c)=>(a.t||'').localeCompare(c.t||''));
-    const body=items.length?items.map(x=>'<div style="font-size:10px;padding:2px 0;">'+x.html+'</div>').join(''):'<div style="font-size:9px;color:var(--gr3);">—</div>';
+    const stays=occupantsOn(ds).filter(b=>_svcKind(b)==='stay');
+    // one row per timed event on a shared 06:00–21:00 axis so overlaps line up horizontally
+    const rows=[];
+    ev.arrivals.forEach(a=>rows.push({s:a.t,cid:a.b.customerId,lab:'🟢 '+a.b.dog,col:'var(--gn)',pt:true,cap:a.t}));
+    ev.departures.forEach(a=>rows.push({s:a.t,cid:a.b.customerId,lab:'🔵 '+a.b.dog,col:'var(--sk)',pt:true,cap:a.t}));
+    ev.daycare.forEach(a=>rows.push({s:a.drop,e:a.pick,cid:a.b.customerId,lab:'☀️ '+a.b.dog,col:'var(--or)',pt:false,cap:a.drop+'–'+a.pick}));
+    ev.visits.forEach(a=>rows.push({s:a.t,cid:a.b.customerId,lab:'🐕 '+a.b.dog,col:'var(--pu)',pt:true,cap:a.t}));
+    rows.sort((a,c)=>(a.s||'').localeCompare(c.s||''));
+    let body='';
+    if(stays.length)body+='<div style="font-size:9px;color:var(--gr2);margin-bottom:4px;">💤 Overnight: '+stays.map(b=>_dogChip(b)).join(', ')+'</div>';
+    if(rows.length){
+      body+=axisHdr+rows.map(r=>{const L=_tpct(r.s);const mark=r.pt?'<div style="position:absolute;left:'+L+'%;top:0;width:3px;height:14px;background:'+r.col+';border-radius:2px;"></div>':'<div style="position:absolute;left:'+L+'%;width:'+Math.max(2,_tpct(r.e)-L)+'%;top:1px;height:12px;background:'+r.col+';border-radius:3px;"></div>';
+        return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;"><span class="cal-dog" style="width:34%;font-size:9px;flex-shrink:0;" onclick="openDogByCid(\''+(r.cid||'')+'\')">'+r.lab+'</span><div style="position:relative;flex:1;height:15px;border-radius:3px;'+axisBg+'">'+mark+'</div><span style="width:58px;font-size:8px;color:var(--gr2);text-align:right;flex-shrink:0;">'+r.cap+'</span></div>';}).join('');
+    }else if(!stays.length)body+='<div style="font-size:9px;color:var(--gr3);">—</div>';
     days+='<div class="cal-week-day'+(ds===today?' today':'')+'" style="border:1px solid var(--gr4);border-radius:var(--r);padding:8px;margin-bottom:6px;'+(ds===today?'border-color:var(--or);':'')+'">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11px;font-weight:800;">'+d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+'</span>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;"><span style="font-size:11px;font-weight:800;">'+d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+'</span>'+
       '<span style="font-size:9px;font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+(occ>=CAL_CAP?' FULL':' · '+(CAL_CAP-occ)+' free')+'</span></div>'+body+'</div>';
   }
-  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;font-weight:800;">'+title+'</span></div>'+days;
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;font-weight:800;">'+title+'</span><span style="font-size:8px;color:var(--gr2);">bars = time of day</span></div>'+days;
 }
 
 // ==================== ANALYSIS ====================
@@ -1965,11 +2004,12 @@ function renderAnalysis(){
   }else{chHtml+='<div style="color:var(--gr3);font-size:11px;">No paid bookings for '+yr+'</div>';}
   document.getElementById('anChannel').innerHTML=chHtml+'</div>';
 
-  // ── 5. Breed Distribution (all registered dogs) ──
-  const breedMap={};allDogs.forEach(d=>{const b=((d.breed||'').trim()||'Unknown');breedMap[b]=(breedMap[b]||0)+1;});
+  // ── 5. Breed Distribution (dogs with bookings in this year only) ──
+  const breedMap={};const _seenBreedDogs=new Set();
+  yBks.forEach(b=>{const k=b.customerId||b.dog;if(!k||_seenBreedDogs.has(k))return;_seenBreedDogs.add(k);const d=allDogs.find(x=>x.cid===b.customerId)||allDogs.find(x=>(x.name||'').toLowerCase()===(b.dog||'').toLowerCase());const br=((d&&d.breed||'').trim()||'Unknown');breedMap[br]=(breedMap[br]||0)+1;});
   const breedSorted=Object.entries(breedMap).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  const maxBreed=breedSorted[0]?.[1]||1,totalDogs=allDogs.length;
-  document.getElementById('anBreed').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(breedSorted.length?breedSorted.map(([b,v])=>'<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+b+'</span><span style="color:var(--sk);">'+v+' dog'+(v!==1?'s':'')+' ('+(v/totalDogs*100).toFixed(0)+'%)</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;"><div style="height:5px;background:var(--sk);border-radius:3px;width:'+(v/maxBreed*100).toFixed(0)+'%;"></div></div></div>').join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:6px;font-size:9px;color:var(--gr2);">'+totalDogs+' dogs total'+(Object.keys(breedMap).length>12?' · top 12 shown':'')+'</div>':'<div style="color:var(--gr3);font-size:11px;">No dogs registered</div>')+'</div>';
+  const maxBreed=breedSorted[0]?.[1]||1,totalDogs=_seenBreedDogs.size;
+  document.getElementById('anBreed').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(breedSorted.length?breedSorted.map(([b,v])=>'<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+b+'</span><span style="color:var(--sk);">'+v+' dog'+(v!==1?'s':'')+' ('+(v/totalDogs*100).toFixed(0)+'%)</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;"><div style="height:5px;background:var(--sk);border-radius:3px;width:'+(v/maxBreed*100).toFixed(0)+'%;"></div></div></div>').join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:6px;font-size:9px;color:var(--gr2);">'+totalDogs+' booked dog'+(totalDogs!==1?'s':'')+(Object.keys(breedMap).length>12?' · top 12 shown':'')+'</div>':'<div style="color:var(--gr3);font-size:11px;">No booked dogs for '+yr+'</div>')+'</div>';
 
   // ── 6. Dog Age at Booking ──
   const dogBdays={};allDogs.forEach(d=>{if(d.birthday){const k=(d.cid||'')+'_'+(d.name||'').toLowerCase();dogBdays[k]=d.birthday;}});
@@ -2306,7 +2346,6 @@ async function syncActsFromSheet(silent=false){
 }
 
 // ==================== EXPORT ====================
-function exportData(incPriv){const recs=incPriv?bookings:bookings.filter(r=>!r.priv);const hdrs=['ID','Dog','Service','Start Date','Start Time','End Date','End Time','Drop-off Location','Pick-up Location','Revenue','Tips','Prepayment','Final Payment','Balance','Rover Comm','Channel','Payment','Status','Private','Month','Rating','Feedback'];const rows=[['THE CUDDLY LANE - Booking Records'],['AWLA Licence: AWLA/124654'],['Exported: '+new Date().toLocaleString('en-GB')],[''],hdrs,...recs.map(r=>{const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);return[r.id,r.dog,r.svc,r.sd,r.st,r.ed,r.et,r.dropLoc,r.pickLoc,r.rev,r.tips,r.prepay,r.finalPay,(paid-owed).toFixed(2),r.roverAmt,r.ch,r.pay,r.status,r.priv?'Yes':'No',r.month,r.rating,r.feedback];})];const csv=rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='TCL-records-'+todayStr()+'.csv';a.click();}
 
 // ==================== MANIFEST / PWA ====================
 function registerSW(){if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}}
@@ -2321,4 +2360,5 @@ document.getElementById('reg_eid').value='';document.getElementById('reg_ridx').
 document.getElementById('st_date').value=todayStr();
 const bmDog=document.getElementById('bm_dog');if(bmDog)bmDog.addEventListener('change',updateDogIdHint);
 registerSW();
+renderSubTabs();
 initPin();

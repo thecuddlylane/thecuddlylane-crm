@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Cuddly Lane">
 <meta name="theme-color" content="#44403C">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>THE CUDDLY LANE</title>
 <style>
@@ -79,6 +80,9 @@ body{
 /* SECTION NAV */
 .snav-bar{background:var(--gr);border-top:1px solid rgba(255,255,255,.06);display:flex;flex-shrink:0;}
 .snav{flex:1;padding:7px 4px;text-align:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.35);cursor:pointer;border-bottom:2px solid transparent;background:none;border-left:none;border-right:none;border-top:none;font-family:var(--fb);letter-spacing:.05em;text-transform:uppercase;}
+.subtab-bar{display:flex;gap:5px;overflow-x:auto;padding:6px 10px;background:var(--gr5);border-bottom:1px solid var(--gr4);flex-shrink:0;-webkit-overflow-scrolling:touch;}
+.subtab{font-family:var(--fb);font-size:11px;white-space:nowrap;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);cursor:pointer;flex-shrink:0;}
+.subtab.active{background:var(--or);color:#fff;border-color:var(--or);}
 .snav.active{color:var(--hnl);border-bottom-color:var(--or);}
 /* MAIN */
 .main{flex:1;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
@@ -314,11 +318,14 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 .cal-nav,.cal-today,.cal-view-btn{font-family:var(--fb);font-size:11px;border-radius:8px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);cursor:pointer;padding:5px 10px;}
 .cal-nav{font-size:16px;line-height:1;padding:3px 10px;font-weight:700;}
 .cal-view-btn.active{background:var(--or);color:#fff;border-color:var(--or);}
-.cal-cell{min-height:46px;border:1px solid var(--gr4);border-radius:7px;padding:3px;cursor:pointer;background:var(--wh);overflow:hidden;}
-.cal-cell.out{background:var(--gr5);}
+.cal-cell{height:108px;border:1px solid var(--gr4);border-radius:7px;padding:3px;cursor:pointer;background:var(--wh);display:flex;flex-direction:column;overflow:hidden;}
+.cal-cell-hd{display:flex;justify-content:space-between;align-items:center;font-size:9px;flex-shrink:0;}
+.cal-names{flex:1;overflow:hidden;margin:1px 0;display:flex;flex-direction:column;gap:1px;}
+.cal-foot{font-size:8px;flex-shrink:0;min-height:10px;}
+.cal-dog{font-size:9px;line-height:1.15;color:var(--bl);cursor:pointer;text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
 .cal-cell.today{border-color:var(--or);border-width:2px;}
 .cal-cell.sel{outline:2px solid var(--bl);outline-offset:-2px;}
-.cal-week-day.today{background:var(--orl,#fff7ed);}
+.cal-week-day.today{background:var(--orxl,#fff7ed);}
 .cat-walk{background:#DBEAFE;color:#1E40AF;}
 .cat-game{background:#FEF3C7;color:#92400E;}
 .cat-field{background:#DCFCE7;color:#166534;}
@@ -450,14 +457,15 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v51b2</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v53b2</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
-  <button class="snav active" id="snav-board" onclick="switchSection('board')">Board</button>
-  <button class="snav" id="snav-quote" onclick="switchSection('quote')">Quote</button>
+  <button class="snav active" id="snav-dogs" onclick="switchSection('dogs')">Dogs</button>
+  <button class="snav" id="snav-customers" onclick="switchSection('customers')">Customers</button>
   <button class="snav" id="snav-business" onclick="switchSection('business')">Business</button>
 </div>
+<div class="subtab-bar" id="subTabs"></div>
 <div class="main" id="mainScroll">
 <!-- BOARD -->
 <div class="screen active" id="sc-board">
@@ -651,30 +659,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
           <button class="sbtn2" style="font-size:11px;padding:6px 12px;" onclick="addHolRange()">+ Add Range</button>
         </div>
       </div>
-      <div class="sp-panel">
-        <div class="sp-hd"><div class="sp-ht">Quote Templates</div><span class="sp-tog" onclick="toggleSP('templates')">Edit</span></div>
-        <div class="sp-bd" id="sp-templates">
-          <div class="f"><label>Get Quote template (no payment details)</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('quote')">Save</button><button class="tplb" onclick="redoTpl('quote')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('quote')">Restore default</button></div>
-            <textarea class="fta" id="tpl_quote" style="min-height:130px;font-size:10px;"></textarea>
-          </div>
-          <div class="f"><label>Book with Us template</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('book')">Save</button><button class="tplb" onclick="redoTpl('book')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('book')">Restore default</button></div>
-            <textarea class="fta" id="tpl_book" style="min-height:150px;font-size:10px;"></textarea>
-          </div>
-          <div class="f"><label>Prepayment Received template</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('prepay')">Save</button><button class="tplb" onclick="redoTpl('prepay')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('prepay')">Restore default</button></div>
-            <textarea class="fta" id="tpl_prepay" style="min-height:150px;font-size:10px;"></textarea>
-          </div>
-          <div class="f"><label>Final Payment template</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('final')">Save</button><button class="tplb" onclick="redoTpl('final')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('final')">Restore default</button></div>
-            <textarea class="fta" id="tpl_final" style="min-height:130px;font-size:10px;"></textarea>
-          </div>
-          <div class="fr"><div class="f"><label>Payment link</label><input class="fi" id="tpl_paylink" placeholder="https://..."></div><div class="f"><label>Pay ref prefix</label><input class="fi" id="tpl_payref_pfx"></div></div>
-          <button class="sbtn2" style="width:100%;" onclick="saveTplSettingsAndSync()">Save &amp; Sync to Sheet</button>
-          <div style="font-size:9px;color:var(--gr3);margin-top:7px;line-height:1.7;">Variables: {{ownerName}} {{dogs}} {{service}} {{dropoff}} {{pickup}} {{dropoffTime}} {{pickupTime}} {{nights}} {{ratePerNight}} {{addDogLine}} {{total}} {{prepayAmt}} {{finalAmt}} {{payRef}} {{payLink}} {{discount}} {{holidayDates}}</div>
-        </div>
-      </div>
     </div>
     <div style="height:18px;"></div>
   </div>
@@ -691,13 +675,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="bc bc-tp" onclick="showScreen('sc-templates')"><div class="bci"><div class="bc-ico">✉️</div><div class="bc-t">Templates</div><div class="bc-d">Shared message library</div></div></div>
     <div class="bc bc-ac" onclick="showScreen('sc-activities')"><div class="bci"><div class="bc-ico">🎯</div><div class="bc-t">Activities</div><div class="bc-d">Library &amp; smart picker</div></div></div>
     <div class="bc bc-an" onclick="showScreen('sc-analysis')"><div class="bci"><div class="bc-ico">🔍</div><div class="bc-t">Analysis</div><div class="bc-d">Revenue, stay &amp; LTV trends</div></div></div>
-  </div>
-  <div style="padding:0 13px 18px;">
-    <div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r2);padding:11px;">
-      <div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gr2);margin-bottom:9px;">Data Export</div>
-      <button onclick="exportData(true)" style="display:block;width:100%;padding:9px 11px;background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);cursor:pointer;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--gr);text-align:left;margin-bottom:5px;">Full export — all records including private</button>
-      <button onclick="exportData(false)" style="display:block;width:100%;padding:9px 11px;background:var(--gr5);border:1px solid var(--gr4);border-radius:var(--r);cursor:pointer;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--gr);text-align:left;">Public export — excludes Private records</button>
-    </div>
   </div>
 </div>
 <!-- BOOKINGS -->
@@ -823,7 +800,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div id="anChannel" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Repeat vs New Bookings</div>
     <div id="anRepeat" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
-    <div class="fsec">Breed Distribution <span style="font-size:9px;font-weight:400;color:var(--gr3);">(all registered dogs)</span></div>
+    <div class="fsec">Breed Distribution <span style="font-size:9px;font-weight:400;color:var(--gr3);">(dogs with bookings)</span></div>
     <div id="anBreed" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Dog Age at Booking</div>
     <div id="anAge" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
@@ -879,6 +856,32 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="tpl-cat-btn" data-cat="Others" onclick="setTplCat('Others')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">📎 Others</button>
     </div>
     <div id="tplHubList"><div class="hload">Loading templates from sheet...</div></div>
+    <div style="margin-top:16px;">
+      <div class="sp-panel">
+        <div class="sp-hd"><div class="sp-ht">Quote / Payment Templates</div><span class="sp-tog" onclick="toggleSP('templates')">Edit</span></div>
+        <div class="sp-bd" id="sp-templates">
+          <div class="f"><label>Get Quote template (no payment details)</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('quote')">Save</button><button class="tplb" onclick="redoTpl('quote')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('quote')">Restore default</button></div>
+            <textarea class="fta" id="tpl_quote" style="min-height:130px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Book with Us template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('book')">Save</button><button class="tplb" onclick="redoTpl('book')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('book')">Restore default</button></div>
+            <textarea class="fta" id="tpl_book" style="min-height:150px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Prepayment Received template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('prepay')">Save</button><button class="tplb" onclick="redoTpl('prepay')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('prepay')">Restore default</button></div>
+            <textarea class="fta" id="tpl_prepay" style="min-height:150px;font-size:10px;"></textarea>
+          </div>
+          <div class="f"><label>Final Payment template</label>
+            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('final')">Save</button><button class="tplb" onclick="redoTpl('final')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('final')">Restore default</button></div>
+            <textarea class="fta" id="tpl_final" style="min-height:130px;font-size:10px;"></textarea>
+          </div>
+          <div class="fr"><div class="f"><label>Payment link</label><input class="fi" id="tpl_paylink" placeholder="https://..."></div><div class="f"><label>Pay ref prefix</label><input class="fi" id="tpl_payref_pfx"></div></div>
+          <button class="sbtn2" style="width:100%;" onclick="saveTplSettingsAndSync()">Save &amp; Sync to Sheet</button>
+          <div style="font-size:9px;color:var(--gr3);margin-top:7px;line-height:1.7;">Variables: {{ownerName}} {{dogs}} {{service}} {{dropoff}} {{pickup}} {{dropoffTime}} {{pickupTime}} {{nights}} {{ratePerNight}} {{addDogLine}} {{total}} {{prepayAmt}} {{finalAmt}} {{payRef}} {{payLink}} {{discount}} {{holidayDates}}</div>
+        </div>
+      </div>
+    </div>
     <div style="height:18px;"></div>
   </div>
 </div>
