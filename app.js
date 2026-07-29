@@ -7,19 +7,48 @@ function fmtDateFull(d){if(!d)return'-';try{return new Date(d+'T12:00:00').toLoc
 function gv(id){const el=document.getElementById(id);return el?el.value||'':(console.warn('gv:',id),'');}
 function calcAge(b){if(!b)return'';try{const dob=new Date(b+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<1?Math.floor((now-dob)/2592000000)+'mo':y+'yr';}catch(e){return'';}}
 function defEmoji(d){const b=(d.breed||'').toLowerCase();if(b.includes('retriever')||b.includes('golden'))return'\u{1F9AE}';if(b.includes('husky'))return'\u{1F43A}';if(b.includes('collie'))return'\u{1F429}';if(b.includes('bulldog')||b.includes('pug')||b.includes('french'))return'\u{1F43E}';if(b.includes('shiba'))return'\u{1F98A}';if(b.includes('lab'))return'\u{1F415}';return'\u{1F436}';}
-function genId(n){return 'TCL-'+n.substring(0,2).toUpperCase()+Date.now().toString(36).slice(-4).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();}
+// Dog/Customer ID: TCL- + 2 letters from name + 4-digit random, matching the house convention (e.g. TCL-CB1017).
+// Checks against existing dog IDs (allDogs) so the generated id is unique.
+function genId(n){
+  const pre='TCL-'+((n||'').replace(/[^A-Za-z]/g,'').substring(0,2).toUpperCase().padEnd(2,'X'));
+  const used=new Set((typeof allDogs!=='undefined'&&allDogs?allDogs:[]).map(d=>d&&d.cid).filter(Boolean));
+  let id;let guard=0;do{id=pre+String(Math.floor(1000+Math.random()*9000));}while(used.has(id)&&++guard<50);
+  return id;
+}
 const VL_A='=IFERROR(VLOOKUP(INDIRECT("A"&ROW()),Dogs!$A:$B,2,FALSE),"")';
 function mkHdr(row){const m={};(row||[]).forEach((v,i)=>{if(v)m[v]=i;});return m;}
 function rowFromMap(hdrRow,map,fallbackHdr){const h=(hdrRow&&hdrRow.length)?hdrRow:fallbackHdr;return h.map(name=>{const v=map[name];return v===undefined?'':v;});}
+// Resolve a booking by row-index first (disambiguates duplicate IDs), falling back to id
+function bkByRef(id,ri){return ri?(bookings.find(b=>b.ri===ri)||bookings.find(b=>b.id===id)):bookings.find(b=>b.id===id);}
 function sheetPhone(v){const s=String(v||'').trim();return s.startsWith('+')?`'${s}`:s;}
 // Normalise cost dates — handles both YYYY-MM-DD (from date input) and DD/MM/YYYY (manual sheet entry)
 function normDate(d){if(!d)return'';if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;if(/^\d{2}\/\d{2}\/\d{4}$/.test(d)){const p=d.split('/');return p[2]+'-'+p[1]+'-'+p[0];}return d;}
 // Cash actually received: Prepaid → deposit only; Fully Paid/Credit → full settlement; Quoted/Booked/Canceled → 0
-function actualRev(r){if(r.status==='Prepaid')return(r.prepay||0);if(r.status==='Fully Paid'||r.status==='Credit')return(r.prepay||0)+(r.finalPay||0)+(r.tips||0);return 0;}
+function actualRev(r){if(r.status==='Prepaid')return(r.prepay||0);if(r.status==='Fully Paid'||r.status==='Credit'||r.status==='Completed')return(r.prepay||0)+(r.finalPay||0)+(r.tips||0);return 0;}
+// Split a booking across the calendar months it spans, pro-rated by nights (multi-night boarding/dog-sit).
+// Single-day services → one segment on the service date. Returns [{y:'2026',mo:'Dec',frac:0.57},...] summing to 1.
+// Used so cross-year/cross-month orders attribute revenue to the right months in Analysis + P&L (DB stays one row).
+function bkMonthFractions(b){
+  const svcL=(b.svc||'').toLowerCase();
+  const multi=svcL.includes('boarding')||svcL.includes('dogsit')||svcL.includes('dog sit');
+  const nsd=normDate(b.sd),ned=normDate(b.ed);
+  if(!multi||!nsd||!ned||ned<=nsd){const d=ned||nsd;if(!d)return[];return[{y:d.slice(0,4),mo:MOS[parseInt(d.slice(5,7),10)-1],frac:1}];}
+  const per={};let tot=0,d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');
+  while(d<end){const ym=d.toISOString().slice(0,7);per[ym]=(per[ym]||0)+1;tot++;d=new Date(d.getTime()+864e5);}
+  return Object.entries(per).map(([ym,n])=>({y:ym.slice(0,4),mo:MOS[parseInt(ym.slice(5,7),10)-1],frac:n/tot}));
+}
 function ir(k,v){if(!v||!v.toString().trim())return'';const lv=v.toString().toLowerCase().trim();if(lv==='n/a'||lv==='na'||lv==='none'||lv==='-')return'';return '<div class="irow"><span class="ikey">'+k+'</span><span class="ival">'+v+'</span></div>';}
 function fmtGBP(n){return '\u00a3'+(parseFloat(n)||0).toFixed(2);}
+// Round half-up to a whole pound (10.5\u219211, 10.4\u219210). Used across the quote engine so amounts have no pennies.
+function roundGBP(n){return Math.round(parseFloat(n)||0);}
+// Holiday rate = base \u00d7 1.15, rounded to whole \u00a3 per night/day (e.g. \u00a338\u2192\u00a344, \u00a328\u2192\u00a332).
+function holRate(base){return roundGBP((parseFloat(base)||0)*1.15);}
 function copyText(msg){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(msg).catch(()=>{});}else{const ta=document.createElement('textarea');ta.value=msg;ta.style.cssText='position:fixed;top:-9999px;opacity:0;';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}}
 function maskKey(k){if(!k||k.length<12)return k?'****':'';return k.slice(0,6)+'...****...'+k.slice(-4);}
+// ---- Dog description helpers (used by message templates, e.g. "🐾 3 y/o spayed female Schnauzer") ----
+function ageYears(bday){if(!bday)return null;try{const dob=new Date(bday+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<0?null:y;}catch(e){return null;}}
+function genderPhrase(gs){const s=(gs||'').toLowerCase();const sex=s.includes('female')?'female':s.includes('male')?'male':'';let mod='';if(s.includes('spay'))mod='spayed';else if(s.includes('neuter')||s.includes('castrat'))mod='neutered';return((mod?mod+' ':'')+sex).trim();}
+function fmtDogDesc(d){if(!d)return'';const a=ageYears(d.birthday);const gp=genderPhrase(d.gender||d.genderStatus);const parts=['🐾'];if(a!==null)parts.push(a+' y/o');if(gp)parts.push(gp);if(d.breed)parts.push(d.breed);return parts.join(' ');}
 
 // ==================== CONSTANTS ====================
 const TABS={DOGS:'Dogs',BK:'Bookings',DAILY:'Daily-Log',HEALTH:'Health-Log',FIGHT:'Fight-Log',TRANSPORT:'Transport-Log',TRIAL:'Trial-Log',COSTS:'Costs',TARGETS:'Targets',TRAIN:'Staff-Training',CONSENT:'Consent',TPLS:'Templates',ACTS:'Activities',ACTLOG:'Activity-Log',RATES:'Rates'};
@@ -146,9 +175,9 @@ function showScreen(id,push=true){
   if(push)_stk.push(id);
   const isRoot=['sc-board','sc-quote','sc-business'].includes(id);
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
-  const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
+  const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-calendar':'Availability Calendar','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -557,9 +586,11 @@ async function saveLog(){
 }
 function buildSummary(dog){
   const alerts=[],notes=[];
-  const medVal=(dog.med||'').toLowerCase().trim();if(medVal&&medVal!=='none'&&medVal!=='n/a'&&medVal!=='na')alerts.push('Medical: '+dog.med);
-  if(dog.medSchedule)alerts.push('Med schedule: '+dog.medSchedule);
-  const algVal=(dog.allerg||'').toLowerCase().trim();if(algVal&&algVal!=='none'&&algVal!=='n/a'&&algVal!=='na')alerts.push('Allergies: '+dog.allerg);
+  // Don't raise an alert when the value is empty / No / N/A / None — nothing to be aware of.
+  const skipAlert=v=>{const s=(v||'').toLowerCase().trim();return !s||s==='no'||s==='none'||s==='n/a'||s==='na'||s==='-';};
+  if(!skipAlert(dog.med))alerts.push('Medical: '+dog.med);
+  if(!skipAlert(dog.medSchedule))alerts.push('Med schedule: '+dog.medSchedule);
+  if(!skipAlert(dog.allerg))alerts.push('Allergies: '+dog.allerg);
   const fearsVal=(dog.fears||'').toLowerCase().trim();if(fearsVal&&fearsVal!=='none'&&fearsVal!=='n/a'&&fearsVal!=='na'&&fearsVal!=='-')notes.push('Fears: '+dog.fears);if(dog.rescue==='Yes')notes.push('Rescue dog');
   if(parseInt(dog.nervous)>=4)notes.push('Very nervous ('+dog.nervous+'/5)');if(parseInt(dog.anxiety)>=4)notes.push('High sep. anxiety');
   const ageStr=calcAge(dog.birthday);const lines=[dog.name+' - '+(dog.breed||'dog')+(ageStr?' ('+ageStr+')':'')+', owned by '+(dog.owner||'unknown')+'.'];
@@ -984,6 +1015,8 @@ function renderSvcLines(){
 function calcMultiQ(){
   if(!_svcLines.length){document.getElementById('q_result').style.display='none';return;}
   const r=getRates();let total=0;const lines=[];const descParts=[];
+  // Holiday rates derived from base × 1.15, rounded to whole £ (board £38→£44, daycare £28→£32, +dog too)
+  const bH=holRate(r.board_std),baH=holRate(r.board_add),dH=holRate(r.day_std),daH=holRate(r.day_add);
   _svcLines.forEach(l=>{
     let amt=0;
     if(l.svc==='extra'){
@@ -1003,7 +1036,7 @@ function calcMultiQ(){
         const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;
         let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
         for(let ni=0;ni<nights;ni++){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
-        const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:r.board_hol;
+        const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:bH;
         const mainAmt=(sN*stdR)+(hN*holR);
         amt=mainAmt;
         const em='\u{1F4A4}';const allDogStr=dogs.join(' & ');
@@ -1014,29 +1047,29 @@ function calcMultiQ(){
         dp+='\n\n'+mainDog+':\n';
         if(sN>0&&hN>0){dp+=fmtGBP(stdR)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*stdR)+'\n'+fmtGBP(holR)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*holR)+'\nTotal: '+fmtGBP(mainAmt);}
         else{dp+=fmtGBP(sN>0?stdR:holR)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(mainAmt);}
-        if(exHrs>0){const baseN=sN>0?stdR:holR;const extAmt=exHrs<8?Math.round(baseN*0.5*100)/100:baseN;amt+=extAmt;lines.push([em+' Boarding \u2014 extra hours '+( exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h'+(hN>0&&sN===0?' holiday':'')+', '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
-        addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*r.board_addh);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n\n'+dog+' (additional dog):\n';if(sN>0&&hN>0){dp+=fmtGBP(r.board_add)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_add)+'\n'+fmtGBP(r.board_addh)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*r.board_addh)+'\nTotal: '+fmtGBP(addAmt);}else{dp+=fmtGBP(sN>0?r.board_add:r.board_addh)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(addAmt);}});
+        if(exHrs>0){const baseN=sN>0?stdR:holR;const extAmt=exHrs<8?roundGBP(baseN*0.5):baseN;amt+=extAmt;lines.push([em+' Boarding \u2014 extra hours '+( exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h'+(hN>0&&sN===0?' holiday':'')+', '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
+        addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*baH);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n\n'+dog+' (additional dog):\n';if(sN>0&&hN>0){dp+=fmtGBP(r.board_add)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_add)+'\n'+fmtGBP(baH)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*baH)+'\nTotal: '+fmtGBP(addAmt);}else{dp+=fmtGBP(sN>0?r.board_add:baH)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(addAmt);}});
         descParts.push(dp);
       }
     }else if(l.svc==='daycare'){
       const hol=l.sd?isHol(l.sd):false;
       const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
       const mainDog=dogs[0];const addDogs=dogs.slice(1);
-      const dayBase=l.rate>0?l.rate:(hol?r.day_hol:r.day_std);const mainAmt=dayBase;amt=mainAmt;
+      const dayBase=l.rate>0?l.rate:(hol?dH:r.day_std);const mainAmt=dayBase;amt=mainAmt;
       const em='\u2600\uFE0F';const allDogStr=dogs.join(' & ');
       lines.push([em+' Daycare \u2014 '+mainDog+(hol?' (holiday)':''),mainAmt]);
       let dp=em+' Daycare ('+allDogStr+'): '+fmtDate(l.sd||'')+'  Drop-off: '+(l.st2||'07:00')+'  Pick-up: '+(l.et||'18:00')+(hol?'\n\uD83C\uDFDD\uFE0F Holiday rate':'');
       dp+='\n'+mainDog+': '+fmtGBP(mainAmt);
-      addDogs.forEach(dog=>{const addAmt=hol?r.day_addh:r.day_add;amt+=addAmt;lines.push([em+' Daycare \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n'+dog+' (additional): '+fmtGBP(addAmt);});
+      addDogs.forEach(dog=>{const addAmt=hol?daH:r.day_add;amt+=addAmt;lines.push([em+' Daycare \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n'+dog+' (additional): '+fmtGBP(addAmt);});
       const [eph,epm]=(l.et||'18:00').split(':').map(Number);const ptD=eph+epm/60;
-      if(ptD>18&&ptD<=23){const eveSur=Math.round(dayBase*(r.evening_pct/100)*100)/100;amt+=eveSur;lines.push([em+' Daycare \u2014 evening care (6\u201311PM, +'+r.evening_pct+'%)',eveSur]);dp+='\nEvening care (pick-up '+(l.et||'18:00')+'): +'+r.evening_pct+'% = '+fmtGBP(eveSur);}
+      if(ptD>18&&ptD<=23){const eveSur=roundGBP(dayBase*(r.evening_pct/100));amt+=eveSur;lines.push([em+' Daycare \u2014 evening care (6\u201311PM, +'+r.evening_pct+'%)',eveSur]);dp+='\nEvening care (pick-up '+(l.et||'18:00')+'): +'+r.evening_pct+'% = '+fmtGBP(eveSur);}
       if(hol)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on this day';
       descParts.push(dp);
     }else if(isTaxi){
       const subDef=SVC_SUBTYPES.taxi?.find(s=>s.key===l.sub);
       const baseRate=l.rate||(subDef?r[subDef.rk]||0:r.t30r);
       const holMult=l.sd&&isHol(l.sd)?1.15:1;
-      amt=Math.round(baseRate*holMult*100)/100;
+      amt=roundGBP(baseRate*holMult);
       const isHolDay=holMult>1;const subLabel=subDef?.label||'';
       lines.push(['\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(isHolDay?' holiday +15%':''),amt]);
       descParts.push('\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(l.sd?' \u2014 '+fmtDate(l.sd):'')+(isHolDay?' \uD83C\uDFDD\uFE0F Holiday rate (+15%)':'')+': '+fmtGBP(amt));
@@ -1044,8 +1077,8 @@ function calcMultiQ(){
       const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
       const mainDog=dogs[0];const addDogs=dogs.slice(1);
       const holMult=l.sd&&isHol(l.sd)?1.15:1;const isHolDay=holMult>1;
-      const baseRate=l.rate||0;const mainRate=Math.round(baseRate*holMult*100)/100;
-      const addRateBase=l.rka?r[l.rka]||0:0;const addRate=Math.round(addRateBase*holMult*100)/100;
+      const baseRate=l.rate||0;const mainRate=roundGBP(baseRate*holMult);
+      const addRateBase=l.rka?r[l.rka]||0:0;const addRate=roundGBP(addRateBase*holMult);
       amt=mainRate;const em=SVC_EMOJIS[l.svc]||'';const svcName=SVC_NAMES[l.svc]||l.svc;
       const subLabel=l.sub&&SVC_SUBTYPES[l.svc]?SVC_SUBTYPES[l.svc].find(s=>s.key===l.sub)?.label||'':'';
       const allDogStr=dogs.join(' & ');
@@ -1065,7 +1098,7 @@ function calcMultiQ(){
         const hrs2=(pickDt2-dropDt2)/3600000;const nights2a=Math.max(1,Math.floor(hrs2/24));
         let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
         for(let ni=0;ni<nights2a;ni++){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
-        const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:r.board_hol;
+        const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:bH;
         const nights2=sN2+hN2;const mainAmt2=(sN2*stdR2)+(hN2*holR2);amt=mainAmt2;
         let dp2=em+' Dog Sit ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
         if(hN2>0)dp2+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN2+' night'+(hN2!==1?'s':'');
@@ -1091,8 +1124,9 @@ function calcMultiQ(){
   let discLine='';
   if(discType==='pct'&&discVal>0){const da=total*(discVal/100);total-=da;discLine='Discount '+discVal+'%: -'+fmtGBP(da);lines.push(['Discount '+discVal+'%',-da]);}
   else if(discType==='gbp'&&discVal>0){total-=discVal;discLine='Discount: -'+fmtGBP(discVal);lines.push(['Discount',-discVal]);}
+  total=roundGBP(total); // whole-£ quote total (round after any discount)
   const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
-  const prepayAmt=total*(prepayPct/100);const finalAmt=total-prepayAmt;
+  const prepayAmt=roundGBP(total*(prepayPct/100));const finalAmt=total-prepayAmt; // outstanding = remainder, so they sum exactly
   _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts,dogRevMap:_computeDogRevMap()};
   document.getElementById('q_total').textContent=fmtGBP(total);
   document.getElementById('q_breakdown').innerHTML=lines.map((l,i)=>'<div class="q-ln"'+(i===lines.length-1?' style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:4px;"':'')+'>'+
@@ -1104,17 +1138,19 @@ function calcMultiQ(){
 }
 
 function getRates(){return JSON.parse(localStorage.getItem('tcl_rates')||JSON.stringify(DR));}
+// Auto-fill the read-only holiday-rate fields from their base rate × 1.15 (rounded). Called on load + base-rate edit.
+function recalcHolFields(){const set=(id,base)=>{const el=document.getElementById(id),b=document.getElementById(base);if(el&&b)el.value=holRate(parseFloat(b.value)||0);};set('r_board_hol','r_board_std');set('r_board_addh','r_board_add');set('r_day_hol','r_day_std');}
 function getHolRanges(){return JSON.parse(localStorage.getItem('tcl_hol_ranges')||JSON.stringify(DEFAULT_RANGES));}
 function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');return{quote:s.quote||TP_QUOTE,book:s.book||TP_BOOK,prepay:s.prepay||TP_PREPAY,final:s.final||TP_FINAL,avail:s.avail||TP_AVAIL,payLink:s.payLink||'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:s.payRefPfx||'KCHEUNG'};}
 function isHol(d){return getHolRanges().some(r=>d>=r.start&&d<=r.end);}
 function getHolDates(sd,ed){const ranges=getHolRanges();const dates=[];let d=new Date(sd+'T12:00:00');const e=new Date(ed+'T12:00:00');while(d<e){const ds=d.toISOString().split('T')[0];if(ranges.some(r=>ds>=r.start&&ds<=r.end))dates.push(ds);d.setDate(d.getDate()+1);}return dates;}
 function loadQSettings(){
-  const r=getRates();['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r','walk30','walk60','walk30a','walk60a','walk30_11','walk60_11','dropin30','dropin60','dropin30a','dropin60a'].forEach(k=>{const el=document.getElementById('r_'+k);if(el)el.value=r[k]!=null?r[k]:DR[k];});
+  const r=getRates();['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r','walk30','walk60','walk30a','walk60a','walk30_11','walk60_11','dropin30','dropin60','dropin30a','dropin60a'].forEach(k=>{const el=document.getElementById('r_'+k);if(el)el.value=r[k]!=null?r[k]:DR[k];});recalcHolFields();
   renderHolList();renderHolYrBtns();const t=getTpls();const qe=document.getElementById('tpl_quote');const be=document.getElementById('tpl_book');const pe=document.getElementById('tpl_prepay');const fe=document.getElementById('tpl_final');if(qe)qe.value=t.quote;if(be)be.value=t.book;if(pe)pe.value=t.prepay;if(fe)fe.value=t.final;
   const pl=document.getElementById('tpl_paylink');const pp=document.getElementById('tpl_payref_pfx');if(pl)pl.value=t.payLink||'';if(pp)pp.value=t.payRefPfx||'';
 }
 function toggleSP(id){document.getElementById('sp-'+id).classList.toggle('open');}
-async function saveRates(){const r={};['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r','walk30','walk60','walk30a','walk60a','walk30_11','walk60_11','dropin30','dropin60','dropin30a','dropin60a'].forEach(k=>r[k]=parseFloat(document.getElementById('r_'+k)?.value)||DR[k]);localStorage.setItem('tcl_rates',JSON.stringify(r));const s=document.getElementById('rateStatus');s.textContent='Saving...';s.className='smsg';
+async function saveRates(){const r={};['board_std','board_hol','board_add','board_addh','day_std','day_hol','day_add','day_addh','evening_pct','t15s','t15r','t30s','t30r','t60s','t60r','walk30','walk60','walk30a','walk60a','walk30_11','walk60_11','dropin30','dropin60','dropin30a','dropin60a'].forEach(k=>r[k]=parseFloat(document.getElementById('r_'+k)?.value)||DR[k]);r.board_hol=holRate(r.board_std);r.board_addh=holRate(r.board_add);r.day_hol=holRate(r.day_std);r.day_addh=holRate(r.day_add);localStorage.setItem('tcl_rates',JSON.stringify(r));const s=document.getElementById('rateStatus');s.textContent='Saving...';s.className='smsg';
   try{
     const rows=await readSheet(TABS.RATES,'A2:C').catch(()=>[]);const existIdx=rows.findIndex(r=>r[0]==='tcl_rates');
     if(existIdx>=0){await updateRow(TABS.RATES,existIdx+2,['tcl_rates',JSON.stringify(r),new Date().toISOString()]);}
@@ -1169,6 +1205,7 @@ function autoGenPayRef(){
 }
 function _computeDogRevMap(){
   const r=getRates();const map={};
+  const bH=holRate(r.board_std),baH=holRate(r.board_add),dH=holRate(r.day_std),daH=holRate(r.day_add);
   const add=(name,a)=>{if(name&&a>0)map[name]=Math.round(((map[name]||0)+a)*100)/100;};
   _svcLines.forEach(l=>{
     if(l.svc==='extra'||l.svc==='taxi')return;
@@ -1180,15 +1217,15 @@ function _computeDogRevMap(){
       const hd=getHolDates(l.sd,l.ed);let hN=0,sN=0;
       let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
       for(let ni=0;ni<nights;ni++){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
-      let mAmt=(sN*r.board_std)+(hN*r.board_hol);
-      if(exHrs>0){const bn=sN>0?r.board_std:r.board_hol;mAmt+=exHrs<8?Math.round(bn*0.5*100)/100:bn;}
-      add(main,mAmt);addDogs.forEach(dog=>add(dog,(sN*r.board_add)+(hN*r.board_addh)));
+      let mAmt=(sN*r.board_std)+(hN*bH);
+      if(exHrs>0){const bn=sN>0?r.board_std:bH;mAmt+=exHrs<8?roundGBP(bn*0.5):bn;}
+      add(main,mAmt);addDogs.forEach(dog=>add(dog,(sN*r.board_add)+(hN*baH)));
     }else if(l.svc==='daycare'&&l.sd){
-      const hol=isHol(l.sd);add(main,hol?r.day_hol:r.day_std);
-      addDogs.forEach(dog=>add(dog,hol?r.day_addh:r.day_add));
+      const hol=isHol(l.sd);add(main,hol?dH:r.day_std);
+      addDogs.forEach(dog=>add(dog,hol?daH:r.day_add));
     }else if((l.svc==='walk'||l.svc==='dropin')&&l.rate){
-      const hm=l.sd&&isHol(l.sd)?1.15:1;const mr=Math.round(l.rate*hm*100)/100;
-      const ar=l.rka?Math.round((r[l.rka]||0)*hm*100)/100:0;
+      const hm=l.sd&&isHol(l.sd)?1.15:1;const mr=roundGBP(l.rate*hm);
+      const ar=l.rka?roundGBP((r[l.rka]||0)*hm):0;
       add(main,mr);addDogs.forEach(dog=>add(dog,ar));
     }else if(l.svc==='dogsit'&&l.sd&&l.ed){
       const hd2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
@@ -1196,9 +1233,10 @@ function _computeDogRevMap(){
       const hrsDs=(pickDtDs-dropDtDs)/3600000;const nightsDs=Math.max(1,Math.floor(hrsDs/24));
       let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
       for(let ni=0;ni<nightsDs;ni++){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
-      add(main,(sN2*r.board_std)+(hN2*r.board_hol));
+      add(main,(sN2*r.board_std)+(hN2*bH));
     }else if(l.rate){const qty=l.qty||1;add(main,(l.rate||0)*qty);}
   });
+  Object.keys(map).forEach(k=>map[k]=roundGBP(map[k])); // whole-£ per-dog amounts, matching the quote
   return map;
 }
 function onQSvc(){}
@@ -1252,7 +1290,7 @@ function genRateBlock(){
     if(svc==='daycare')return '\u2600\ufe0f Day Care (per day, 10 hours)\nDrop-off after 7AM \u00b7 Pick-up before 6PM\nPer day: '+fmtGBP(r.day_std)+'\nAdditional pet: '+fmtGBP(r.day_add)+'/day\nEvening care (6\u201311PM): +'+r.evening_pct+'%\nHoliday rate: +15%';
     if(svc==='walk')return '\ud83d\udc15 Dog Walk\n30 min: '+fmtGBP(r.walk30)+' / Additional pet: '+fmtGBP(r.walk30a)+'\n60 min: '+fmtGBP(r.walk60)+' / Additional pet: '+fmtGBP(r.walk60a)+'\nHoliday rate: +15%';
     if(svc==='dropin')return '\ud83d\udd11 Drop-in Visit\n30 min: '+fmtGBP(r.dropin30)+' / 60 min: '+fmtGBP(r.dropin60)+'\nAdditional pet \u2014 30 min: '+fmtGBP(r.dropin30a)+' / 60 min: '+fmtGBP(r.dropin60a)+'\nHoliday rate: +15%';
-    if(svc==='dogsit')return '\ud83d\udecb\ufe0f Dog Sit\nPer night: '+fmtGBP(r.board_std)+'\nHoliday rate: '+fmtGBP(r.board_hol)+'/night';
+    if(svc==='dogsit')return '\ud83d\udecb\ufe0f Dog Sit\nPer night: '+fmtGBP(r.board_std)+'\nHoliday rate: '+fmtGBP(holRate(r.board_std))+'/night';
     if(svc==='taxi')return '\ud83d\ude95 Pet Taxi\n15 min \u2014 single: '+fmtGBP(r.t15s)+' / return: '+fmtGBP(r.t15r)+'\n30 min \u2014 single: '+fmtGBP(r.t30s)+' / return: '+fmtGBP(r.t30r)+'\n60 min \u2014 single: '+fmtGBP(r.t60s)+' / return: '+fmtGBP(r.t60r)+'\nHoliday rate: +15%';
     if(svc==='training')return '\ud83c\udfc5 Training\nPricing not available yet \u2014 please contact us for details';
     return '';
@@ -1339,7 +1377,7 @@ async function markBookingsQuotedFromQuote(){
           existing.status='Quoted';changed=true;
         }
       }else if(sd){
-        const id=nextBkId();const month=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'});
+        const id=nextBkId(sd);const month=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'});
         const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dogName,id,svc:svcLabel,sd,st:mainLine.st2||'09:00',ed:ed||sd,et:mainLine.et||'18:00',dropLoc:'',pickLoc:'',rev:0,tips:0,prepay:0,finalPay:0,unit:0,discNotes:'',roverPct:0,roverAmt:0,ch:'TCL',pay:'',status:'Quoted',priv:false,month,rating:'',feedback:'',rem:['','','','','']}),TABS.BK.h);
         await appendRow(TABS.BK,vals);
         bookings.push(mapBk(vals,bookings.length,mkHdr(bkHdrRow)));changed=true;
@@ -1366,7 +1404,7 @@ async function createBookingsFromQuote(){
     const sd=line.sd||'';const ed=line.ed||sd;const st=line.st2||'09:00';const et=line.et||'18:00';
     const svcLabel=svcN[line.svc]||line.svc;
     for(const dogName of dogs){
-      const id=nextBkId();
+      const id=nextBkId(sd);
       const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
       const rev=line.svc==='taxi'?(_cr.lines.find(l=>l[0].includes('Taxi'))?.[1]||0):revenueMap[dogName]||0;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
@@ -1393,7 +1431,16 @@ function quoteFromBk(){
 }
 
 // ==================== BOOKINGS ====================
-function nextBkId(){let max=0;bookings.forEach(b=>{const m=(b.id||'').match(/^BK-BD-(\d+)$/);if(m)max=Math.max(max,parseInt(m[1],10));});const n=max+1;return'BK-BD-'+(n<10?'00'+n:n<100?'0'+n:''+n);}
+// Booking ID: BK-BD-YYMM-XXXX (YY+MM from the booking start date, + 4-char random). Year-scoped + random
+// avoids the old sequential BK-BD-### cap (999) and its concurrent-creation collisions. Checked for uniqueness.
+function nextBkId(sd){
+  const d=(sd&&/^\d{4}-\d{2}/.test(sd))?sd:todayStr();
+  const yymm=d.slice(2,4)+d.slice(5,7);
+  const used=new Set(bookings.map(b=>b.id).filter(Boolean));
+  const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let id,guard=0;do{id='BK-BD-'+yymm+'-'+Array.from({length:4},()=>A[Math.floor(Math.random()*36)]).join('');}while(used.has(id)&&++guard<50);
+  return id;
+}
 function openBkModal(editId=null,fromProf=false,editRi=null){
   const modal=document.getElementById('bkModal');const ed=editId&&(editRi?bookings.find(r=>r.id===editId&&r.ri===editRi):bookings.find(r=>r.id===editId));
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
@@ -1447,7 +1494,10 @@ function wfAutoCompat(bk){
       const tCid=t.cid||'';
       const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
       const matchesPrimary=bkCid?tCid===bkCid:(t.dog||'').toLowerCase()===bkDog;
-      const matchesMixed=mixedParts.some(m=>m.includes(mixedDog)||(mixedCid&&m.includes(mixedCid.toLowerCase())));
+      // Match on the whole CID token (stored as "CID DogName") to avoid substring false-positives
+      // e.g. "TCL-CB101" must not match a log for "TCL-CB1017", and a comma in a dog name won't break CID matching
+      const mc=(mixedCid||'').toLowerCase();
+      const matchesMixed=mc?mixedParts.some(m=>m===mc||m.startsWith(mc+' ')):mixedParts.some(m=>m===mixedDog||m.endsWith(' '+mixedDog));
       return matchesPrimary&&matchesMixed&&t.date>=bk.sd&&t.date<=(bk.ed||bk.sd);
     });
   });
@@ -1456,7 +1506,7 @@ async function persistAutoWf(bk,key){
   if(!bk||!bk.ri)return;
   const updated={...bk.wf,[key]:'auto'};
   const vals=rowFromMap(bkHdrRow,bkFieldMap({...bk,wf:updated}),TABS.BK.h);
-  try{await updateRow(TABS.BK,bk.ri,vals);bk.wf[key]='auto';const idx=bookings.findIndex(b=>b.id===bk.id);if(idx>=0)bookings[idx].wf[key]='auto';}catch(e){}
+  try{await updateRow(TABS.BK,bk.ri,vals);bk.wf[key]='auto';const idx=bookings.findIndex(b=>bk.ri?b.ri===bk.ri:b.id===bk.id);if(idx>=0)bookings[idx].wf[key]='auto';}catch(e){}
 }
 function wfStepValue(bk,key){
   const sv=bk.wf||{};
@@ -1472,7 +1522,7 @@ function wfCompletion(bk){
   return{done,total:WF_STEPS.length,pct:Math.round(done/WF_STEPS.length*100),allDone:done===WF_STEPS.length};
 }
 async function toggleWfStep(eid,key,checked){
-  const bk=bookings.find(b=>b.id===eid);if(!bk)return;
+  const bk=bkByRef(eid,parseInt(document.getElementById('bm_ridx')?.value)||null);if(!bk)return;
   if(!bk.wf)bk.wf={};
   const prev=bk.wf[key];
   if(key==='review')bk.wf.review=checked?'done':'';
@@ -1484,7 +1534,7 @@ async function toggleWfStep(eid,key,checked){
   renderWfChecklist();updateStatusFlow();updatePendingBadge();
 }
 async function setWfReviewNA(eid,isNA){
-  const bk=bookings.find(b=>b.id===eid);if(!bk)return;
+  const bk=bkByRef(eid,parseInt(document.getElementById('bm_ridx')?.value)||null);if(!bk)return;
   if(!bk.wf)bk.wf={};
   const prev=bk.wf.review;
   bk.wf.review=isNA?'na':'';
@@ -1498,7 +1548,7 @@ function renderWfChecklist(){
   const c=document.getElementById('bm_workflow');if(!c)return;
   const eid=document.getElementById('bm_eid')?.value;
   if(!eid){c.innerHTML='<div style="font-size:9px;color:var(--gr3);">Save the booking first to track its workflow checklist.</div>';return;}
-  const bk=bookings.find(b=>b.id===eid);if(!bk)return;
+  const bk=bkByRef(eid,parseInt(document.getElementById('bm_ridx')?.value)||null);if(!bk)return;
   // Persist auto-computed WF fields if newly true
   const autoLogsVal=wfAutoLogs(bk);if(autoLogsVal===true&&!bk.wf?.dailyLogs)persistAutoWf(bk,'dailyLogs').catch(()=>{});
   const autoCompatVal=wfAutoCompat(bk);if(autoCompatVal===true&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
@@ -1537,7 +1587,7 @@ function renderOverlapCheck(){
   const seen=new Set();const names=overlaps.filter(b=>{const k=b.customerId||b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
   const dogEsc=(dog||'').replace(/'/g,"\\'");
   const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log full Trial-Log entry</button>':'';
-  const bk=dogObj?bookings.find(b=>b.id===eid):null;
+  const bk=dogObj?bkByRef(eid,parseInt(document.getElementById('bm_ridx')?.value)||null):null;
   const bkSd=bk?bk.sd:sd;const bkEd=bk?bk.ed||bk.sd:ed||sd;
   c.innerHTML='<div style="font-size:9px;color:var(--gr3);margin-bottom:5px;">⚠️ Other dogs staying during this period — log how they got on:</div>'+
     names.map(b=>{
@@ -1548,7 +1598,8 @@ function renderOverlapCheck(){
         const tCid=t.cid||'';
         const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
         const matchesPrimary=dogObj?tCid===dogObj.cid:(t.dog||'').toLowerCase()===(dog||'').toLowerCase();
-        const matchesMixed=mixedParts.some(m=>m.includes((b.dog||'').toLowerCase())||(b.customerId&&m.includes(b.customerId.toLowerCase())));
+        const md=(b.dog||'').toLowerCase();const mc=(b.customerId||'').toLowerCase();
+        const matchesMixed=mc?mixedParts.some(m=>m===mc||m.startsWith(mc+' ')):mixedParts.some(m=>m===md||m.endsWith(' '+md));
         return matchesPrimary&&matchesMixed&&t.date>=bkSd&&t.date<=bkEd;
       });
       const curResult=existingLog?.suitable||'';
@@ -1606,7 +1657,7 @@ function updateStatusFlow(){const v=document.getElementById('bm_status')?.value|
   const warnEl=document.getElementById('bm_status_warn');
   if(warnEl){
     if(isCompleted){
-      const eid=document.getElementById('bm_eid')?.value;const bk=eid?bookings.find(b=>b.id===eid):null;
+      const eid=document.getElementById('bm_eid')?.value;const bk=eid?bkByRef(eid,parseInt(document.getElementById('bm_ridx')?.value)||null):null;
       const comp=bk?wfCompletion(bk):{allDone:false,done:0,total:WF_STEPS.length};
       warnEl.style.display=comp.allDone?'none':'block';
       warnEl.textContent='⚠️ Workflow checklist incomplete ('+comp.done+'/'+comp.total+'). Scroll down to finish before marking Completed.';
@@ -1624,14 +1675,14 @@ async function saveBk(){
   if(eid&&!ri){const existing=bookings.find(b=>b.id===eid);if(existing?.ri)ri=existing.ri;}
   const rev=parseFloat(document.getElementById('bm_rev').value)||0;const tips=parseFloat(document.getElementById('bm_tips').value)||0;const pre=parseFloat(document.getElementById('bm_prepay').value)||0;const fin=parseFloat(document.getElementById('bm_final').value)||0;const unit=parseFloat(document.getElementById('bm_unit').value)||0;
   const ch=document.getElementById('bm_channel').value;const rPct=ch==='Rover'?(parseFloat(document.getElementById('bm_rpct').value)||0):0;const rAmt=ch==='Rover'?(parseFloat(document.getElementById('bm_ramt').value)||0):0;
-  const priv=document.getElementById('bm_priv').checked;const id=eid||nextBkId();const rems=eid?(bookings.find(b=>b.id===eid)?.rem||['','','','','']):['','','','',''];
+  const priv=document.getElementById('bm_priv').checked;const id=eid||nextBkId(document.getElementById('bm_sd').value);const rems=eid?(bkByRef(eid,ri)?.rem||['','','','','']):['','','','',''];
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
   const dogData=allDogs.find(d=>d.name===dog);const customerId=dogData?dogData.cid:'';
-  const existingWf=eid?(bookings.find(b=>b.id===eid)?.wf||{}):{};
+  const existingWf=eid?(bkByRef(eid,ri)?.wf||{}):{};
   const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dog,id,svc:document.getElementById('bm_svc').value,sd,st:document.getElementById('bm_st').value,ed:document.getElementById('bm_ed').value,et:document.getElementById('bm_et').value,dropLoc:gv('bm_drop_loc'),pickLoc:gv('bm_pick_loc'),rev,tips,prepay:pre,finalPay:fin,unit,discNotes:document.getElementById('bm_disc_notes').value,roverPct:rPct,roverAmt:rAmt,ch,pay:document.getElementById('bm_pay').value,status:document.getElementById('bm_status').value,priv,month,rating:gv('bm_rating'),feedback:gv('bm_feedback'),rem:rems,wf:existingWf,bookingRef:gv('bm_ref'),prepayRef:gv('bm_prepay_ref'),finalPayRef:gv('bm_final_ref')}),TABS.BK.h);
   try{
     if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
-    const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
+    const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>ri?r.ri===ri:r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
     st.textContent='Saved!';st.className='smsg ok';setTimeout(()=>{document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();renderBoard();updatePendingBadge();},1400);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';_bkSaving=false;}
 }
@@ -1705,7 +1756,7 @@ async function syncTargetsFromSheet(){
 function buildPLTable(yr){
   const tgts=getTargets(yr);const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0,rover:0};});
   const active=['Prepaid','Fully Paid','Credit'];
-  bookings.forEach(r=>{const ned=normDate(r.ed);if(!ned||!ned.startsWith(yr))return;const mo=new Date(ned+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=actualRev(r);if(active.includes(r.status))monthly[mo].rover+=(r.roverAmt||0);}});
+  bookings.forEach(r=>{const rev=actualRev(r),rov=r.roverAmt||0,isA=active.includes(r.status);bkMonthFractions(r).forEach(s=>{if(s.y!==yr||!monthly[s.mo])return;monthly[s.mo].rev+=rev*s.frac;if(isA)monthly[s.mo].rover+=rov*s.frac;});});
   costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   document.getElementById('plTbl').innerHTML=MOS.map(m=>{const tgt=tgts[m];const act=monthly[m];const totalCost=act.cost+act.rover;const net=act.rev-totalCost;
     const netTgt=tgt.rev-tgt.cost;
@@ -1729,8 +1780,8 @@ async function saveTargets(){
 }
 function updatePL(){
   const yr=document.getElementById('plYear')?.value||'2026';const tgts=getTargets(yr);const revTgt=Object.values(tgts).reduce((s,t)=>s+t.rev,0);const costTgt=Object.values(tgts).reduce((s,t)=>s+t.cost,0);
-  const active=['Prepaid','Fully Paid','Credit'];const yRec=bookings.filter(r=>r.ed&&normDate(r.ed).startsWith(yr));const normCosts=costs.map(c=>({...c,_nd:normDate(c.date)}));
-  const totalRev=yRec.reduce((s,r)=>s+actualRev(r),0);const totalRover=yRec.filter(r=>active.includes(r.status)).reduce((s,r)=>s+(r.roverAmt||0),0);
+  const active=['Prepaid','Fully Paid','Credit'];const fracYr=r=>bkMonthFractions(r).filter(s=>s.y===yr).reduce((a,s)=>a+s.frac,0);const yRec=bookings.filter(r=>fracYr(r)>0);const normCosts=costs.map(c=>({...c,_nd:normDate(c.date)}));
+  const totalRev=yRec.reduce((s,r)=>s+actualRev(r)*fracYr(r),0);const totalRover=yRec.filter(r=>active.includes(r.status)).reduce((s,r)=>s+(r.roverAmt||0)*fracYr(r),0);
   const totalCost=normCosts.filter(c=>c._nd&&c._nd.startsWith(yr)).reduce((s,c)=>s+(c.amount||0),0)+totalRover;const net=totalRev-totalCost;const pct=revTgt>0?(totalRev/revTgt*100):0;
   document.getElementById('kpi_rev').textContent=fmtGBP(totalRev);document.getElementById('kpi_rev_s').textContent='vs '+fmtGBP(revTgt)+' target';
   document.getElementById('kpi_pct').textContent=pct.toFixed(1)+'%';document.getElementById('kpi_cost').textContent=fmtGBP(totalCost);
@@ -1741,7 +1792,7 @@ function updatePL(){
 }
 function drawChart(yr,tgts){
   const monthly={};MOS.forEach(m=>{monthly[m]={rev:0,cost:0};});const active=['Prepaid','Fully Paid','Credit'];
-  bookings.forEach(r=>{const ned=normDate(r.ed);if(!ned||!ned.startsWith(yr))return;const mo=new Date(ned+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo]){monthly[mo].rev+=actualRev(r);if(active.includes(r.status))monthly[mo].cost+=(r.roverAmt||0);}});
+  bookings.forEach(r=>{const rev=actualRev(r),rov=r.roverAmt||0,isA=active.includes(r.status);bkMonthFractions(r).forEach(s=>{if(s.y!==yr||!monthly[s.mo])return;monthly[s.mo].rev+=rev*s.frac;if(isA)monthly[s.mo].cost+=rov*s.frac;});});
   costs.forEach(c=>{const nd=normDate(c.date);if(!nd||!nd.startsWith(yr))return;const mo=new Date(nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(monthly[mo])monthly[mo].cost+=(c.amount||0);});
   const rd=MOS.map(m=>monthly[m].rev);const cd=MOS.map(m=>monthly[m].cost);const rt=MOS.map(m=>tgts[m].rev);const ct=MOS.map(m=>tgts[m].cost);
   const nd=MOS.map(m=>monthly[m].rev-monthly[m].cost);const nt=MOS.map(m=>tgts[m].rev-tgts[m].cost);
@@ -1754,20 +1805,124 @@ function drawChart(yr,tgts){
   document.getElementById('plChart').innerHTML='<g font-family="system-ui,sans-serif">'+g+poly(nt.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#DCFCE7','4,3')+poly(rt.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#FED7AA','4,3')+poly(ct.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#7DD3FC','3,3')+poly(cd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#1E40AF')+poly(nd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#16A34A')+poly(rd.map((v,i)=>xi(i)+','+yi(v)).join(' '),'#F97316')+dots+lbl+'</g>';
 }
 
+// ==================== CALENDAR (Feature 1) ====================
+// Availability calendar. Capacity = 4 dogs/night (boarding + dog-sit occupy each night sd..ed-1; day-care occupies its day).
+const CAL_CAP=4;
+let _calView='month',_calAnchor=todayStr(),_calSelDay='';
+const CAL_ACTIVE=['Booked','Prepaid','Fully Paid','Credit','Completed'];
+function _svcKind(b){const s=(b.svc||'').toLowerCase();if(s.includes('boarding')||s.includes('dogsit')||s.includes('dog sit'))return'stay';if(s.includes('daycare')||s.includes('day care'))return'day';return'visit';}
+// Dogs occupying an overnight place on the night of dateStr (boarding/dog-sit nights sd..ed-1; day-care on its day).
+function occupantsOn(dateStr){
+  const res=[];
+  bookings.forEach(b=>{if(!CAL_ACTIVE.includes(b.status))return;const k=_svcKind(b);const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
+    if(k==='stay'){if(nsd<=dateStr&&dateStr<(ned||nsd))res.push(b);}
+    else if(k==='day'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}});
+  return res;
+}
+// All events touching a date: arrivals (drop-off), departures (pick-up), day-care visits, other visits — with times.
+function eventsOn(dateStr){
+  const arrivals=[],departures=[],daycare=[],visits=[];
+  bookings.forEach(b=>{if(!CAL_ACTIVE.includes(b.status))return;const k=_svcKind(b);const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
+    if(k==='stay'){if(nsd===dateStr)arrivals.push({b,t:b.st||'09:00'});if(ned===dateStr)departures.push({b,t:b.et||'18:00'});}
+    else if(k==='day'){if(nsd<=dateStr&&dateStr<=(ned||nsd))daycare.push({b,drop:b.st||'07:00',pick:b.et||'18:00'});}
+    else{if(nsd===dateStr)visits.push({b,t:b.st||''});}});
+  const byT=(a,c)=>(a.t||'').localeCompare(c.t||'');
+  return{arrivals:arrivals.sort(byT),departures:departures.sort(byT),daycare:daycare.sort((a,c)=>(a.drop||'').localeCompare(c.drop||'')),visits:visits.sort(byT)};
+}
+function _capCol(n){return n>=CAL_CAP?'var(--rd)':n===CAL_CAP-1?'var(--or)':n>0?'var(--gn)':'var(--gr3)';}
+function setCalView(v){_calView=v;renderCalendar();}
+function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*7);_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
+function calToday(){_calAnchor=todayStr();_calSelDay='';renderCalendar();}
+function _mondayOf(dateStr){const d=new Date(dateStr+'T12:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d;}
+function _dstr(d){return d.toISOString().slice(0,10);}
+function renderCalendar(){
+  const host=document.getElementById('sc-calendar');if(!host)return;
+  document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===_calView));
+  document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calWeekHtml();
+  if(_calView==='month'&&_calSelDay)document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(_calSelDay);
+}
+function selCalDay(ds){_calSelDay=ds;document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(ds);document.querySelectorAll('.cal-cell').forEach(c=>c.classList.toggle('sel',c.dataset.d===ds));}
+function _calMonthHtml(){
+  const anchor=new Date(_calAnchor+'T12:00:00');const y=anchor.getFullYear(),m=anchor.getMonth();
+  const title=anchor.toLocaleString('en-GB',{month:'long',year:'numeric'});
+  const first=new Date(y,m,1);const start=_mondayOf(_dstr(first));const today=todayStr();
+  let cells='';
+  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const inMo=d.getMonth()===m;
+    const occ=occupantsOn(ds).length;const ev=eventsOn(ds);
+    const col=_capCol(occ);const isToday=ds===today;
+    const chips=occupantsOn(ds).slice(0,3).map(b=>'<span style="font-size:7px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gr2);">'+(b.dog||'')+'</span>').join('');
+    const arrDep=(ev.arrivals.length?'<span style="color:var(--gn);">▲'+ev.arrivals.length+'</span> ':'')+(ev.departures.length?'<span style="color:var(--sk);">▼'+ev.departures.length+'</span>':'');
+    cells+='<div class="cal-cell'+(inMo?'':' out')+(isToday?' today':'')+(ds===_calSelDay?' sel':'')+'" data-d="'+ds+'" onclick="selCalDay(\''+ds+'\')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:10px;font-weight:700;'+(inMo?'':'color:var(--gr3);')+'">'+d.getDate()+'</span>'+
+      (occ>0?'<span style="font-size:8px;font-weight:800;color:'+col+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+
+      chips+(occupantsOn(ds).length>3?'<span style="font-size:7px;color:var(--gr3);">+'+(occupantsOn(ds).length-3)+'</span>':'')+
+      '<div style="font-size:7px;margin-top:1px;">'+arrDep+'</div></div>';
+  }
+  const hdr=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-align:center;padding:2px 0;">'+d+'</div>').join('');
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;font-weight:800;">'+title+'</span>'+
+    '<span style="font-size:8px;color:var(--gr2);">▲ arrivals · ▼ departures · n/'+CAL_CAP+' places</span></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">'+hdr+cells+'</div>'+
+    '<div id="calDayDetail" style="margin-top:10px;"></div>';
+}
+function _fmtT(t){return t||'';}
+function _calDayDetailHtml(ds){
+  const ev=eventsOn(ds);const occ=occupantsOn(ds);const remaining=Math.max(0,CAL_CAP-occ.length);
+  const d=new Date(ds+'T12:00:00');const dTitle=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+  const row=(icon,txt,time,col)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--gr4);"><span style="font-size:11px;">'+icon+' '+txt+'</span><span style="font-size:10px;font-weight:700;color:'+(col||'var(--gr2)')+';">'+time+'</span></div>';
+  let h='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:800;">'+dTitle+'</span>'+
+    '<span style="font-size:10px;font-weight:800;color:'+_capCol(occ.length)+';">'+occ.length+'/'+CAL_CAP+' places'+(remaining>0?' · '+remaining+' free':' · FULL')+'</span></div>';
+  if(!ev.arrivals.length&&!ev.departures.length&&!ev.daycare.length&&!ev.visits.length&&!occ.length)h+='<div style="font-size:10px;color:var(--gr3);">No bookings this day.</div>';
+  ev.arrivals.forEach(a=>h+=row('🟢 Arrive',a.b.dog+' (boarding)','⬇ '+_fmtT(a.t),'var(--gn)'));
+  ev.departures.forEach(a=>h+=row('🔵 Depart',a.b.dog+' (boarding)','⬆ '+_fmtT(a.t),'var(--sk)'));
+  ev.daycare.forEach(a=>h+=row('☀️ Day care',a.b.dog,_fmtT(a.drop)+' → '+_fmtT(a.pick),'var(--or)'));
+  ev.visits.forEach(a=>h+=row('🐕 Visit',a.b.dog+' ('+(a.b.svc||'')+')',_fmtT(a.t),'var(--pu)'));
+  // continuing stays (present but not arriving/departing today)
+  const arrDepIds=new Set([...ev.arrivals,...ev.departures].map(x=>x.b.ri));
+  const staying=occ.filter(b=>_svcKind(b)==='stay'&&!arrDepIds.has(b.ri));
+  if(staying.length)h+='<div style="font-size:9px;color:var(--gr2);margin-top:6px;">💤 Staying over: '+staying.map(b=>b.dog).join(', ')+'</div>';
+  h+='</div>';
+  return h;
+}
+function _calWeekHtml(){
+  const start=_mondayOf(_calAnchor);const today=todayStr();
+  const end=new Date(start);end.setDate(start.getDate()+6);
+  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  let days='';
+  for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const ev=eventsOn(ds);const occ=occupantsOn(ds).length;
+    const items=[];
+    ev.arrivals.forEach(a=>items.push({t:a.t,html:'<span style="color:var(--gn);font-weight:700;">'+a.t+'</span> 🟢 '+a.b.dog+' arrives'}));
+    ev.daycare.forEach(a=>items.push({t:a.drop,html:'<span style="color:var(--or);font-weight:700;">'+a.drop+'–'+a.pick+'</span> ☀️ '+a.b.dog+' day care'}));
+    ev.visits.forEach(a=>items.push({t:a.t,html:'<span style="color:var(--pu);font-weight:700;">'+(a.t||'')+'</span> 🐕 '+a.b.dog}));
+    ev.departures.forEach(a=>items.push({t:a.t,html:'<span style="color:var(--sk);font-weight:700;">'+a.t+'</span> 🔵 '+a.b.dog+' departs'}));
+    items.sort((a,c)=>(a.t||'').localeCompare(c.t||''));
+    const body=items.length?items.map(x=>'<div style="font-size:10px;padding:2px 0;">'+x.html+'</div>').join(''):'<div style="font-size:9px;color:var(--gr3);">—</div>';
+    days+='<div class="cal-week-day'+(ds===today?' today':'')+'" style="border:1px solid var(--gr4);border-radius:var(--r);padding:8px;margin-bottom:6px;'+(ds===today?'border-color:var(--or);':'')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11px;font-weight:800;">'+d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+'</span>'+
+      '<span style="font-size:9px;font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+(occ>=CAL_CAP?' FULL':' · '+(CAL_CAP-occ)+' free')+'</span></div>'+body+'</div>';
+  }
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;font-weight:800;">'+title+'</span></div>'+days;
+}
+
 // ==================== ANALYSIS ====================
 function renderAnalysis(){
   const yr=document.getElementById('anYear')?.value||'2026';
   const today=todayStr();
-  const paid=['Prepaid','Fully Paid','Credit'];
-  const active=['Booked','Prepaid','Fully Paid','Credit','Completed'];
+  // Revenue reports count Prepaid (deposit) + Fully Paid + Credit + Completed. actualRev() handles how much
+  // of each counts (Prepaid → deposit only; the rest → full settlement).
+  const paid=['Prepaid','Fully Paid','Credit','Completed'];
+  const active=['Booked','Prepaid','Fully Paid','Credit','Completed']; // occupancy = physical presence
   const svcCols={Boarding:'#F97316',DayCare:'#EAB308',Walking:'#22C55E','Drop-in':'#8B5CF6','Dog Sit':'#06B6D4','Pet Taxi':'#EC4899',Training:'#6366F1',Other:'#A8A29E'};
-  const yBks=bookings.filter(b=>b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status));
+  // Cross-year/month split: a booking is in-year if any night falls in yr; revenue counts only its in-year portion.
+  const yBks=bookings.filter(b=>paid.includes(b.status)&&bkMonthFractions(b).some(s=>s.y===yr));
+  const fracInYr=b=>bkMonthFractions(b).filter(s=>s.y===yr);
+  const revY=b=>actualRev(b)*fracInYr(b).reduce((a,s)=>a+s.frac,0);
   const yrN=parseInt(yr);
   const isLeap=yrN%4===0&&(yrN%100!==0||yrN%400===0);const daysInYr=isLeap?366:365;
 
   // ── 1. Revenue by Service — stacked bar chart by month ──
   const moSvcRev={};MOS.forEach(m=>moSvcRev[m]={});
-  yBks.forEach(b=>{const med=normDate(b.ed);if(!med)return;const mo=new Date(med+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(!moSvcRev[mo])return;const s=b.svc||'Other';moSvcRev[mo][s]=(moSvcRev[mo][s]||0)+actualRev(b);});
+  yBks.forEach(b=>{const s=b.svc||'Other';const rev=actualRev(b);fracInYr(b).forEach(seg=>{if(!moSvcRev[seg.mo])return;moSvcRev[seg.mo][s]=(moSvcRev[seg.mo][s]||0)+rev*seg.frac;});});
   const allSvcsSet=new Set();MOS.forEach(m=>Object.keys(moSvcRev[m]).forEach(s=>allSvcsSet.add(s)));
   const svcTotals={};[...allSvcsSet].forEach(s=>svcTotals[s]=MOS.reduce((sum,m)=>sum+(moSvcRev[m][s]||0),0));
   const svcsOrd=[...allSvcsSet].sort((a,b)=>svcTotals[b]-svcTotals[a]);
@@ -1784,20 +1939,20 @@ function renderAnalysis(){
 
   // ── 2. Bookings Count & AOV (numbers outside bar to the right) ──
   const moBkCnt={};const moBkRev={};MOS.forEach(m=>{moBkCnt[m]=0;moBkRev[m]=0;});
-  yBks.forEach(b=>{const med=normDate(b.ed);if(!med)return;const mo=new Date(med+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(moBkCnt[mo]!==undefined){moBkCnt[mo]++;moBkRev[mo]+=actualRev(b);}});
-  const totalBks=yBks.length,totalRevY=yBks.reduce((s,b)=>s+actualRev(b),0),aov=totalBks>0?Math.round(totalRevY/totalBks):0;
+  yBks.forEach(b=>{const segs=fracInYr(b);if(!segs.length)return;const rev=actualRev(b);if(moBkCnt[segs[0].mo]!==undefined)moBkCnt[segs[0].mo]++;segs.forEach(seg=>{if(moBkRev[seg.mo]!==undefined)moBkRev[seg.mo]+=rev*seg.frac;});});
+  const totalBks=yBks.length,totalRevY=yBks.reduce((s,b)=>s+revY(b),0),aov=totalBks>0?Math.round(totalRevY/totalBks):0;
   const maxCnt=Math.max(...MOS.map(m=>moBkCnt[m]),1);
   document.getElementById('anBkCount').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:flex;gap:8px;margin-bottom:10px;"><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--bl);">'+totalBks+'</div><div style="font-size:8px;color:var(--gr2);">Bookings</div></div><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--or);">'+fmtGBP(totalRevY)+'</div><div style="font-size:8px;color:var(--gr2);">Revenue</div></div><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--gn);">'+fmtGBP(aov)+'</div><div style="font-size:8px;color:var(--gr2);">Avg Order</div></div></div>'+MOS.map(m=>{const cnt=moBkCnt[m];const pct=cnt/maxCnt*100;const ov=cnt>0?fmtGBP(Math.round(moBkRev[m]/cnt)):'-';return'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><div style="font-size:9px;color:var(--gr2);width:22px;flex-shrink:0;">'+m+'</div><div style="flex:1;height:12px;background:var(--gr4);border-radius:3px;"><div style="height:12px;background:var(--bl);border-radius:3px;width:'+pct+'%;min-width:'+(cnt?2:0)+'px;"></div></div><div style="font-size:8px;color:var(--gr);min-width:90px;text-align:right;white-space:nowrap;">'+cnt+(cnt>0?' · AOV '+ov:'')+'</div></div>';}).join('')+'</div>';
 
   // ── 3. Service Type Revenue Share (% of total revenue) ──
-  const svcRevMap={};yBks.forEach(b=>{const s=b.svc||'Other';svcRevMap[s]=(svcRevMap[s]||0)+actualRev(b);});
+  const svcRevMap={};yBks.forEach(b=>{const s=b.svc||'Other';svcRevMap[s]=(svcRevMap[s]||0)+revY(b);});
   const totalSvcRev=Object.values(svcRevMap).reduce((s,v)=>s+v,0);
   const svcRevSorted=Object.entries(svcRevMap).sort((a,b)=>b[1]-a[1]);
   document.getElementById('anSvcCount').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(totalSvcRev>0?svcRevSorted.map(([s,v])=>{const pct=(v/totalSvcRev*100).toFixed(1);const col=svcCols[s]||'#A8A29E';return'<div style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+s+'</span><span style="color:'+col+';">'+fmtGBP(v)+' ('+pct+'%)</span></div><div style="height:6px;background:var(--gr4);border-radius:3px;"><div style="height:6px;background:'+col+';border-radius:3px;width:'+pct+'%;"></div></div></div>';}).join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:6px;font-size:9px;color:var(--gr2);">Total revenue: '+fmtGBP(totalSvcRev)+'</div>':'<div style="color:var(--gr3);font-size:11px;">No paid bookings for '+yr+'</div>')+'</div>';
 
   // ── 4. Rover vs Direct (with % of total revenue) ──
   const chMap={};
-  yBks.forEach(b=>{const k=(b.ch||'TCL').toLowerCase().includes('rover')?'Rover':'Direct (TCL)';if(!chMap[k])chMap[k]={count:0,rev:0};chMap[k].count++;chMap[k].rev+=actualRev(b);});
+  yBks.forEach(b=>{const k=(b.ch||'TCL').toLowerCase().includes('rover')?'Rover':'Direct (TCL)';if(!chMap[k])chMap[k]={count:0,rev:0};chMap[k].count++;chMap[k].rev+=revY(b);});
   const chCols={'Direct (TCL)':'#F97316',Rover:'#1E40AF'};
   const totalChRev=Object.values(chMap).reduce((s,d)=>s+d.rev,0);
   const chEntries=Object.entries(chMap).sort((a,b)=>b[1].rev-a[1].rev);
@@ -1825,10 +1980,12 @@ function renderAnalysis(){
   document.getElementById('anAge').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+['Puppy (<1yr)','1–2 yrs','3–5 yrs','6–9 yrs','10+ yrs','Unknown'].map(k=>{const v=ageBuckets[k];const col=ageCols[k];return'<div style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+k+'</span><span style="color:'+col+';">'+v+' booking'+(v!==1?'s':'')+'</span></div><div style="height:8px;background:var(--gr4);border-radius:3px;"><div style="height:8px;background:'+col+';border-radius:3px;width:'+(v/maxAge*100).toFixed(0)+'%;"></div></div></div>';}).join('')+'</div>';
 
   // ── 7. Repeat vs New Bookings (first-ever sd per dog = New, rest = Repeat) ──
-  const firstBkSd={};
-  bookings.filter(b=>paid.includes(b.status)&&b.sd).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!firstBkSd[k]||nsd<firstBkSd[k])firstBkSd[k]=nsd;});
+  // First-ever booking per dog = New. Tie-break by row index (ri) so two bookings sharing the same sd
+  // don't both count as New — exactly one booking per dog is the "first".
+  const firstBk={};
+  bookings.filter(b=>paid.includes(b.status)&&b.sd).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const cur=firstBk[k];if(!cur||nsd<cur.sd||(nsd===cur.sd&&(b.ri||0)<cur.ri))firstBk[k]={sd:nsd,ri:b.ri||0};});
   let newBks=0,repBks=0,newRev=0,repRev=0;
-  yBks.forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const rev=actualRev(b);if(firstBkSd[k]===nsd){newBks++;newRev+=rev;}else{repBks++;repRev+=rev;}});
+  yBks.forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const rev=revY(b);const f=firstBk[k];if(f&&f.sd===nsd&&f.ri===(b.ri||0)){newBks++;newRev+=rev;}else{repBks++;repRev+=rev;}});
   const totalRN=newBks+repBks;
   const newPct=totalRN>0?Math.round(newBks/totalRN*100):0,repPct=totalRN>0?Math.round(repBks/totalRN*100):0;
   document.getElementById('anRepeat').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;"><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--gn);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🆕 New</div><div style="font-size:24px;font-weight:800;color:var(--gn);">'+newBks+'</div><div style="font-size:10px;font-weight:700;color:var(--gn);">'+newPct+'% of bookings</div><div style="font-size:9px;color:var(--or);font-weight:700;margin-top:4px;">'+fmtGBP(newRev)+'</div></div><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--bl);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🔄 Repeat</div><div style="font-size:24px;font-weight:800;color:var(--bl);">'+repBks+'</div><div style="font-size:10px;font-weight:700;color:var(--bl);">'+repPct+'% of bookings</div><div style="font-size:9px;color:var(--or);font-weight:700;margin-top:4px;">'+fmtGBP(repRev)+'</div></div></div><div style="display:flex;height:8px;border-radius:4px;overflow:hidden;"><div style="width:'+newPct+'%;background:var(--gn);"></div><div style="flex:1;background:var(--bl);"></div></div><div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gr3);margin-top:3px;"><span>New</span><span>Repeat</span></div></div>';
@@ -1860,7 +2017,7 @@ function renderAnalysis(){
     if(!isB&&!isDC)return;
     const nsd=normDate(b.sd);const ned=normDate(b.ed);if(!nsd||!ned)return;
     if(isB){let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
-    else{const mo=new Date(ned+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}
+    else{let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
   });
   const totalPlacesUsed=MOS.reduce((s,m)=>s+placesMo[m],0);const totalCapYr=4*daysInYr;const yrPlacesPct=Math.round(totalPlacesUsed/totalCapYr*100);
   const yrPlacesCol=yrPlacesPct>=80?'var(--gn)':yrPlacesPct>=50?'var(--or)':'var(--gr3)';
@@ -1945,13 +2102,30 @@ function renderTplHub(){
 async function delTplHub(idx){
   const tpl=msgTpls[idx];if(!tpl)return;
   if(!confirm('Delete this template?'))return;
-  msgTpls.splice(idx,1);saveMsgTpls();renderTplHub();
+  // Delete from the Google Sheet FIRST. If that fails we must NOT remove it locally, otherwise the next
+  // sync (which replaces local with the sheet) would resurrect it. Only splice locally once the sheet is clear.
   try{
-    const rows=await readSheet(TABS.TPLS,'A2:D').catch(()=>[]);
-    const ri=rows.findIndex(r=>r[0]===tpl.name);
-    if(ri>=0)await clearRow(TABS.TPLS,ri+2);
-  }catch(e){}
+    const rows=await readSheet(TABS.TPLS,'A2:D');
+    // clear EVERY matching row (handles duplicate names accumulated by the old bug), bottom-up
+    const matches=rows.map((r,i)=>r[0]===tpl.name?i+2:-1).filter(n=>n>0).sort((a,b)=>b-a);
+    for(const ri of matches)await clearRow(TABS.TPLS,ri);
+  }catch(e){
+    alert('Could not delete from Google Sheet (check connection): '+e.message+'\nThe template was NOT deleted — please try again.');
+    return;
+  }
+  msgTpls.splice(idx,1);saveMsgTpls();renderTplHub();
 }
+// Render the fill-in field for one template variable. `otherDogs`/`dogList` get a dog multi-select picker
+// that outputs formatted lines like "🐾 3 y/o spayed female Schnauzer"; everything else gets a text input.
+function tplFieldHtml(v,idx,varLabels){
+  const lbl='<label style="font-size:10px;color:var(--gr2);font-weight:600;display:block;margin-bottom:3px;">'+(varLabels[v]||v)+'</label>';
+  if(v==='otherDogs'||v==='dogList'){
+    const opts=[...allDogs].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(d=>'<label style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 2px;cursor:pointer;"><input type="checkbox" class="otherDogChk" value="'+encodeURIComponent(d.cid)+'" onchange="updateCopyPreview('+idx+')" style="width:14px;height:14px;flex-shrink:0;">'+(d.name||'(no name)')+' <span style="color:var(--gr3);font-size:9px;">'+fmtDogDesc(d).replace('🐾 ','')+'</span></label>').join('');
+    return '<div style="margin-bottom:7px;">'+lbl+'<input class="fi" placeholder="Search dogs..." oninput="filterOtherDogs(this.value)" style="font-size:11px;margin-bottom:5px;"><div id="otherDogPick" style="max-height:170px;overflow-y:auto;border:1px solid var(--gr4);border-radius:8px;padding:6px;">'+(opts||'<div style="font-size:10px;color:var(--gr3);">No dogs registered</div>')+'</div></div>';
+  }
+  return '<div style="margin-bottom:7px;">'+lbl+'<input class="fi" id="ctplv_'+v+'" placeholder="Enter '+(varLabels[v]||v)+'..." style="font-size:11px;" oninput="updateCopyPreview('+idx+')"></div>';
+}
+function filterOtherDogs(q){q=(q||'').toLowerCase();document.querySelectorAll('#otherDogPick label').forEach(l=>{l.style.display=l.textContent.toLowerCase().includes(q)?'':'none';});}
 function openCopyTpl(idx){
   const tpl=msgTpls[idx];if(!tpl)return;
   const content=tpl.content||'';
@@ -1959,9 +2133,9 @@ function openCopyTpl(idx){
   document.getElementById('ctpl_title').textContent=tpl.name;
   document.getElementById('ctpl_idx').value=idx;
   const fEl=document.getElementById('ctpl_fields');
-  const varLabels={ownerName:'Owner name',dogs:'Dog name(s)',dropoff:'Drop-off date',pickup:'Pick-up date',dropoffTime:'Drop-off time',pickupTime:'Pick-up time',service:'Service',total:'Total amount',prepayAmt:'Prepayment amount',finalAmt:'Balance due',payRef:'Payment reference',payLink:'Payment link',rateBlock:'Rate block',discount:'Discount line'};
+  const varLabels={ownerName:'Owner name',dogs:'Dog name(s)',dropoff:'Drop-off date',pickup:'Pick-up date',dropoffTime:'Drop-off time',pickupTime:'Pick-up time',service:'Service',total:'Total amount',prepayAmt:'Prepayment amount',finalAmt:'Balance due',payRef:'Payment reference',payLink:'Payment link',rateBlock:'Rate block',discount:'Discount line',otherDogs:'Other dogs (pick from profiles)',dogList:'Dog list (pick from profiles)'};
   if(vars.length){
-    fEl.innerHTML=vars.map(v=>'<div style="margin-bottom:7px;"><label style="font-size:10px;color:var(--gr2);font-weight:600;display:block;margin-bottom:3px;">'+(varLabels[v]||v)+'</label><input class="fi" id="ctplv_'+v+'" placeholder="Enter '+(varLabels[v]||v)+'..." style="font-size:11px;" oninput="updateCopyPreview('+idx+')"></div>').join('');
+    fEl.innerHTML=vars.map(v=>tplFieldHtml(v,idx,varLabels)).join('');
     if(curDog){const e=document.getElementById('ctplv_ownerName');if(e)e.value=curDog.owner||'';const f=document.getElementById('ctplv_dogs');if(f)f.value=curDog.name||'';}
   }else{
     fEl.innerHTML='<div style="font-size:10px;color:var(--gr3);margin-bottom:8px;padding:8px;background:var(--gr5);border-radius:8px;">No personalised fields — ready to copy.</div>';
@@ -1973,7 +2147,15 @@ function updateCopyPreview(idx){
   const tpl=msgTpls[idx];if(!tpl)return;
   let msg=tpl.content||'';
   const vars=[...new Set((msg.match(/\{\{(\w+)\}\}/g)||[]).map(m=>m.slice(2,-2)))];
-  vars.forEach(v=>{const el=document.getElementById('ctplv_'+v);const val=el&&el.value?el.value:'{{'+v+'}}';msg=msg.replace(new RegExp('\\{\\{'+v+'\\}\\}','g'),val);});
+  vars.forEach(v=>{
+    let val;
+    if(v==='otherDogs'||v==='dogList'){
+      const cids=[...document.querySelectorAll('.otherDogChk:checked')].map(c=>decodeURIComponent(c.value));
+      const list=cids.map(cid=>fmtDogDesc(allDogs.find(d=>d.cid===cid))).filter(Boolean).join('\n');
+      val=list||'{{'+v+'}}';
+    }else{const el=document.getElementById('ctplv_'+v);val=el&&el.value?el.value:'{{'+v+'}}';}
+    msg=msg.replace(new RegExp('\\{\\{'+v+'\\}\\}','g'),val);
+  });
   document.getElementById('ctpl_preview').value=msg;
 }
 function doCopyTpl(){
