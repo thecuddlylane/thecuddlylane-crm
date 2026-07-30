@@ -273,24 +273,32 @@ async function quickToggleWf(bkId,key,checked){
 function renderPendingPanel(){
   const el=document.getElementById('pending_results');if(!el)return;
   const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth}=computePendingActions();
-  if(!missingLogs.length&&!pendingCompletion.length&&!wfTasks.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
+  const today=todayStr();
+  // Collect per-booking tasks, then group by dog.
+  const bkMap={};const ensure=bk=>{const k=(bk.ri||bk.id);if(!bkMap[k])bkMap[k]={bk,tasks:[]};return bkMap[k];};
+  wfTasks.forEach(({bk,label})=>ensure(bk).tasks.push(label));
+  pendingCompletion.forEach(bk=>ensure(bk).tasks.push('Finish checklist → mark Completed'));
+  const dogs={};const dogEntry=(cid,name)=>{if(!dogs[cid])dogs[cid]={name,cid,up:[],past:[],missing:null};return dogs[cid];};
+  Object.values(bkMap).forEach(({bk,tasks})=>{if(!tasks.length)return;const e=dogEntry(bk.customerId||bk.dog,bk.dog);((bk.ed||bk.sd)<today?e.past:e.up).push({bk,tasks});});
+  missingLogs.forEach(({dog,dates})=>{dogEntry(dog.cid,dog.name).missing=dates;});
+  const dogList=Object.values(dogs);
+  if(!dogList.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
+  // Upcoming: soonest first · Past: most recent first · Dogs ordered by soonest upcoming (dogs with only past come after).
+  dogList.forEach(d=>{d.up.sort((a,c)=>(a.bk.sd||'').localeCompare(c.bk.sd||''));d.past.sort((a,c)=>((c.bk.ed||c.bk.sd)||'').localeCompare((a.bk.ed||a.bk.sd)||''));});
+  dogList.sort((a,c)=>((a.up[0]?a.up[0].bk.sd:'9999')).localeCompare(c.up[0]?c.up[0].bk.sd:'9999'));
+  const dates=x=>fmtDate(x.bk.sd)+(x.bk.ed&&x.bk.ed!==x.bk.sd?' → '+fmtDate(x.bk.ed):'');
+  const bkRow=x=>'<div onclick="openBkModal(\''+x.bk.id+'\',false,'+x.bk.ri+')" style="cursor:pointer;padding:6px 10px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--bk);">'+x.bk.svc+' · '+dates(x)+' <span style="font-size:11px;">✏️</span></div><div style="font-size:9px;color:var(--gr2);">'+x.tasks.join(' · ')+'</div></div>';
+  const subhd=t=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;padding:5px 10px 2px;background:var(--gr5);">'+t+'</div>';
   let html='';
-  if(wfTasks.length){
-    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">To-Do by Booking</div>';
-    html+=wfTasks.map(({bk,key,label})=>'<div style="display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--gr4);cursor:pointer;" onclick="openBkModal(\''+bk.id+'\',false,'+bk.ri+')"><div style="flex:1;"><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+label+'</div><div style="font-size:9px;color:var(--gr2);">'+bk.dog+' · '+bk.svc+' · '+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</div></div><span style="font-size:12px;">✏️</span></div>').join('');
-  }
-  if(missingLogs.length){
-    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Missing Daily Logs</div>';
-    html+=missingLogs.map(({dog,dates})=>'<div onclick="togglePendingPanel();openProfile(allDogs.find(d=>d.cid===\''+dog.cid+'\'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+dog.name+'</div><div style="font-size:9px;color:var(--gr2);">'+dates.length+' day'+(dates.length>1?'s':'')+' missing: '+dates.map(fmtDate).join(', ')+'</div></div><span style="font-size:14px;">⚠️</span></div>').join('');
-  }
-  if(pendingCompletion.length){
-    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Bookings Awaiting Completion</div>';
-    html+=pendingCompletion.map(b=>{const comp=wfCompletion(b);return'<div onclick="togglePendingPanel();openBkModal(\''+b.id+'\',false,'+b.ri+')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+b.dog+'</div><div style="font-size:9px;color:var(--gr2);">'+b.svc+' · ended '+fmtDate(b.ed)+' · checklist '+comp.done+'/'+comp.total+'</div></div><span style="font-size:14px;">'+(comp.allDone?'✅':'📋')+'</span></div>';}).join('');
-  }
-  if(noTrainingThisMonth){
-    html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Staff Training</div>';
-    html+='<div onclick="togglePendingPanel();showScreen(\'sc-training\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gr4);"><div><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">No training logged this month</div><div style="font-size:9px;color:var(--gr2);">Log CPD or training activity for '+new Date().toLocaleString('en-GB',{month:'long',year:'numeric'})+'</div></div><span style="font-size:14px;">📚</span></div>';
-  }
+  dogList.forEach(d=>{
+    html+='<div style="margin-bottom:11px;border:1px solid var(--gr4);border-radius:8px;overflow:hidden;">'+
+      '<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;font-size:12px;font-weight:800;color:var(--bl);padding:7px 10px;background:var(--gr5);text-decoration:underline;">🐾 '+d.name+'</div>';
+    if(d.up.length){html+=subhd('🔜 Upcoming (soonest first)');d.up.forEach(x=>html+=bkRow(x));}
+    if(d.past.length){html+=subhd('🕓 Past (most recent first)');d.past.forEach(x=>html+=bkRow(x));}
+    if(d.missing)html+='<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;padding:6px 10px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--or);">⚠️ Missing daily logs ('+d.missing.length+')</div><div style="font-size:9px;color:var(--gr2);">'+d.missing.map(fmtDate).join(', ')+'</div></div>';
+    html+='</div>';
+  });
+  if(noTrainingThisMonth)html+='<div onclick="showScreen(\'sc-training\')" style="cursor:pointer;padding:8px 10px;border:1px solid var(--gr4);border-radius:8px;"><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">📚 No training logged this month</div><div style="font-size:9px;color:var(--gr2);">Log CPD/training for '+new Date().toLocaleString('en-GB',{month:'long',year:'numeric'})+'</div></div>';
   el.innerHTML=html;
 }
 // Populate the Check Dates screen (av_dog dropdown + default dates). Called on sc-checkdates show.
@@ -1054,26 +1062,26 @@ function calcMultiQ(){
     }
     const isTaxi=l.svc==='taxi';
     if(l.svc==='boarding'){
-      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:_orderedSel()).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
       const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');
       if(l.sd&&l.ed){
         const dropDt=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt=new Date(l.ed+'T'+(l.et||'18:00'));
         const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
-        const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
+        const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;let d=new Date(l.sd+'T12:00:00');
         for(let ni=0;ni<nights;ni++){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
         const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:bH;const em='\u{1F4A4}';
         const bd=(std,hol,tot)=>(sN>0&&hN>0)?(fmtGBP(std)+'/night \u00D7 '+sN+' + '+fmtGBP(hol)+'/night \u00D7 '+hN+' = '+fmtGBP(tot)):(fmtGBP(sN>0?std:hol)+'/night \u00D7 '+nights+' = '+fmtGBP(tot));
         const holRangeStr=holDates.length>0?fmtDate(holDates[0])+' - '+fmtDate(holDates[holDates.length-1]):'';
         let dp=em+' Boarding ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
         if(hN>0)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN+' night'+(hN!==1?'s':'')+(holRangeStr?' ('+holRangeStr+')':'');
-        prim.forEach(x=>{const a=(sN*stdR)+(hN*holR);amt+=a;lines.push([em+' Boarding - '+x.name+' (primary)',a]);dp+='\n\n'+x.name+':\n'+bd(stdR,holR,a);});
-        if(exHrs>0){const baseN=sN>0?stdR:holR;const extAmt=exHrs<8?roundGBP(baseN*0.5):baseN;amt+=extAmt;lines.push([em+' Boarding - extra hours '+(exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h, '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
-        adds.forEach(x=>{const a=(sN*r.board_add)+(hN*baH);amt+=a;lines.push([em+' Boarding - '+x.name+' (additional)',a]);dp+='\n\n'+x.name+' (additional dog):\n'+bd(r.board_add,baH,a);});
+        const exLbl=exHrs<8?'(<8h, +50%)':'(8+h, +100%)';const exTxt='\nExtra hours ('+exHrs.toFixed(1)+'h, '+(exHrs<8?'+50%':'+100%')+'): ';
+        prim.forEach(x=>{let a=(sN*stdR)+(hN*holR);lines.push([em+' Boarding - '+x.name+' (primary)',a]);let sub='\n\n'+x.name+':\n'+bd(stdR,holR,a);if(exHrs>0){const b=sN>0?stdR:holR;const ex=exHrs<8?roundGBP(b*0.5):b;a+=ex;lines.push([em+' Boarding - '+x.name+' extra hours '+exLbl,ex]);sub+=exTxt+fmtGBP(ex);}amt+=a;dp+=sub;});
+        adds.forEach(x=>{let a=(sN*r.board_add)+(hN*baH);lines.push([em+' Boarding - '+x.name+' (additional)',a]);let sub='\n\n'+x.name+' (additional dog):\n'+bd(r.board_add,baH,a);if(exHrs>0){const b=sN>0?r.board_add:baH;const ex=exHrs<8?roundGBP(b*0.5):b;a+=ex;lines.push([em+' Boarding - '+x.name+' extra hours '+exLbl,ex]);sub+=exTxt+fmtGBP(ex);}amt+=a;dp+=sub;});
         descParts.push(dp);
       }
     }else if(l.svc==='daycare'){
       const hol=l.sd?isHol(l.sd):false;
-      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:_orderedSel()).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
       const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');
       const dayStd=l.rate>0?l.rate:(hol?dH:r.day_std),dayAdd=hol?daH:r.day_add;const em='\u2600\uFE0F';
       let dp=em+' Daycare ('+allDogStr+'): '+fmtDate(l.sd||'')+'  Drop-off: '+(l.st2||'07:00')+'  Pick-up: '+(l.et||'18:00')+(hol?'\n\uD83C\uDFDD\uFE0F Holiday rate':'');
@@ -1091,7 +1099,7 @@ function calcMultiQ(){
       lines.push(['\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(isHolDay?' holiday +15%':''),amt]);
       descParts.push('\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(l.sd?' \u2014 '+fmtDate(l.sd):'')+(isHolDay?' \uD83C\uDFDD\uFE0F Holiday rate (+15%)':'')+': '+fmtGBP(amt));
     }else if(l.svc==='walk'||l.svc==='dropin'){
-      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:_orderedSel()).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
       const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);
       const holMult=l.sd&&isHol(l.sd)?1.15:1;const isHolDay=holMult>1;
       const mainRate=roundGBP((l.rate||0)*holMult);const addRate=roundGBP((l.rka?r[l.rka]||0:0)*holMult);
@@ -1104,13 +1112,13 @@ function calcMultiQ(){
       if(addRate===0&&adds.length>0)dp+=' (no add-on rate for this type)';
       descParts.push(dp);
     }else if(l.svc==='dogsit'){
-      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:_orderedSel()).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
       const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');const em='\uD83E\uDEB1';
       if(l.sd&&l.ed){
         const holDates2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
         const dropDt2=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt2=new Date(l.ed+'T'+(l.et||'18:00'));
         const hrs2=(pickDt2-dropDt2)/3600000;const nights2a=Math.max(1,Math.floor(hrs2/24));
-        let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
+        let d2=new Date(l.sd+'T12:00:00');
         for(let ni=0;ni<nights2a;ni++){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
         const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:bH;
         const bd2=(std,hol,tot)=>(sN2>0&&hN2>0)?(fmtGBP(std)+'/night x '+sN2+' + '+fmtGBP(hol)+'/night x '+hN2+' = '+fmtGBP(tot)):(fmtGBP(sN2>0?std:hol)+'/night x '+(sN2+hN2)+' = '+fmtGBP(tot));
@@ -1232,7 +1240,7 @@ function _computeDogRevMap(){
       const drop=new Date(l.sd+'T'+(l.st2||'09:00')),pick=new Date(l.ed+'T'+(l.et||'18:00'));
       const hrs=(pick-drop)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
       const hd=getHolDates(l.sd,l.ed);let hN=0,sN=0;
-      let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
+      let d=new Date(l.sd+'T12:00:00');
       for(let ni=0;ni<nights;ni++){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
       const base=(sN*r.board_std)+(hN*bH);let ex=0;if(exHrs>0){const bn=sN>0?r.board_std:bH;ex=exHrs<8?roundGBP(bn*0.5):bn;}
       prim.forEach((c,i)=>add(c,base+(i===0?ex:0)));adds.forEach(c=>add(c,(sN*r.board_add)+(hN*baH)));
@@ -1245,7 +1253,7 @@ function _computeDogRevMap(){
       const hd2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
       const dropDtDs=new Date(l.sd+'T'+(l.st2||'09:00')),pickDtDs=new Date(l.ed+'T'+(l.et||'18:00'));
       const hrsDs=(pickDtDs-dropDtDs)/3600000;const nightsDs=Math.max(1,Math.floor(hrsDs/24));
-      let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
+      let d2=new Date(l.sd+'T12:00:00');
       for(let ni=0;ni<nightsDs;ni++){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
       prim.forEach(c=>add(c,(sN2*r.board_std)+(hN2*bH)));adds.forEach(c=>add(c,(sN2*r.board_add)+(hN2*baH)));
     }else if(l.rate){const qty=l.qty||1;prim.forEach(c=>add(c,(l.rate||0)*qty));}
@@ -1479,7 +1487,7 @@ function wfAutoCompat(bk){
     const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
     return bS<qEnd&&bE>qStart;
   });
-  if(!overlapBks.length)return false;
+  if(!overlapBks.length)return true;// no dogs overlap this booking → nothing to check → auto-tick
   return overlapBks.every(b=>{
     const mixedDog=(b.dog||'').toLowerCase();const mixedCid=b.customerId||'';
     return trialLogs.some(t=>{
@@ -1807,7 +1815,7 @@ function _svcKind(b){const s=(b.svc||'').toLowerCase();if(s.includes('boarding')
 function occupantsOn(dateStr){
   const res=[];
   bookings.forEach(b=>{if(!CAL_ACTIVE.includes(b.status))return;const k=_svcKind(b);const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
-    if(k==='stay'){if(nsd<=dateStr&&dateStr<(ned||nsd))res.push(b);}
+    if(k==='stay'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}
     else if(k==='day'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}});
   return res;
 }
@@ -1815,7 +1823,7 @@ function occupantsOn(dateStr){
 function quotedOn(dateStr){
   const res=[];
   bookings.forEach(b=>{if(b.status!=='Quoted')return;const k=_svcKind(b);const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
-    if(k==='stay'){if(nsd<=dateStr&&dateStr<(ned||nsd))res.push(b);}
+    if(k==='stay'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}
     else if(k==='day'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}});
   return res;
 }
@@ -1876,7 +1884,8 @@ function _calMonthHtml(){
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">'+hdr+cells+'</div>'+
     '<div id="calDayDetail" style="margin-top:10px;"></div>';
 }
-function _fmtT(t){return t||'';}
+// Normalise any time to HH:MM (strip seconds, pad hour) so the calendar shows 09:00-19:00 consistently.
+function _fmtT(t){if(!t)return'';const p=String(t).split(':');const h=(p[0]||'0').padStart(2,'0');const m=(p[1]||'00').slice(0,2).padStart(2,'0');return h+':'+m;}
 function _calDayDetailHtml(ds){
   const ev=eventsOn(ds);const occ=occupantsOn(ds);const remaining=Math.max(0,CAL_CAP-occ.length);
   const d=new Date(ds+'T12:00:00');const dTitle=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
@@ -1908,7 +1917,7 @@ function _calWeekHtml(){
   // Boarding/dog-sit (nights sd..ed-1) + day-care (its day), committed OR quoted, present this week.
   const items=[];
   bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;const k=_svcKind(b);if(k==='visit')return;const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
-    const idx=[];days.forEach((ds,i)=>{const occ=(k==='stay')?(nsd<=ds&&ds<(ned||nsd)):(nsd<=ds&&ds<=(ned||nsd));if(occ)idx.push(i);});
+    const idx=[];days.forEach((ds,i)=>{const occ=(nsd<=ds&&ds<=(ned||nsd));if(occ)idx.push(i);});
     if(idx.length)items.push({b,quoted,k,s:idx[0],e:idx[idx.length-1]});});
   // Greedy lane packing — committed take the low places (#1..), so ≤4 lanes normally.
   items.sort((a,c)=>(a.quoted-c.quoted)||(a.s-c.s)||((c.e-c.s)-(a.e-a.s)));
@@ -1920,10 +1929,10 @@ function _calWeekHtml(){
   days.forEach((ds,i)=>{const d=new Date(ds+'T12:00:00');const occ=occupantsOn(ds).length;const q=quotedOn(ds).length;
     g+='<div class="cw-cell cw-dayhd'+(ds===today?' cw-today':'')+'" style="grid-row:1;grid-column:'+(i+2)+';"><div>'+d.toLocaleDateString('en-GB',{weekday:'short'})+' '+d.getDate()+'</div><div style="font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+(q?' <span style="color:var(--gr3);">+'+q+'Q</span>':'')+'</div></div>';});
   for(let L=0;L<nLanes;L++){
-    g+='<div class="cw-cell cw-lanelbl'+(L>=CAL_CAP?' cw-over':'')+'" style="grid-row:'+(L+2)+';grid-column:1;">#'+(L+1)+'</div>';
+    g+='<div class="cw-cell cw-lanelbl'+(L>=CAL_CAP?' cw-over':'')+'" style="grid-row:'+(L+2)+';grid-column:1;" title="'+(L>=CAL_CAP?'Overbooked':'Place '+(L+1))+'">'+(L>=CAL_CAP?'⚠':'#'+(L+1))+'</div>';
     for(let i=0;i<7;i++)g+='<div class="cw-cell cw-bgcell'+(days[i]===today?' cw-today':'')+'" style="grid-row:'+(L+2)+';grid-column:'+(i+2)+';"></div>';
   }
-  items.forEach(it=>{const b=it.b;const nm=b.dog||'';const per=it.k==='day'?(_fmtT(b.st||'07:00')+'-'+_fmtT(b.et||'18:00')):(_fmtT(b.st||'09:00')+'→'+_fmtT(b.et||'18:00'));
+  items.forEach(it=>{const b=it.b;const nm=b.dog||'';const per=it.k==='day'?(_fmtT(b.st||'07:00')+'-'+_fmtT(b.et||'18:00')):(_fmtT(b.st||'09:00')+'-'+_fmtT(b.et||'18:00'));
     const bg=it.quoted?'':('background:'+(it.k==='day'?'var(--or)':'var(--sk)')+';');
     g+='<div class="cw-bar'+(it.quoted?' cw-quo':'')+'" style="grid-row:'+(it.lane+2)+';grid-column:'+(it.s+2)+' / '+(it.e+3)+';'+bg+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+nm+(it.quoted?' (QUOTED)':'')+' · '+per+'"><span class="cw-nm">'+nm+(it.quoted?' (Q)':'')+'</span><span class="cw-per">'+per+'</span></div>';});
   g+='</div>';
