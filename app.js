@@ -79,7 +79,11 @@ const WF_STEPS=[
   {k:'reviewReq',l:'Review request sent'},
   {k:'review',l:'Review logged (or marked N/A)'}
 ];
-let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_mainDog='';
+let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_addDogs=[],_mainDog='';
+// Quote dogs are stored as CustomerIDs (cids) to avoid same-name mix-ups. _addDogs = cids charged the additional-dog rate.
+function _nm(cid){const d=allDogs.find(x=>x.cid===cid);return d?d.name:(cid||'Dog');}
+function _isAddDog(cid){return _addDogs.includes(cid);}
+function _orderedSel(){return [..._selDogs.filter(c=>!_addDogs.includes(c)),..._selDogs.filter(c=>_addDogs.includes(c))];}
 let _bkSaving=false;
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
@@ -159,7 +163,7 @@ async function doCreateSheet(){
     {n:TABS.TARGETS,h:['Month','RevTarget','CostTarget']},
     {n:TABS.TRAIN,h:['Date','Staff','Category','Objective','Provider','Learnt','CPDPoints','CertLink','MaterialsLink']},
     {n:TABS.CONSENT,h:['CustomerID','DogName','Date','PhotoConsent','OffLeash','Mixing','WalkOutside','GroupWalk','FeedTogether','Crate','SameRoom','MedCost','VetConsent','TCSigned']},
-    {n:TABS.TPLS,h:['Name','Category','Content','LastUpdated']},
+    {n:TABS.TPLS,h:['Name','Category','Content','LastUpdated','Key']},
     {n:TABS.ACTS,h:['Title','Category','IndoorOutdoor','EnergyLevel','Weather','Location','MapsURL','DurationMins','DistanceMins','Cost','Notes']},
     {n:TABS.ACTLOG,h:['CustomerID','DogName','Date','Activity','Staff','Duration','Notes']},
     {n:TABS.RATES,h:['Key','Value','UpdatedAt']},
@@ -177,8 +181,8 @@ function openAvail(){const p=document.getElementById('availPanel');if(p&&(p.styl
 function openSP(id){const e=document.getElementById('sp-'+id);if(e){e.classList.add('open');setTimeout(()=>{try{e.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}} ,60);}}
 // Section → ordered sub-tabs. sc = primary screen; after = optional panel to open on that screen.
 const SECTIONS={
-  dogs:[{k:'dogs',lbl:'🐾 Dogs',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'check',lbl:'🔎 Check Dates',sc:'sc-board',after:openAvail},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
-  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-board',after:openPending},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-quote',after:()=>openSP('rates')},{k:'hol',lbl:'🏝️ Holidays',sc:'sc-quote',after:()=>openSP('holidays')}],
+  dogs:[{k:'dogs',lbl:'🐾 Profiles',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'check',lbl:'🔎 Check Dates',sc:'sc-checkdates'},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
+  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-todo'},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-rates'},{k:'hol',lbl:'🏝️ Holidays',sc:'sc-holidays'}],
   business:[{k:'an',lbl:'🔍 Analysis',sc:'sc-analysis'},{k:'cost',lbl:'💸 Costs',sc:'sc-costs'},{k:'pl',lbl:'📈 P&L',sc:'sc-pl'},{k:'train',lbl:'📚 Training',sc:'sc-training'}]
 };
 const SECTION_ROOTS=new Set(Object.values(SECTIONS).flat().map(t=>t.sc));
@@ -194,7 +198,7 @@ function showScreen(id,push=true){
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-calendar':'Availability Calendar','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}if(id==='sc-todo')renderPendingPanel();if(id==='sc-checkdates')initAvail();if(id==='sc-rates')loadQSettings();if(id==='sc-holidays')renderHolYrBtns();
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -258,7 +262,7 @@ function updatePendingBadge(){
   if(n){b.textContent=n;b.style.display='block';}else b.style.display='none';
 }
 function togglePendingPanel(){
-  const p=document.getElementById('pendingPanel');const showing=p.style.display!=='none'&&p.style.display!=='';
+  const p=document.getElementById('pendingPanel');if(!p)return;const showing=p.style.display!=='none'&&p.style.display!=='';
   p.style.display=showing?'none':'block';
   if(!showing)renderPendingPanel();
 }
@@ -273,7 +277,7 @@ function renderPendingPanel(){
   let html='';
   if(wfTasks.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">To-Do by Booking</div>';
-    html+=wfTasks.map(({bk,key,label})=>'<label style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid var(--gr4);cursor:pointer;"><input type="checkbox" onclick="event.stopPropagation()" onchange="quickToggleWf(\''+bk.id+'\',\''+key+'\',this.checked)" style="width:13px;height:13px;accent-color:var(--gr);margin-top:2px;"><span style="flex:1;" onclick="togglePendingPanel();openBkModal(\''+bk.id+'\',false,'+bk.ri+')"><div style="font-size:11px;font-weight:700;color:var(--bk);">'+label+'</div><div style="font-size:9px;color:var(--gr2);">'+bk.dog+' · '+bk.svc+' · '+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</div></span></label>').join('');
+    html+=wfTasks.map(({bk,key,label})=>'<div style="display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--gr4);cursor:pointer;" onclick="openBkModal(\''+bk.id+'\',false,'+bk.ri+')"><div style="flex:1;"><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">'+label+'</div><div style="font-size:9px;color:var(--gr2);">'+bk.dog+' · '+bk.svc+' · '+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</div></div><span style="font-size:12px;">✏️</span></div>').join('');
   }
   if(missingLogs.length){
     html+='<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin:9px 0 4px;">Missing Daily Logs</div>';
@@ -289,8 +293,14 @@ function renderPendingPanel(){
   }
   el.innerHTML=html;
 }
+// Populate the Check Dates screen (av_dog dropdown + default dates). Called on sc-checkdates show.
+function initAvail(){
+  const dse=document.getElementById('av_dog_search');if(dse)dse.value='';
+  const sel=document.getElementById('av_dog');if(sel){sel.innerHTML='<option value="">— No dog (skip compatibility check) —</option>';[...allDogs].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).forEach(d=>sel.add(new Option(d.name+' - '+d.cid,d.name)));}
+  const td=todayStr();const sd=document.getElementById('av_sd'),ed=document.getElementById('av_ed');if(sd&&!sd.value)sd.value=td;if(ed&&!ed.value)ed.value=td;
+}
 function toggleAvailPanel(){
-  const p=document.getElementById('availPanel');const showing=p.style.display!=='none'&&p.style.display!=='';
+  const p=document.getElementById('availPanel');if(!p)return;const showing=p.style.display!=='none'&&p.style.display!=='';
   p.style.display=showing?'none':'block';
   if(!showing){
     const dse=document.getElementById('av_dog_search');if(dse)dse.value='';
@@ -1044,43 +1054,33 @@ function calcMultiQ(){
     }
     const isTaxi=l.svc==='taxi';
     if(l.svc==='boarding'){
-      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
-      const mainDog=dogs[0];const addDogs=dogs.slice(1);
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');
       if(l.sd&&l.ed){
         const dropDt=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt=new Date(l.ed+'T'+(l.et||'18:00'));
-        const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));
-        const exHrs=hrs-nights*24;
-        const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;
-        let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
+        const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
+        const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
         for(let ni=0;ni<nights;ni++){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
-        const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:bH;
-        const mainAmt=(sN*stdR)+(hN*holR);
-        amt=mainAmt;
-        const em='\u{1F4A4}';const allDogStr=dogs.join(' & ');
-        lines.push([em+' Boarding \u2014 '+mainDog+' (main)',mainAmt]);
-        const holRangeStr=holDates.length>0?fmtDate(holDates[0])+' \u2014 '+fmtDate(holDates[holDates.length-1]):'';
+        const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:bH;const em='\u{1F4A4}';
+        const bd=(std,hol,tot)=>(sN>0&&hN>0)?(fmtGBP(std)+'/night \u00D7 '+sN+' + '+fmtGBP(hol)+'/night \u00D7 '+hN+' = '+fmtGBP(tot)):(fmtGBP(sN>0?std:hol)+'/night \u00D7 '+nights+' = '+fmtGBP(tot));
+        const holRangeStr=holDates.length>0?fmtDate(holDates[0])+' - '+fmtDate(holDates[holDates.length-1]):'';
         let dp=em+' Boarding ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
         if(hN>0)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN+' night'+(hN!==1?'s':'')+(holRangeStr?' ('+holRangeStr+')':'');
-        dp+='\n\n'+mainDog+':\n';
-        if(sN>0&&hN>0){dp+=fmtGBP(stdR)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*stdR)+'\n'+fmtGBP(holR)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*holR)+'\nTotal: '+fmtGBP(mainAmt);}
-        else{dp+=fmtGBP(sN>0?stdR:holR)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(mainAmt);}
-        if(exHrs>0){const baseN=sN>0?stdR:holR;const extAmt=exHrs<8?roundGBP(baseN*0.5):baseN;amt+=extAmt;lines.push([em+' Boarding \u2014 extra hours '+( exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h'+(hN>0&&sN===0?' holiday':'')+', '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
-        addDogs.forEach(dog=>{const addAmt=(sN*r.board_add)+(hN*baH);amt+=addAmt;lines.push([em+' Boarding \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n\n'+dog+' (additional dog):\n';if(sN>0&&hN>0){dp+=fmtGBP(r.board_add)+'/night \u00D7 '+sN+' night'+(sN!==1?'s':'')+' = '+fmtGBP(sN*r.board_add)+'\n'+fmtGBP(baH)+'/night \u00D7 '+hN+' night'+(hN!==1?'s':'')+' = '+fmtGBP(hN*baH)+'\nTotal: '+fmtGBP(addAmt);}else{dp+=fmtGBP(sN>0?r.board_add:baH)+'/night \u00D7 '+nights+' night'+(nights!==1?'s':'')+' = '+fmtGBP(addAmt);}});
+        prim.forEach(x=>{const a=(sN*stdR)+(hN*holR);amt+=a;lines.push([em+' Boarding - '+x.name+' (primary)',a]);dp+='\n\n'+x.name+':\n'+bd(stdR,holR,a);});
+        if(exHrs>0){const baseN=sN>0?stdR:holR;const extAmt=exHrs<8?roundGBP(baseN*0.5):baseN;amt+=extAmt;lines.push([em+' Boarding - extra hours '+(exHrs<8?'(<8h, +50%)':'(8+h, +100%)'),extAmt]);dp+='\nExtra hours ('+exHrs.toFixed(1)+'h, '+(exHrs<8?'+50%':'+100%')+'): '+fmtGBP(extAmt);}
+        adds.forEach(x=>{const a=(sN*r.board_add)+(hN*baH);amt+=a;lines.push([em+' Boarding - '+x.name+' (additional)',a]);dp+='\n\n'+x.name+' (additional dog):\n'+bd(r.board_add,baH,a);});
         descParts.push(dp);
       }
     }else if(l.svc==='daycare'){
       const hol=l.sd?isHol(l.sd):false;
-      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
-      const mainDog=dogs[0];const addDogs=dogs.slice(1);
-      const dayBase=l.rate>0?l.rate:(hol?dH:r.day_std);const mainAmt=dayBase;amt=mainAmt;
-      const em='\u2600\uFE0F';const allDogStr=dogs.join(' & ');
-      lines.push([em+' Daycare \u2014 '+mainDog+(hol?' (holiday)':''),mainAmt]);
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');
+      const dayStd=l.rate>0?l.rate:(hol?dH:r.day_std),dayAdd=hol?daH:r.day_add;const em='\u2600\uFE0F';
       let dp=em+' Daycare ('+allDogStr+'): '+fmtDate(l.sd||'')+'  Drop-off: '+(l.st2||'07:00')+'  Pick-up: '+(l.et||'18:00')+(hol?'\n\uD83C\uDFDD\uFE0F Holiday rate':'');
-      dp+='\n'+mainDog+': '+fmtGBP(mainAmt);
-      addDogs.forEach(dog=>{const addAmt=hol?daH:r.day_add;amt+=addAmt;lines.push([em+' Daycare \u2014 '+dog+' (+dog rate)',addAmt]);dp+='\n'+dog+' (additional): '+fmtGBP(addAmt);});
+      prim.forEach(x=>{amt+=dayStd;lines.push([em+' Daycare - '+x.name+(hol?' (holiday)':''),dayStd]);dp+='\n'+x.name+': '+fmtGBP(dayStd);});
+      adds.forEach(x=>{amt+=dayAdd;lines.push([em+' Daycare - '+x.name+' (additional)',dayAdd]);dp+='\n'+x.name+' (additional): '+fmtGBP(dayAdd);});
       const [eph,epm]=(l.et||'18:00').split(':').map(Number);const ptD=eph+epm/60;
-      if(ptD>18&&ptD<=23){const eveSur=roundGBP(dayBase*(r.evening_pct/100));amt+=eveSur;lines.push([em+' Daycare \u2014 evening care (6\u201311PM, +'+r.evening_pct+'%)',eveSur]);dp+='\nEvening care (pick-up '+(l.et||'18:00')+'): +'+r.evening_pct+'% = '+fmtGBP(eveSur);}
-      if(hol)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on this day';
+      if(ptD>18&&ptD<=23){const eveSur=roundGBP(dayStd*(r.evening_pct/100));amt+=eveSur;lines.push([em+' Daycare - evening care (+'+r.evening_pct+'%)',eveSur]);dp+='\nEvening care (pick-up '+(l.et||'18:00')+'): +'+r.evening_pct+'% = '+fmtGBP(eveSur);}
       descParts.push(dp);
     }else if(isTaxi){
       const subDef=SVC_SUBTYPES.taxi?.find(s=>s.key===l.sub);
@@ -1091,24 +1091,21 @@ function calcMultiQ(){
       lines.push(['\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(isHolDay?' holiday +15%':''),amt]);
       descParts.push('\u{1F695} Pet Taxi'+(subLabel?' ('+subLabel+')':'')+(l.sd?' \u2014 '+fmtDate(l.sd):'')+(isHolDay?' \uD83C\uDFDD\uFE0F Holiday rate (+15%)':'')+': '+fmtGBP(amt));
     }else if(l.svc==='walk'||l.svc==='dropin'){
-      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
-      const mainDog=dogs[0];const addDogs=dogs.slice(1);
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);
       const holMult=l.sd&&isHol(l.sd)?1.15:1;const isHolDay=holMult>1;
-      const baseRate=l.rate||0;const mainRate=roundGBP(baseRate*holMult);
-      const addRateBase=l.rka?r[l.rka]||0:0;const addRate=roundGBP(addRateBase*holMult);
-      amt=mainRate;const em=SVC_EMOJIS[l.svc]||'';const svcName=SVC_NAMES[l.svc]||l.svc;
+      const mainRate=roundGBP((l.rate||0)*holMult);const addRate=roundGBP((l.rka?r[l.rka]||0:0)*holMult);
+      const em=SVC_EMOJIS[l.svc]||'';const svcName=SVC_NAMES[l.svc]||l.svc;
       const subLabel=l.sub&&SVC_SUBTYPES[l.svc]?SVC_SUBTYPES[l.svc].find(s=>s.key===l.sub)?.label||'':'';
-      const allDogStr=dogs.join(' & ');
-      let dp=em+' '+svcName+(subLabel?' ('+subLabel+')':'')+(l.sd?' \u2014 '+fmtDate(l.sd):'');
+      let dp=em+' '+svcName+(subLabel?' ('+subLabel+')':'')+(l.sd?' - '+fmtDate(l.sd):'');
       if(isHolDay)dp+='\n\uD83C\uDFDD\uFE0F Holiday rate (+15%)';
-      dp+='\n'+mainDog+': '+fmtGBP(mainRate);
-      lines.push([em+' '+svcName+' \u2014 '+mainDog+(isHolDay?' (holiday)':'')+(subLabel?' ('+subLabel+')':''),mainRate]);
-      addDogs.forEach(dog=>{amt+=addRate;lines.push([em+' '+svcName+' \u2014 '+dog+' (add-on'+(isHolDay?', holiday':'')+') ',addRate]);dp+='\n'+dog+' (additional): '+fmtGBP(addRate);});
-      if(addRate===0&&addDogs.length>0)dp+=' (no add-on rate for this type)';
+      prim.forEach(x=>{amt+=mainRate;lines.push([em+' '+svcName+' - '+x.name+(isHolDay?' (holiday)':'')+(subLabel?' ('+subLabel+')':''),mainRate]);dp+='\n'+x.name+': '+fmtGBP(mainRate);});
+      adds.forEach(x=>{amt+=addRate;lines.push([em+' '+svcName+' - '+x.name+' (additional)',addRate]);dp+='\n'+x.name+' (additional): '+fmtGBP(addRate);});
+      if(addRate===0&&adds.length>0)dp+=' (no add-on rate for this type)';
       descParts.push(dp);
     }else if(l.svc==='dogsit'){
-      const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||'Dog'];
-      const em='\uD83E\uDEB1';const allDogStr=dogs.join(' & ');
+      let dogObjs=(l.dogs&&l.dogs.length?l.dogs:[]).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
+      const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');const em='\uD83E\uDEB1';
       if(l.sd&&l.ed){
         const holDates2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
         const dropDt2=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt2=new Date(l.ed+'T'+(l.et||'18:00'));
@@ -1116,21 +1113,20 @@ function calcMultiQ(){
         let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
         for(let ni=0;ni<nights2a;ni++){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
         const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:bH;
-        const nights2=sN2+hN2;const mainAmt2=(sN2*stdR2)+(hN2*holR2);amt=mainAmt2;
+        const bd2=(std,hol,tot)=>(sN2>0&&hN2>0)?(fmtGBP(std)+'/night x '+sN2+' + '+fmtGBP(hol)+'/night x '+hN2+' = '+fmtGBP(tot)):(fmtGBP(sN2>0?std:hol)+'/night x '+(sN2+hN2)+' = '+fmtGBP(tot));
         let dp2=em+' Dog Sit ('+allDogStr+'):\n'+fmtDate(l.sd)+'  Drop-off: '+(l.st2||'09:00')+'\n'+fmtDate(l.ed)+'  Pick-up: '+(l.et||'18:00');
         if(hN2>0)dp2+='\n\uD83C\uDFDD\uFE0F Holiday rate applies on '+hN2+' night'+(hN2!==1?'s':'');
-        dp2+='\n\n'+dogs[0]+':\n';
-        if(sN2>0&&hN2>0){dp2+=fmtGBP(stdR2)+'/night \u00D7 '+sN2+' night'+(sN2!==1?'s':'')+' = '+fmtGBP(sN2*stdR2)+'\n'+fmtGBP(holR2)+'/night \u00D7 '+hN2+' night'+(hN2!==1?'s':'')+' = '+fmtGBP(hN2*holR2)+'\nTotal: '+fmtGBP(mainAmt2);}
-        else{dp2+=fmtGBP(sN2>0?stdR2:holR2)+'/night \u00D7 '+nights2+' night'+(nights2!==1?'s':'')+' = '+fmtGBP(mainAmt2);}
-        lines.push([em+' Dog Sit \u2014 '+dogs[0],mainAmt2]);descParts.push(dp2);
+        prim.forEach(x=>{const a=(sN2*stdR2)+(hN2*holR2);amt+=a;lines.push([em+' Dog Sit - '+x.name+' (primary)',a]);dp2+='\n\n'+x.name+':\n'+bd2(stdR2,holR2,a);});
+        adds.forEach(x=>{const a=(sN2*r.board_add)+(hN2*baH);amt+=a;lines.push([em+' Dog Sit - '+x.name+' (additional)',a]);dp2+='\n\n'+x.name+' (additional dog):\n'+bd2(r.board_add,baH,a);});
+        descParts.push(dp2);
       }else{
-        const qty2=l.qty||1;const nRate=l.rate||r.board_std;amt=nRate*qty2;
-        lines.push([em+' Dog Sit \u00D7'+qty2,amt]);
-        descParts.push(em+' Dog Sit ('+allDogStr+'): '+fmtGBP(nRate)+'/night \u00D7 '+qty2+' = '+fmtGBP(amt));
+        const qty2=l.qty||1;const nRate=l.rate||r.board_std;amt=nRate*qty2*Math.max(1,prim.length);
+        lines.push([em+' Dog Sit x'+qty2,amt]);
+        descParts.push(em+' Dog Sit ('+allDogStr+'): '+fmtGBP(nRate)+'/night x '+qty2+' = '+fmtGBP(amt));
       }
     }else{
       const qty=l.qty||1;amt=(l.rate||0)*qty;
-      const em=SVC_EMOJIS[l.svc]||'';const dogStr=l.dogs&&l.dogs.length?l.dogs.join(' & '):'';
+      const em=SVC_EMOJIS[l.svc]||'';const dogStr=(l.dogs&&l.dogs.length)?l.dogs.map(_nm).join(' & '):'';
       const label=em+' '+(SVC_NAMES[l.svc]||l.svc)+(dogStr?' ('+dogStr+')':'');
       lines.push([label+(qty>1?' \u00D7'+qty:''),amt]);
       descParts.push(label+(qty>1?'\n\u00D7'+qty+' sessions @ '+fmtGBP(l.rate||0)+' = '+fmtGBP(amt):': '+fmtGBP(amt)));
@@ -1144,7 +1140,7 @@ function calcMultiQ(){
   total=roundGBP(total); // whole-£ quote total (round after any discount)
   const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
   const prepayAmt=roundGBP(total*(prepayPct/100));const finalAmt=total-prepayAmt; // outstanding = remainder, so they sum exactly
-  _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:[..._selDogs],mainDog:_mainDog||_selDogs[0]||'',descParts,dogRevMap:_computeDogRevMap()};
+  _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:_orderedSel().map(_nm),mainDog:_nm(_orderedSel()[0]||''),descParts,dogRevMap:_computeDogRevMap()};
   document.getElementById('q_total').textContent=fmtGBP(total);
   document.getElementById('q_breakdown').innerHTML=lines.map((l,i)=>'<div class="q-ln"'+(i===lines.length-1?' style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:4px;"':'')+'>'+
     '<span>'+l[0]+'</span><span>'+(l[1]<0?'-':'')+fmtGBP(Math.abs(l[1]))+'</span></div>').join('');
@@ -1203,17 +1199,22 @@ function buildQDogMS(){
   if(!allDogs.length){c.innerHTML='<div style="padding:9px;font-size:10px;color:var(--gr3);">No dogs loaded - tap Refresh on the Board first</div>';return;}
   const q=(document.getElementById('q_dog_search')?.value||'').toLowerCase();
   const visible=allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q));
-  c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);return'<div class="dog-ms-item'+(_selDogs.includes(d.name)?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(_selDogs.includes(d.name)?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+(d.breed?' <span style="color:var(--gr3);font-weight:400;">'+d.breed+'</span>':'')+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
+  c.innerHTML=visible.map(d=>{const i=allDogs.indexOf(d);const sel=_selDogs.includes(d.cid);return'<div class="dog-ms-item'+(sel?' sel':'')+'" onclick="toggleQDog('+i+')"><input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation()"><span style="flex:1;">'+d.name+(d.breed?' <span style="color:var(--gr3);font-weight:400;">'+d.breed+'</span>':'')+'</span><span style="font-size:8px;color:var(--gr3);">'+d.cid+'</span></div>';}).join('');
 }
-function _syncDogsToLines(){const ordered=_mainDog?[_mainDog,..._selDogs.filter(n=>n!==_mainDog)]:[..._selDogs];_svcLines.forEach(l=>{if(l.svc!=='extra'&&l.svc!=='taxi')l.dogs=[...ordered];});}
-function toggleQDog(i){const name=allDogs[i].name;const idx=_selDogs.indexOf(name);if(idx>=0)_selDogs.splice(idx,1);else _selDogs.push(name);if(!_selDogs.includes(_mainDog))_mainDog=_selDogs[0]||'';_syncDogsToLines();buildQDogMS();buildMainDogBtns();calcMultiQ();
-  const dogData=allDogs.find(d=>d.name===(_mainDog||_selDogs[0]||''));if(dogData){const ownerEl=document.getElementById('q_owner');if(ownerEl&&!ownerEl.value)ownerEl.value=dogData.owner||'';}
+function _syncDogsToLines(){const ordered=_orderedSel();_svcLines.forEach(l=>{if(l.svc!=='extra'&&l.svc!=='taxi')l.dogs=[...ordered];});}
+function toggleQDog(i){const cid=allDogs[i].cid;const idx=_selDogs.indexOf(cid);if(idx>=0){_selDogs.splice(idx,1);const ai=_addDogs.indexOf(cid);if(ai>=0)_addDogs.splice(ai,1);}else{_selDogs.push(cid);if(_selDogs.length>1)_addDogs.push(cid);/* default: 2nd+ dog = additional, freely toggleable */}
+  _syncDogsToLines();buildQDogMS();buildAddDogChecks();calcMultiQ();
+  const first=_selDogs[0];const dogData=first?allDogs.find(d=>d.cid===first):null;if(dogData){const ownerEl=document.getElementById('q_owner');if(ownerEl&&!ownerEl.value)ownerEl.value=dogData.owner||'';}
   autoGenPayRef();
 }
-function buildMainDogBtns(){const w=document.getElementById('q_main_dog_wrap');const c=document.getElementById('q_main_dog_btns');if(!w||!c)return;if(_selDogs.length<=1){w.style.display='none';_mainDog=_selDogs[0]||'';return;}w.style.display='block';c.innerHTML=_selDogs.map((n,i)=>'<button class="main-dog-pill'+(_mainDog===n?' active':'')+'" onclick="setMainDog('+i+')">* '+n+'</button>').join('');}
-function setMainDog(i){_mainDog=_selDogs[i];_syncDogsToLines();buildMainDogBtns();calcMultiQ();autoGenPayRef();}
+// Per-dog "additional dog rate" toggles (replaces the single main-dog picker). Primary = not ticked.
+function buildAddDogChecks(){const w=document.getElementById('q_add_dog_wrap');const c=document.getElementById('q_add_dog_btns');if(!w||!c)return;if(!_selDogs.length){w.style.display='none';return;}w.style.display='block';
+  c.innerHTML=_orderedSel().map(cid=>{const add=_addDogs.includes(cid);return'<label class="adddog-row"><span>'+_nm(cid)+' <span style="font-size:8px;color:var(--gr3);">'+cid+'</span></span><span style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:'+(add?'var(--or)':'var(--gn)')+';">'+(add?'Additional':'Primary')+' <input type="checkbox" '+(add?'checked':'')+' onchange="toggleAddDog(\''+cid+'\')" title="Charge additional-dog rate"></span></label>';}).join('');
+}
+function toggleAddDog(cid){const i=_addDogs.indexOf(cid);if(i>=0)_addDogs.splice(i,1);else _addDogs.push(cid);_syncDogsToLines();buildAddDogChecks();calcMultiQ();autoGenPayRef();}
+function buildMainDogBtns(){buildAddDogChecks();}// back-compat shim for existing callers
 function autoGenPayRef(){
-  const names=(_selDogs.length?_selDogs:[_mainDog]).filter(Boolean).map(n=>n.replace(/\s+/g,'')).join('');
+  const names=_orderedSel().map(_nm).filter(Boolean).map(n=>n.replace(/\s+/g,'')).join('');
   const lines=_svcLines.filter(l=>l.sd);
   const d=lines.length?new Date(lines[0].sd+'T12:00:00'):new Date();
   const mm=String(d.getMonth()+1).padStart(2,'0');const yy=String(d.getFullYear()).slice(-2);
@@ -1223,35 +1224,31 @@ function autoGenPayRef(){
 function _computeDogRevMap(){
   const r=getRates();const map={};
   const bH=holRate(r.board_std),baH=holRate(r.board_add),dH=holRate(r.day_std),daH=holRate(r.day_add);
-  const add=(name,a)=>{if(name&&a>0)map[name]=Math.round(((map[name]||0)+a)*100)/100;};
+  const add=(cid,a)=>{if(cid&&a>0)map[cid]=Math.round(((map[cid]||0)+a)*100)/100;};
   _svcLines.forEach(l=>{
     if(l.svc==='extra'||l.svc==='taxi')return;
-    const dogs=l.dogs&&l.dogs.length?l.dogs:[_mainDog||''];
-    const main=dogs[0];const addDogs=dogs.slice(1);
+    const prim=(l.dogs||[]).filter(c=>!_addDogs.includes(c)),adds=(l.dogs||[]).filter(c=>_addDogs.includes(c));
     if(l.svc==='boarding'&&l.sd&&l.ed){
       const drop=new Date(l.sd+'T'+(l.st2||'09:00')),pick=new Date(l.ed+'T'+(l.et||'18:00'));
       const hrs=(pick-drop)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
       const hd=getHolDates(l.sd,l.ed);let hN=0,sN=0;
       let d=new Date(l.sd+'T12:00:00');d.setDate(d.getDate()+1);
       for(let ni=0;ni<nights;ni++){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
-      let mAmt=(sN*r.board_std)+(hN*bH);
-      if(exHrs>0){const bn=sN>0?r.board_std:bH;mAmt+=exHrs<8?roundGBP(bn*0.5):bn;}
-      add(main,mAmt);addDogs.forEach(dog=>add(dog,(sN*r.board_add)+(hN*baH)));
+      const base=(sN*r.board_std)+(hN*bH);let ex=0;if(exHrs>0){const bn=sN>0?r.board_std:bH;ex=exHrs<8?roundGBP(bn*0.5):bn;}
+      prim.forEach((c,i)=>add(c,base+(i===0?ex:0)));adds.forEach(c=>add(c,(sN*r.board_add)+(hN*baH)));
     }else if(l.svc==='daycare'&&l.sd){
-      const hol=isHol(l.sd);add(main,hol?dH:r.day_std);
-      addDogs.forEach(dog=>add(dog,hol?daH:r.day_add));
+      const hol=isHol(l.sd);prim.forEach(c=>add(c,hol?dH:r.day_std));adds.forEach(c=>add(c,hol?daH:r.day_add));
     }else if((l.svc==='walk'||l.svc==='dropin')&&l.rate){
-      const hm=l.sd&&isHol(l.sd)?1.15:1;const mr=roundGBP(l.rate*hm);
-      const ar=l.rka?roundGBP((r[l.rka]||0)*hm):0;
-      add(main,mr);addDogs.forEach(dog=>add(dog,ar));
+      const hm=l.sd&&isHol(l.sd)?1.15:1;const mr=roundGBP(l.rate*hm);const ar=l.rka?roundGBP((r[l.rka]||0)*hm):0;
+      prim.forEach(c=>add(c,mr));adds.forEach(c=>add(c,ar));
     }else if(l.svc==='dogsit'&&l.sd&&l.ed){
       const hd2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
       const dropDtDs=new Date(l.sd+'T'+(l.st2||'09:00')),pickDtDs=new Date(l.ed+'T'+(l.et||'18:00'));
       const hrsDs=(pickDtDs-dropDtDs)/3600000;const nightsDs=Math.max(1,Math.floor(hrsDs/24));
       let d2=new Date(l.sd+'T12:00:00');d2.setDate(d2.getDate()+1);
       for(let ni=0;ni<nightsDs;ni++){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
-      add(main,(sN2*r.board_std)+(hN2*bH));
-    }else if(l.rate){const qty=l.qty||1;add(main,(l.rate||0)*qty);}
+      prim.forEach(c=>add(c,(sN2*r.board_std)+(hN2*bH)));adds.forEach(c=>add(c,(sN2*r.board_add)+(hN2*baH)));
+    }else if(l.rate){const qty=l.qty||1;prim.forEach(c=>add(c,(l.rate||0)*qty));}
   });
   Object.keys(map).forEach(k=>map[k]=roundGBP(map[k])); // whole-£ per-dog amounts, matching the quote
   return map;
@@ -1313,60 +1310,37 @@ function genRateBlock(){
     return '';
   }).filter(Boolean).join('\n\n');
 }
+// Payment templates are matched by a STABLE key (quote/book/prepay/final), so renaming them in the hub is safe.
+// If no keyed hub template exists (or it's empty), fall back to the built-in default → quotes never break.
+const DEFAULT_PAY_TPLS={quote:TP_QUOTE,book:TP_BOOK,prepay:TP_PREPAY,final:TP_FINAL};
+function paymentTpl(key){const t=(msgTpls||[]).find(x=>(x.key||'')===key&&(x.content||'').trim());return t?t.content:DEFAULT_PAY_TPLS[key];}
+function fillQuoteVars(tpl,vars){let m=tpl||'';Object.keys(vars).forEach(k=>{m=m.split('{{'+k+'}}').join(vars[k]==null?'':vars[k]);});return m.replace(/\{\{[a-zA-Z]+\}\}/g,'');/* blank any unknown placeholder */}
+// Show the built-in fallback drafts (read-only) + whether each is currently overridden by a keyed Payment template.
+function renderPayFallbacks(){
+  const el=document.getElementById('payFallbacks');if(!el)return;
+  const labels={quote:'Get Quote',book:'Book with Us',prepay:'Prepayment Received',final:'Final Payment'};
+  const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  el.innerHTML=Object.keys(DEFAULT_PAY_TPLS).map(k=>{
+    const t=(msgTpls||[]).find(x=>(x.key||'')===k&&(x.content||'').trim());
+    const status=t?'<span style="color:var(--gn);">● live: uses your \''+esc(t.name)+'\'</span>':'<span style="color:var(--or);">● live: uses this fallback</span>';
+    return '<div style="margin-bottom:9px;"><div style="font-size:10px;font-weight:700;margin-bottom:3px;">'+labels[k]+' <span style="font-weight:400;font-size:8px;">'+status+'</span></div><textarea readonly style="width:100%;min-height:66px;font-size:9px;background:var(--gr5);border:1px solid var(--gr4);border-radius:6px;padding:6px;color:var(--gr2);box-sizing:border-box;">'+esc(DEFAULT_PAY_TPLS[k])+'</textarea></div>';
+  }).join('');
+}
 function genQuote(type){
   calcMultiQ();// always recalculate to pick up latest discount/prepay changes
   const t=getTpls();const ownerName=document.getElementById('q_owner').value||'there';
   const payRef=document.getElementById('q_payref').value||(t.payRefPfx||'KCHEUNG');
-  const allDogNames=[...new Set((_svcLines||[]).flatMap(l=>l.svc!=='extra'?l.dogs||[]:[]))].filter(Boolean).join(' & ')||_cr.selDogs.join(' & ')||'your dog';
+  const allDogNames=_orderedSel().map(_nm).filter(Boolean).join(' & ')||(_cr.selDogs||[]).join(' & ')||'your dog';// primary dogs first, then additional
   const serviceBlock=(_cr.descParts||[]).join('\n\n');
   const actualPrepay=parseFloat(document.getElementById('q_actual_prepay')?.value)||_cr.prepayAmt;
   const balanceDue=Math.max(0,_cr.total-actualPrepay);
-  let msg='Hi '+ownerName+',\n\n';
-  // clear other output boxes
+  // clear the other output boxes
   ['q_out_quote','q_out_book','q_out_prepay','q_out_final'].forEach(id=>{if('q_out_'+type!==id){const el=document.getElementById(id);if(el){el.style.display='none';el.textContent='';}}});
-  if(type==='quote'){
-    markBookingsQuotedFromQuote();
-    const rateBlock=genRateBlock();
-    msg+='Here is the rate for our services with THE CUDDLY LANE \u2601\ufe0f\u2728\n\n';
-    msg+=rateBlock;
-    msg+='\n\nHere is your quotation:\n\n';
-    msg+=serviceBlock;
-    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
-    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
-    msg+='\n\nTo secure your booking, a 50% prepayment will be required (non-refundable, but transferable to other dates). Let us know if you\'d like to go ahead!';
-    msg+='\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
-  }else if(type==='book'){
-    msg+='Thank you for choosing THE CUDDLY LANE \u2014 we can\'t wait to welcome *'+allDogNames+'*! \ud83d\udc3e\n\n';
-    msg+='Here is a summary of your booking:\n\n';
-    msg+=serviceBlock;
-    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
-    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
-    msg+='\n\nTo confirm your spot, please send your 50% prepayment:\n*'+fmtGBP(_cr.prepayAmt)+'*';
-    msg+='\n\nPayment reference: *'+payRef+'*\n'+(t.payLink||'[payment link]');
-    msg+='\n\nThis payment is non-refundable but fully transferable to alternative dates. Once received, your booking is confirmed!';
-    msg+='\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
-  }else if(type==='prepay'){
-    msg+='Great news \u2014 your prepayment has been received and your booking is confirmed! \ud83c\udf89\n\n';
-    msg+='Here is your booking summary:\n\n';
-    msg+=serviceBlock;
-    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
-    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
-    msg+='\nPrepayment received: *'+fmtGBP(actualPrepay)+'*';
-    msg+='\n*Balance due at drop-off: '+fmtGBP(balanceDue)+'*';
-    msg+='\n\nPayment reference: *'+payRef+'*\n'+(t.payLink||'[payment link]');
-    msg+='\n\nWe look forward to seeing *'+allDogNames+'*! \ud83d\udc3e\nKatie & Osbert';
-  }else{
-    msg+='Your booking is coming up soon! \ud83d\udc3e\n\n';
-    msg+='Here is your final payment summary:\n\n';
-    msg+=serviceBlock;
-    if(_cr.discLine)msg+='\n\n'+_cr.discLine;
-    msg+='\n\n*Total: '+fmtGBP(_cr.total)+'*';
-    msg+='\nPrepayment received: '+fmtGBP(actualPrepay);
-    msg+='\n*Balance due: '+fmtGBP(balanceDue)+'*';
-    msg+='\n\nPlease settle the balance before drop-off.\nPayment reference: *'+payRef+'*\n'+(t.payLink||'[payment link]');
-    msg+='\n\nLooking forward to seeing *'+allDogNames+'*!\nKatie & Osbert \ud83d\udc3e';
-  }
-  msg=msg.replace(/\n{3,}/g,'\n\n').trim();
+  if(type==='quote')markBookingsQuotedFromQuote();
+  const disc=_cr.discLine?('\n\n'+_cr.discLine):'';
+  const vars={ownerName,dogs:allDogNames,service:serviceBlock,discount:disc,total:fmtGBP(_cr.total),rateBlock:genRateBlock(),prepayAmt:fmtGBP(type==='book'?_cr.prepayAmt:actualPrepay),finalAmt:fmtGBP(balanceDue),payRef,payLink:(t.payLink||'[payment link]')};
+  let msg=fillQuoteVars(paymentTpl(type),vars);
+  msg=msg.replace(/[—–]/g,'-').replace(/\n{3,}/g,'\n\n').trim();// quote templates use plain '-' not long dashes
   const outId='q_out_'+type;
   document.getElementById(outId).style.display='block';document.getElementById(outId).textContent=msg;copyText(msg);
   const btnLabels={quote:'Copy Get Quote',book:'Copy Book with Us',prepay:'Copy Prepayment Received',final:'Copy Final Payment'};
@@ -1381,9 +1355,9 @@ async function markBookingsQuotedFromQuote(){
     const sd=mainLine.sd||'';const ed=mainLine.ed||sd;const svcLabel=svcN[mainLine.svc]||mainLine.svc;
     const dogs=(_selDogs&&_selDogs.length)?_selDogs:(mainLine.dogs||[]);
     let changed=false;
-    for(const dogName of dogs){
-      if(!dogName)continue;
-      const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
+    for(const cid of dogs){
+      if(!cid)continue;
+      const customerId=cid;const dogName=_nm(cid);
       const existing=bookings.find(b=>(customerId?b.customerId===customerId:b.dog.toLowerCase()===dogName.toLowerCase())&&b.sd===sd&&(b.ed||b.sd)===(ed||sd)&&!['Cancelled','Canceled'].includes(b.status));
       if(existing){
         if(!existing.status){
@@ -1417,15 +1391,15 @@ async function createBookingsFromQuote(){
   for(const line of _svcLines){
     if(line.svc==='extra')continue;
     // Taxi: flat rate per trip — one booking for main dog only
-    const dogs=line.svc==='taxi'?[_mainDog||_selDogs[0]||'']:(line.dogs&&line.dogs.length?line.dogs:(_selDogs.length?_selDogs:['']));
+    const dogs=line.svc==='taxi'?[_selDogs[0]||'']:(line.dogs&&line.dogs.length?line.dogs:(_selDogs.length?_selDogs:['']));
     const sd=line.sd||'';const ed=line.ed||sd;const st=line.st2||'09:00';const et=line.et||'18:00';
     const svcLabel=svcN[line.svc]||line.svc;
-    for(const dogName of dogs){
+    for(const cid of dogs){
       const id=nextBkId(sd);
       const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
-      const rev=line.svc==='taxi'?(_cr.lines.find(l=>l[0].includes('Taxi'))?.[1]||0):revenueMap[dogName]||0;
+      const customerId=cid;const dogName=_nm(cid);
+      const rev=line.svc==='taxi'?(_cr.lines.find(l=>l[0].includes('Taxi'))?.[1]||0):revenueMap[cid]||0;
       const prepayAmt=parseFloat((rev*(prepayPct/100)).toFixed(2));
-      const dogData=allDogs.find(d=>d.name===dogName);const customerId=dogData?dogData.cid:'';
       const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dogName,id,svc:svcLabel,sd,st,ed,et,dropLoc:'',pickLoc:'',rev,tips:0,prepay:prepayAmt,finalPay:0,unit:0,discNotes:'',roverPct:0,roverAmt:0,ch:'TCL',pay:'',status:'Booked',priv:false,month,rating:'',feedback:'',rem:['','','','','']}),TABS.BK.h);
       try{await appendRow(TABS.BK,vals);const mv=[...vals];mv[1]=dogName;bookings.push(mapBk(mv,bookings.length,mkHdr(bkHdrRow)));created++;}catch(e){alert('Error for '+dogName+' ('+svcLabel+'): '+e.message);}
     }
@@ -1438,9 +1412,10 @@ function quoteFromBk(){
   const actualPrepay=parseFloat(document.getElementById('bm_prepay')?.value)||0;
   const svcMap={Boarding:'boarding',DayCare:'daycare',Walking:'walk','Drop-in':'dropin','Dog Sit':'dogsit','Pet Taxi':'taxi',Training:'training'};
   const svcKey=svcMap[svc]||'boarding';
-  _svcLines=[{svc:svcKey,dogs:dog?[dog]:[],sd,ed,st2:bst||'09:00',et:et||'18:00',rate:0}];
-  _selDogs=dog?[dog]:[];_mainDog=dog||'';
-  const dogData=allDogs.find(d=>d.name.toLowerCase()===(dog||'').toLowerCase());
+  const _dd=allDogs.find(x=>x.name.toLowerCase()===(dog||'').toLowerCase());const cid0=_dd?_dd.cid:'';
+  _svcLines=[{svc:svcKey,dogs:cid0?[cid0]:[],sd,ed,st2:bst||'09:00',et:et||'18:00',rate:0}];
+  _selDogs=cid0?[cid0]:[];_addDogs=[];
+  const dogData=_dd;
   if(dogData)document.getElementById('q_owner').value=dogData.owner;
   if(actualPrepay>0){const apEl=document.getElementById('q_actual_prepay');if(apEl)apEl.value=actualPrepay.toFixed(2);}
   document.getElementById('bkModal').classList.remove('open');goToTab('customers','quote');
@@ -1836,6 +1811,14 @@ function occupantsOn(dateStr){
     else if(k==='day'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}});
   return res;
 }
+// Quoted (not-yet-committed) dogs occupying a date — shown faded so we know how many we could still commit / chase.
+function quotedOn(dateStr){
+  const res=[];
+  bookings.forEach(b=>{if(b.status!=='Quoted')return;const k=_svcKind(b);const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
+    if(k==='stay'){if(nsd<=dateStr&&dateStr<(ned||nsd))res.push(b);}
+    else if(k==='day'){if(nsd<=dateStr&&dateStr<=(ned||nsd))res.push(b);}});
+  return res;
+}
 // All events touching a date: arrivals (drop-off), departures (pick-up), day-care visits, other visits — with times.
 function eventsOn(dateStr){
   const arrivals=[],departures=[],daycare=[],visits=[];
@@ -1876,11 +1859,11 @@ function _calMonthHtml(){
   const first=new Date(y,m,1);const start=_mondayOf(_dstr(first));const today=todayStr();
   let cells='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const inMo=d.getMonth()===m;
-    const occs=occupantsOn(ds);const occ=occs.length;const ev=eventsOn(ds);const isToday=ds===today;
+    const occs=occupantsOn(ds);const occ=occs.length;const quo=quotedOn(ds);const ev=eventsOn(ds);const isToday=ds===today;
     const bg=inMo?_capBg(occ):'var(--gr5)';
-    const names=occs.map(b=>_dogChip(b)).join('');
+    const names=occs.map(b=>_dogChip(b)).join('')+quo.map(b=>'<span class="cal-dog cal-quo" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')" title="Quoted — not yet committed">'+(b.dog||'')+' (Q)</span>').join('');
     const newArr=ev.arrivals.some(a=>_calNewRis.has(a.b.ri));
-    const foot=(ev.arrivals.length?'<span style="color:var(--gn);font-weight:800;">▲'+ev.arrivals.length+'</span> ':'')+(ev.departures.length?'<span style="color:var(--sk);font-weight:800;">▼'+ev.departures.length+'</span>':'')+(newArr?' <span title="New (non-returning) dog" style="color:var(--or);font-weight:800;">🆕</span>':'');
+    const foot=(ev.arrivals.length?'<span style="color:var(--gn);font-weight:800;">▲'+ev.arrivals.length+'</span> ':'')+(ev.departures.length?'<span style="color:var(--sk);font-weight:800;">▼'+ev.departures.length+'</span>':'')+(quo.length?' <span title="Quoted, not committed" style="color:var(--gr3);font-weight:800;">'+quo.length+'Q</span>':'')+(newArr?' <span title="New (non-returning) dog" style="color:var(--or);font-weight:800;">🆕</span>':'');
     cells+='<div class="cal-cell'+(inMo?'':' out')+(isToday?' today':'')+(ds===_calSelDay?' sel':'')+'" data-d="'+ds+'" onclick="selCalDay(\''+ds+'\')" style="background:'+bg+';">'+
       '<div class="cal-cell-hd"><span style="font-weight:700;'+(inMo?'':'color:var(--gr3);')+'">'+d.getDate()+'</span>'+
       (occ>0?'<span style="font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+
@@ -1911,36 +1894,40 @@ function _calDayDetailHtml(ds){
   const arrDepIds=new Set([...ev.arrivals,...ev.departures].map(x=>x.b.ri));
   const staying=occ.filter(b=>_svcKind(b)==='stay'&&!arrDepIds.has(b.ri));
   if(staying.length)h+='<div style="font-size:9px;color:var(--gr2);margin-top:6px;">💤 Staying over: '+staying.map(b=>lnk(b)).join(', ')+'</div>';
+  const quo=quotedOn(ds);
+  if(quo.length)h+='<div style="font-size:9px;color:var(--gr3);font-style:italic;margin-top:6px;border-top:1px dashed var(--gr4);padding-top:6px;">📝 Quoted (not committed) · '+quo.length+' — chase or commit: '+quo.map(b=>lnk(b)).join(', ')+'</div>';
   h+='</div>';
   return h;
 }
+// Week view = resource grid: 4 "places" (rows) × 7 days (columns); each booking is a bar spanning its nights.
 function _calWeekHtml(){
   const start=_mondayOf(_calAnchor);const today=todayStr();
   const end=new Date(start);end.setDate(start.getDate()+6);
-  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  const axisBg='background:repeating-linear-gradient(90deg,var(--gr5),var(--gr5) calc(20% - 1px),var(--gr4) calc(20% - 1px),var(--gr4) 20%);';
-  const axisHdr='<div style="display:flex;font-size:7px;color:var(--gr3);padding-left:36%;"><span style="flex:1;">6</span><span style="flex:1;">9</span><span style="flex:1;">12</span><span style="flex:1;">15</span><span style="flex:1;">18</span><span style="width:0;">21</span></div>';
-  let days='';
-  for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const ev=eventsOn(ds);const occ=occupantsOn(ds).length;
-    const stays=occupantsOn(ds).filter(b=>_svcKind(b)==='stay');
-    // one row per timed event on a shared 06:00–21:00 axis so overlaps line up horizontally
-    const rows=[];
-    ev.arrivals.forEach(a=>rows.push({s:a.t,cid:a.b.customerId,lab:'🟢 '+a.b.dog,col:'var(--gn)',pt:true,cap:a.t}));
-    ev.departures.forEach(a=>rows.push({s:a.t,cid:a.b.customerId,lab:'🔵 '+a.b.dog,col:'var(--sk)',pt:true,cap:a.t}));
-    ev.daycare.forEach(a=>rows.push({s:a.drop,e:a.pick,cid:a.b.customerId,lab:'☀️ '+a.b.dog,col:'var(--or)',pt:false,cap:a.drop+'–'+a.pick}));
-    ev.visits.forEach(a=>rows.push({s:a.t,cid:a.b.customerId,lab:'🐕 '+a.b.dog,col:'var(--pu)',pt:true,cap:a.t}));
-    rows.sort((a,c)=>(a.s||'').localeCompare(c.s||''));
-    let body='';
-    if(stays.length)body+='<div style="font-size:9px;color:var(--gr2);margin-bottom:4px;">💤 Overnight: '+stays.map(b=>_dogChip(b)).join(', ')+'</div>';
-    if(rows.length){
-      body+=axisHdr+rows.map(r=>{const L=_tpct(r.s);const mark=r.pt?'<div style="position:absolute;left:'+L+'%;top:0;width:3px;height:14px;background:'+r.col+';border-radius:2px;"></div>':'<div style="position:absolute;left:'+L+'%;width:'+Math.max(2,_tpct(r.e)-L)+'%;top:1px;height:12px;background:'+r.col+';border-radius:3px;"></div>';
-        return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;"><span class="cal-dog" style="width:34%;font-size:9px;flex-shrink:0;" onclick="openDogByCid(\''+(r.cid||'')+'\')">'+r.lab+'</span><div style="position:relative;flex:1;height:15px;border-radius:3px;'+axisBg+'">'+mark+'</div><span style="width:58px;font-size:8px;color:var(--gr2);text-align:right;flex-shrink:0;">'+r.cap+'</span></div>';}).join('');
-    }else if(!stays.length)body+='<div style="font-size:9px;color:var(--gr3);">—</div>';
-    days+='<div class="cal-week-day'+(ds===today?' today':'')+'" style="border:1px solid var(--gr4);border-radius:var(--r);padding:8px;margin-bottom:6px;'+(ds===today?'border-color:var(--or);':'')+'">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;"><span style="font-size:11px;font-weight:800;">'+d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+'</span>'+
-      '<span style="font-size:9px;font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+(occ>=CAL_CAP?' FULL':' · '+(CAL_CAP-occ)+' free')+'</span></div>'+body+'</div>';
+  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const days=[];for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);days.push(_dstr(d));}
+  // Boarding/dog-sit (nights sd..ed-1) + day-care (its day), committed OR quoted, present this week.
+  const items=[];
+  bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;const k=_svcKind(b);if(k==='visit')return;const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
+    const idx=[];days.forEach((ds,i)=>{const occ=(k==='stay')?(nsd<=ds&&ds<(ned||nsd)):(nsd<=ds&&ds<=(ned||nsd));if(occ)idx.push(i);});
+    if(idx.length)items.push({b,quoted,k,s:idx[0],e:idx[idx.length-1]});});
+  // Greedy lane packing — committed take the low places (#1..), so ≤4 lanes normally.
+  items.sort((a,c)=>(a.quoted-c.quoted)||(a.s-c.s)||((c.e-c.s)-(a.e-a.s)));
+  const lanes=[];
+  items.forEach(it=>{let L=lanes.findIndex(lane=>lane.every(x=>it.s>x.e||it.e<x.s));if(L<0){L=lanes.length;lanes.push([]);}lanes[L].push(it);it.lane=L;});
+  const nLanes=Math.max(CAL_CAP,lanes.length);
+  let g='<div class="cw-grid" style="grid-template-columns:30px repeat(7,minmax(0,1fr));">';
+  g+='<div class="cw-cell cw-corner" style="grid-row:1;grid-column:1;"></div>';
+  days.forEach((ds,i)=>{const d=new Date(ds+'T12:00:00');const occ=occupantsOn(ds).length;const q=quotedOn(ds).length;
+    g+='<div class="cw-cell cw-dayhd'+(ds===today?' cw-today':'')+'" style="grid-row:1;grid-column:'+(i+2)+';"><div>'+d.toLocaleDateString('en-GB',{weekday:'short'})+' '+d.getDate()+'</div><div style="font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+(q?' <span style="color:var(--gr3);">+'+q+'Q</span>':'')+'</div></div>';});
+  for(let L=0;L<nLanes;L++){
+    g+='<div class="cw-cell cw-lanelbl'+(L>=CAL_CAP?' cw-over':'')+'" style="grid-row:'+(L+2)+';grid-column:1;">#'+(L+1)+'</div>';
+    for(let i=0;i<7;i++)g+='<div class="cw-cell cw-bgcell'+(days[i]===today?' cw-today':'')+'" style="grid-row:'+(L+2)+';grid-column:'+(i+2)+';"></div>';
   }
-  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;font-weight:800;">'+title+'</span><span style="font-size:8px;color:var(--gr2);">bars = time of day</span></div>'+days;
+  items.forEach(it=>{const b=it.b;const nm=b.dog||'';const per=it.k==='day'?(_fmtT(b.st||'07:00')+'-'+_fmtT(b.et||'18:00')):(_fmtT(b.st||'09:00')+'→'+_fmtT(b.et||'18:00'));
+    const bg=it.quoted?'':('background:'+(it.k==='day'?'var(--or)':'var(--sk)')+';');
+    g+='<div class="cw-bar'+(it.quoted?' cw-quo':'')+'" style="grid-row:'+(it.lane+2)+';grid-column:'+(it.s+2)+' / '+(it.e+3)+';'+bg+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+nm+(it.quoted?' (QUOTED)':'')+' · '+per+'"><span class="cw-nm">'+nm+(it.quoted?' (Q)':'')+'</span><span class="cw-per">'+per+'</span></div>';});
+  g+='</div>';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;"><span style="font-size:14px;font-weight:800;">'+title+'</span><span style="font-size:8px;color:var(--gr2);">4 places · blue=board · orange=daycare · hatched=quoted</span></div>'+g;
 }
 
 // ==================== ANALYSIS ====================
@@ -2210,16 +2197,16 @@ async function saveTplHub(){
   const content=document.getElementById('tpl_content').value;const cat=document.getElementById('tpl_cat').value;
   if(!cat){alert('Category is required');return;}
   const idx2=document.getElementById('tpl_eidx').value;const st=document.getElementById('tplHubStatus');
-  let oldName='';
-  if(idx2!==''){const prev=msgTpls[parseInt(idx2)];oldName=prev.name;msgTpls[parseInt(idx2)]={...prev,_prev:{name:prev.name,content:prev.content,cat:prev.cat||''},name,content,cat};}
-  else{msgTpls.push({name,content,cat});}
+  let oldName='',key='';
+  if(idx2!==''){const prev=msgTpls[parseInt(idx2)];oldName=prev.name;key=prev.key||'';msgTpls[parseInt(idx2)]={...prev,_prev:{name:prev.name,content:prev.content,cat:prev.cat||''},name,content,cat};}
+  else{msgTpls.push({name,content,cat,key:''});}
   saveMsgTpls();st.textContent='Saving...';st.className='smsg';
   try{
     const rows=await readSheet(TABS.TPLS,'A2:D').catch(()=>[]);
     const lookupName=oldName||name;
     const existIdx=rows.findIndex(r=>r[0]===lookupName);
-    if(existIdx>=0){await updateRow(TABS.TPLS,existIdx+2,[name,cat,content,new Date().toISOString()]);}
-    else{await appendRow(TABS.TPLS,[name,cat,content,new Date().toISOString()]);}
+    if(existIdx>=0){await updateRow(TABS.TPLS,existIdx+2,[name,cat,content,new Date().toISOString(),key]);}
+    else{await appendRow(TABS.TPLS,[name,cat,content,new Date().toISOString(),key]);}
     st.textContent='Saved & synced!';st.className='smsg ok';
   }catch(e){st.textContent='Saved locally (sheet: '+e.message+')';st.className='smsg err';}
   setTimeout(()=>{st.className='smsg';renderTplHub();document.getElementById('tplModal').classList.remove('open');},1800);
@@ -2228,10 +2215,10 @@ function redoTplHub(){const idx=document.getElementById('tpl_eidx').value;if(idx
 async function syncTplsFromSheet(){
   const el=document.getElementById('tplHubList');el.innerHTML='<div class="hload">Syncing...</div>';
   try{
-    const rows=await readSheet(TABS.TPLS,'A2:D');
-    const sheetTpls=rows.map(r=>({name:r[0]||'',cat:r[1]||'',content:r[2]||'',_updated:r[3]||''})).filter(t=>t.name);
+    const rows=await readSheet(TABS.TPLS,'A2:E');
+    const sheetTpls=rows.map(r=>({name:r[0]||'',cat:r[1]||'',content:r[2]||'',_updated:r[3]||'',key:r[4]||''})).filter(t=>t.name);
     msgTpls=sheetTpls;saveMsgTpls();
-    renderTplHub();
+    renderTplHub();renderPayFallbacks();
   }catch(e){el.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
 }
 

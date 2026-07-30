@@ -83,6 +83,7 @@ body{
 .subtab-bar{display:flex;gap:5px;overflow-x:auto;padding:6px 10px;background:var(--gr5);border-bottom:1px solid var(--gr4);flex-shrink:0;-webkit-overflow-scrolling:touch;}
 .subtab{font-family:var(--fb);font-size:11px;white-space:nowrap;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);cursor:pointer;flex-shrink:0;}
 .subtab.active{background:var(--or);color:#fff;border-color:var(--or);}
+.adddog-row{display:flex;justify-content:space-between;align-items:center;padding:5px 9px;background:var(--gr5);border:1px solid var(--gr4);border-radius:7px;margin-bottom:4px;font-size:11px;}
 .snav.active{color:var(--hnl);border-bottom-color:var(--or);}
 /* MAIN */
 .main{flex:1;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
@@ -323,6 +324,18 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 .cal-names{flex:1;overflow:hidden;margin:1px 0;display:flex;flex-direction:column;gap:1px;}
 .cal-foot{font-size:8px;flex-shrink:0;min-height:10px;}
 .cal-dog{font-size:9px;line-height:1.15;color:var(--bl);cursor:pointer;text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+.cal-quo{color:var(--gr3)!important;font-style:italic;opacity:.8;text-decoration:none!important;}
+.cw-grid{display:grid;gap:2px;grid-auto-rows:30px;}
+.cw-cell{background:var(--gr5);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:8px;color:var(--gr2);padding:1px;overflow:hidden;}
+.cw-corner{background:transparent;}
+.cw-dayhd{font-weight:700;line-height:1.1;}
+.cw-lanelbl{background:transparent;font-weight:800;color:var(--gr3);font-size:10px;}
+.cw-lanelbl.cw-over{color:var(--rd);}
+.cw-today{outline:1.5px solid var(--or);outline-offset:-1px;}
+.cw-bar{align-self:stretch;justify-self:stretch;border-radius:5px;padding:2px 5px;color:#fff;font-weight:700;display:flex;flex-direction:column;justify-content:center;overflow:hidden;cursor:pointer;line-height:1.1;margin:1px 0;}
+.cw-bar .cw-nm{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cw-bar .cw-per{font-size:7px;font-weight:400;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cw-bar.cw-quo{background:repeating-linear-gradient(45deg,var(--gr4),var(--gr4) 4px,#fff 4px,#fff 8px);color:var(--gr2);border:1px dashed var(--gr3);font-style:italic;}
 .cal-cell.today{border-color:var(--or);border-width:2px;}
 .cal-cell.sel{outline:2px solid var(--bl);outline-offset:-2px;}
 .cal-week-day.today{background:var(--orxl,#fff7ed);}
@@ -457,7 +470,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v53b2</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v55b3</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -470,17 +483,34 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- BOARD -->
 <div class="screen active" id="sc-board">
   <div style="margin:10px 13px 0;background:var(--rdl);border:1px solid #FCA5A5;border-radius:var(--r);padding:9px 11px;font-size:10px;color:var(--rd);display:none;" id="credWarn">No credentials — tap Settings to connect Google Sheets.</div>
-  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div><div style="display:flex;gap:6px;"><button onclick="togglePendingPanel()" style="position:relative;background:var(--orl);border:1.5px solid var(--or);color:var(--or);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📋 To-Do<span id="pendingBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--rd);color:#fff;border-radius:99px;font-size:8px;padding:1px 5px;"></span></button><button onclick="toggleAvailPanel()" style="background:var(--pul);border:1.5px solid var(--pu);color:var(--pu);border-radius:8px;font-size:10px;font-weight:700;font-family:var(--fb);padding:5px 11px;cursor:pointer;white-space:nowrap;">📅 Check Dates</button></div></div>
-  <div id="pendingPanel" style="display:none;margin:0 13px 8px;">
-    <div style="background:var(--wh);border:1px solid var(--or);border-radius:var(--r2);padding:12px;">
-      <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📋 Pending Actions</div>
-      <div id="pending_results"></div>
-    </div>
+  <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div></div>
+  <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name or ID..." oninput="renderBoard()"></div>
+  <div class="bsec">
+    <div class="bsec-l on">Active today</div>
+    <div class="dcards" id="todayCards"><div class="empty"><p>Tap Refresh to load</p></div></div>
+    <div class="bsec-l wk" style="margin-top:14px;">Upcoming this week</div>
+    <div class="dcards" id="weekCards"><div class="empty"><p></p></div></div>
+    <div class="bsec-l up" style="margin-top:14px;">Other upcoming</div>
+    <div class="dcards" id="upcomingCards"><div class="empty"><p></p></div></div>
+    <div class="bsec-l off" style="margin-top:14px;">All other dogs</div>
+    <div class="dcards" id="otherCards"><div class="empty"><p></p></div></div>
   </div>
-  <!-- AVAILABILITY CHECKER -->
-  <div id="availPanel" style="display:none;margin:0 13px 8px;">
-    <div style="background:var(--wh);border:1px solid var(--pu);border-radius:var(--r2);padding:12px;">
-      <div style="font-size:11px;font-weight:700;color:var(--bk);margin-bottom:9px;">📅 Availability &amp; Compatibility Check</div>
+  <button class="add-btn" onclick="startReg()">+ Register New Dog</button>
+  <div style="height:14px;"></div>
+</div>
+<!-- TO-DO -->
+<div class="screen" id="sc-todo">
+  <div class="pg">
+    <div class="pg-t">📋 To-Do</div><div class="pg-s">Pending actions — tap an item to open &amp; update it</div>
+    <div id="pending_results" style="margin-top:11px;"></div>
+    <div style="height:14px;"></div>
+  </div>
+</div>
+<!-- CHECK DATES -->
+<div class="screen" id="sc-checkdates">
+  <div class="pg">
+    <div class="pg-t">📅 Check Dates</div><div class="pg-s">Availability &amp; compatibility check</div>
+    <div style="margin-top:11px;">
       <div class="f" style="margin-bottom:7px;"><label>Dog (optional — enables compatibility flags)</label>
         <input class="fi" id="av_dog_search" placeholder="Search dog name..." style="font-size:11px;margin-bottom:4px;" oninput="filterAvDog()">
         <select class="fs" id="av_dog" style="font-size:11px;"></select>
@@ -497,20 +527,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div id="av_results"></div>
       <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;margin-top:8px;background:var(--pu);" onclick="copyAvailReply()">📋 Copy Availability Reply</button>
     </div>
+    <div style="height:14px;"></div>
   </div>
-  <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name or ID..." oninput="renderBoard()"></div>
-  <div class="bsec">
-    <div class="bsec-l on">Active today</div>
-    <div class="dcards" id="todayCards"><div class="empty"><p>Tap Refresh to load</p></div></div>
-    <div class="bsec-l wk" style="margin-top:14px;">Upcoming this week</div>
-    <div class="dcards" id="weekCards"><div class="empty"><p></p></div></div>
-    <div class="bsec-l up" style="margin-top:14px;">Other upcoming</div>
-    <div class="dcards" id="upcomingCards"><div class="empty"><p></p></div></div>
-    <div class="bsec-l off" style="margin-top:14px;">All other dogs</div>
-    <div class="dcards" id="otherCards"><div class="empty"><p></p></div></div>
-  </div>
-  <button class="add-btn" onclick="startReg()">+ Register New Dog</button>
-  <div style="height:14px;"></div>
 </div>
 <!-- QUOTE -->
 <div class="screen" id="sc-quote">
@@ -518,6 +536,15 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="pg-t">Quote</div><div class="pg-s">Calculate fees &amp; generate WhatsApp quotes</div>
     <!-- QUOTE DETAILS FIRST -->
     <div class="fsec">Quote Details</div>
+    <div style="margin-bottom:9px;">
+      <label style="font-size:11px;font-weight:600;">Select dogs first <span class="req">*</span></label>
+      <input class="fi" id="q_dog_search" placeholder="Search dog name / breed / ID..." oninput="buildQDogMS()" style="margin:4px 0;">
+      <div class="dog-ms" id="q_dog_ms"></div>
+      <div id="q_add_dog_wrap" style="display:none;margin-top:6px;">
+        <div style="font-size:9px;font-weight:600;color:var(--gr2);margin-bottom:4px;">Primary = full rate · tick a dog to charge the additional-dog rate:</div>
+        <div id="q_add_dog_btns"></div>
+      </div>
+    </div>
     <div class="fsec">Add Service Lines</div>
           <div class="fr">
             <div class="f"><label>Service</label>
@@ -580,14 +607,6 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     </div>
     <div id="q_manual_wrap" style="display:none;"><div class="fr"><div class="f"><label>Rate (£)</label><input class="fi" type="number" id="q_rate" oninput="calcMultiQ()"></div><div class="f"><label>Sessions</label><input class="fi" type="number" id="q_qty" value="1" oninput="calcMultiQ()"></div></div></div>
     <div id="q_shared_wrap">
-      <div class="f"><label>Select dogs <span class="req">*</span></label>
-        <input class="fi" id="q_dog_search" placeholder="Search dog..." oninput="buildQDogMS()" style="margin-bottom:4px;">
-        <div class="dog-ms" id="q_dog_ms"></div>
-      </div>
-      <div id="q_main_dog_wrap" style="display:none;">
-        <div style="font-size:10px;font-weight:600;color:var(--gr);margin-bottom:4px;">Main dog (full rate):</div>
-        <div class="main-dog-sel" id="q_main_dog_btns"></div>
-      </div>
       <div class="fr">
         <div class="f"><label>Owner name</label><input class="fi" id="q_owner"></div>
         <div class="f"><label>Payment reference</label><input class="fi" id="q_payref" placeholder="e.g. ObiMay2026" oninput="this._userEdited=!!this.value"></div>
@@ -623,44 +642,49 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="q-out" id="q_out_final"></div>
       <button class="cpbtn gn" onclick="createBookingsFromQuote()">+ Create Booking(s) from Quote</button>
     </div>
-    <!-- SETTINGS PANELS BELOW -->
-    <div style="margin-top:14px;">
-      <div class="sp-panel">
-        <div class="sp-hd"><div class="sp-ht">Service Rates</div><span class="sp-tog" onclick="toggleSP('rates')">Edit</span></div>
-        <div class="sp-bd" id="sp-rates">
-          <div class="fr"><div class="f"><label>Boarding/night (£)</label><input class="fi" id="r_board_std" type="number" step="0.5" oninput="recalcHolFields()"></div><div class="f"><label>Boarding holiday (auto ×1.15)</label><input class="fi" id="r_board_hol" type="number" readonly tabindex="-1" style="background:var(--gr5);color:var(--gr2);"></div></div>
-          <div class="fr"><div class="f"><label>Add. dog boarding (£)</label><input class="fi" id="r_board_add" type="number" step="0.5" oninput="recalcHolFields()"></div><div class="f"><label>Add. dog holiday (auto ×1.15)</label><input class="fi" id="r_board_addh" type="number" readonly tabindex="-1" style="background:var(--gr5);color:var(--gr2);"></div></div>
-          <div class="fr"><div class="f"><label>Daycare/day (£)</label><input class="fi" id="r_day_std" type="number" step="0.5" oninput="recalcHolFields()"></div><div class="f"><label>Daycare holiday (auto ×1.15)</label><input class="fi" id="r_day_hol" type="number" readonly tabindex="-1" style="background:var(--gr5);color:var(--gr2);"></div></div>
-          <div class="fr"><div class="f"><label>Add. dog daycare (£)</label><input class="fi" id="r_day_add" type="number" step="0.5"></div><div class="f"><label>Evening surcharge %</label><input class="fi" id="r_evening_pct" type="number" step="1"></div></div>
-          <div class="fsec">Dog Walk</div>
-          <div class="fr"><div class="f"><label>Group 30 min (£)</label><input class="fi" id="r_walk30" type="number" step="0.5"></div><div class="f"><label>Group 60 min (£)</label><input class="fi" id="r_walk60" type="number" step="0.5"></div></div>
-          <div class="fr"><div class="f"><label>Add-on pet 30 min (£)</label><input class="fi" id="r_walk30a" type="number" step="0.5"></div><div class="f"><label>Add-on pet 60 min (£)</label><input class="fi" id="r_walk60a" type="number" step="0.5"></div></div>
-          <div class="fr"><div class="f"><label>1:1 walk 30 min (£)</label><input class="fi" id="r_walk30_11" type="number" step="0.5"></div><div class="f"><label>1:1 walk 60 min (£)</label><input class="fi" id="r_walk60_11" type="number" step="0.5"></div></div>
-          <div class="fsec">Drop-in Visit</div>
-          <div class="fr"><div class="f"><label>Drop-in 30 min (£)</label><input class="fi" id="r_dropin30" type="number" step="0.5"></div><div class="f"><label>Drop-in 60 min (£)</label><input class="fi" id="r_dropin60" type="number" step="0.5"></div></div>
-          <div class="fr"><div class="f"><label>Add-on pet 30 min (£)</label><input class="fi" id="r_dropin30a" type="number" step="0.5"></div><div class="f"><label>Add-on pet 60 min (£)</label><input class="fi" id="r_dropin60a" type="number" step="0.5"></div></div>
-          <div class="fsec">Pet Taxi</div>
-          <div class="fr"><div class="f"><label>15min Single (£)</label><input class="fi" id="r_t15s" type="number" step="0.5"></div><div class="f"><label>15min Return (£)</label><input class="fi" id="r_t15r" type="number" step="0.5"></div></div>
-          <div class="fr"><div class="f"><label>30min Single (£)</label><input class="fi" id="r_t30s" type="number" step="0.5"></div><div class="f"><label>30min Return (£)</label><input class="fi" id="r_t30r" type="number" step="0.5"></div></div>
-          <div class="fr"><div class="f"><label>60min Single (£)</label><input class="fi" id="r_t60s" type="number" step="0.5"></div><div class="f"><label>60min Return (£)</label><input class="fi" id="r_t60r" type="number" step="0.5"></div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px;">
-            <button class="sbtn2" onclick="saveRates()">Save &amp; Sync to Sheet</button>
-            <button class="sbtn2" onclick="loadRatesFromSheet()" style="background:var(--gr4);color:var(--gr2);">Load from Sheet</button>
-          </div>
-          <span class="smsg" id="rateStatus" style="display:block;margin-top:5px;"></span>
-        </div>
-      </div>
-      <div class="sp-panel">
-        <div class="sp-hd"><div class="sp-ht">Holiday Date Ranges</div><span class="sp-tog" onclick="toggleSP('holidays')">Edit</span></div>
-        <div class="sp-bd" id="sp-holidays">
-          <div class="hol-yr" id="holYrBtns"></div>
-          <div class="hol-list" id="holList"></div>
-          <div class="fr"><div class="f"><label>Range start</label><input class="fi" type="date" id="holStart"></div><div class="f"><label>Range end</label><input class="fi" type="date" id="holEnd"></div></div>
-          <button class="sbtn2" style="font-size:11px;padding:6px 12px;" onclick="addHolRange()">+ Add Range</button>
-        </div>
-      </div>
-    </div>
     <div style="height:18px;"></div>
+  </div>
+</div>
+<!-- SERVICE RATES -->
+<div class="screen" id="sc-rates">
+  <div class="pg">
+    <div class="pg-t">💷 Service Rates</div><div class="pg-s">Holiday rates auto-calc as base × 1.15</div>
+    <div class="sp-bd open" id="sp-rates" style="margin-top:11px;">
+      <div class="fr"><div class="f"><label>Boarding/night (£)</label><input class="fi" id="r_board_std" type="number" step="0.5" oninput="recalcHolFields()"></div><div class="f"><label>Boarding holiday (auto ×1.15)</label><input class="fi" id="r_board_hol" type="number" readonly tabindex="-1" style="background:var(--gr5);color:var(--gr2);"></div></div>
+      <div class="fr"><div class="f"><label>Add. dog boarding (£)</label><input class="fi" id="r_board_add" type="number" step="0.5" oninput="recalcHolFields()"></div><div class="f"><label>Add. dog holiday (auto ×1.15)</label><input class="fi" id="r_board_addh" type="number" readonly tabindex="-1" style="background:var(--gr5);color:var(--gr2);"></div></div>
+      <div class="fr"><div class="f"><label>Daycare/day (£)</label><input class="fi" id="r_day_std" type="number" step="0.5" oninput="recalcHolFields()"></div><div class="f"><label>Daycare holiday (auto ×1.15)</label><input class="fi" id="r_day_hol" type="number" readonly tabindex="-1" style="background:var(--gr5);color:var(--gr2);"></div></div>
+      <div class="fr"><div class="f"><label>Add. dog daycare (£)</label><input class="fi" id="r_day_add" type="number" step="0.5"></div><div class="f"><label>Evening surcharge %</label><input class="fi" id="r_evening_pct" type="number" step="1"></div></div>
+      <div class="fsec">Dog Walk</div>
+      <div class="fr"><div class="f"><label>Group 30 min (£)</label><input class="fi" id="r_walk30" type="number" step="0.5"></div><div class="f"><label>Group 60 min (£)</label><input class="fi" id="r_walk60" type="number" step="0.5"></div></div>
+      <div class="fr"><div class="f"><label>Add-on pet 30 min (£)</label><input class="fi" id="r_walk30a" type="number" step="0.5"></div><div class="f"><label>Add-on pet 60 min (£)</label><input class="fi" id="r_walk60a" type="number" step="0.5"></div></div>
+      <div class="fr"><div class="f"><label>1:1 walk 30 min (£)</label><input class="fi" id="r_walk30_11" type="number" step="0.5"></div><div class="f"><label>1:1 walk 60 min (£)</label><input class="fi" id="r_walk60_11" type="number" step="0.5"></div></div>
+      <div class="fsec">Drop-in Visit</div>
+      <div class="fr"><div class="f"><label>Drop-in 30 min (£)</label><input class="fi" id="r_dropin30" type="number" step="0.5"></div><div class="f"><label>Drop-in 60 min (£)</label><input class="fi" id="r_dropin60" type="number" step="0.5"></div></div>
+      <div class="fr"><div class="f"><label>Add-on pet 30 min (£)</label><input class="fi" id="r_dropin30a" type="number" step="0.5"></div><div class="f"><label>Add-on pet 60 min (£)</label><input class="fi" id="r_dropin60a" type="number" step="0.5"></div></div>
+      <div class="fsec">Pet Taxi</div>
+      <div class="fr"><div class="f"><label>15min Single (£)</label><input class="fi" id="r_t15s" type="number" step="0.5"></div><div class="f"><label>15min Return (£)</label><input class="fi" id="r_t15r" type="number" step="0.5"></div></div>
+      <div class="fr"><div class="f"><label>30min Single (£)</label><input class="fi" id="r_t30s" type="number" step="0.5"></div><div class="f"><label>30min Return (£)</label><input class="fi" id="r_t30r" type="number" step="0.5"></div></div>
+      <div class="fr"><div class="f"><label>60min Single (£)</label><input class="fi" id="r_t60s" type="number" step="0.5"></div><div class="f"><label>60min Return (£)</label><input class="fi" id="r_t60r" type="number" step="0.5"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px;">
+        <button class="sbtn2" onclick="saveRates()">Save &amp; Sync to Sheet</button>
+        <button class="sbtn2" onclick="loadRatesFromSheet()" style="background:var(--gr4);color:var(--gr2);">Load from Sheet</button>
+      </div>
+      <span class="smsg" id="rateStatus" style="display:block;margin-top:5px;"></span>
+    </div>
+    <div style="height:14px;"></div>
+  </div>
+</div>
+<!-- HOLIDAY RANGES -->
+<div class="screen" id="sc-holidays">
+  <div class="pg">
+    <div class="pg-t">🏝️ Holiday Date Ranges</div><div class="pg-s">Dates charged the holiday rate</div>
+    <div class="sp-bd open" id="sp-holidays" style="margin-top:11px;">
+      <div class="hol-yr" id="holYrBtns"></div>
+      <div class="hol-list" id="holList"></div>
+      <div class="fr"><div class="f"><label>Range start</label><input class="fi" type="date" id="holStart"></div><div class="f"><label>Range end</label><input class="fi" type="date" id="holEnd"></div></div>
+      <button class="sbtn2" style="font-size:11px;padding:6px 12px;" onclick="addHolRange()">+ Add Range</button>
+    </div>
+    <div style="height:14px;"></div>
   </div>
 </div>
 <!-- BUSINESS HUB -->
@@ -846,6 +870,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="tpl-cat-btn active" data-cat="" onclick="setTplCat('')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--or);background:rgba(239,111,54,.1);color:var(--or);font-family:var(--fb);cursor:pointer;white-space:nowrap;">All</button>
       <button class="tpl-cat-btn" data-cat="First Touch" onclick="setTplCat('First Touch')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">✉️ First Touch</button>
       <button class="tpl-cat-btn" data-cat="Meet &amp; Greet" onclick="setTplCat('Meet &amp; Greet')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🤝 Meet &amp; Greet</button>
+      <button class="tpl-cat-btn" data-cat="Payment" onclick="setTplCat('Payment')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">💳 Payment</button>
       <button class="tpl-cat-btn" data-cat="Require Info" onclick="setTplCat('Require Info')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">❓ Require Info</button>
       <button class="tpl-cat-btn" data-cat="Arrival/Departure" onclick="setTplCat('Arrival/Departure')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🚗 Arrival/Departure</button>
       <button class="tpl-cat-btn" data-cat="Review" onclick="setTplCat('Review')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">⭐ Review</button>
@@ -858,27 +883,19 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div id="tplHubList"><div class="hload">Loading templates from sheet...</div></div>
     <div style="margin-top:16px;">
       <div class="sp-panel">
-        <div class="sp-hd"><div class="sp-ht">Quote / Payment Templates</div><span class="sp-tog" onclick="toggleSP('templates')">Edit</span></div>
-        <div class="sp-bd" id="sp-templates">
-          <div class="f"><label>Get Quote template (no payment details)</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('quote')">Save</button><button class="tplb" onclick="redoTpl('quote')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('quote')">Restore default</button></div>
-            <textarea class="fta" id="tpl_quote" style="min-height:130px;font-size:10px;"></textarea>
-          </div>
-          <div class="f"><label>Book with Us template</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('book')">Save</button><button class="tplb" onclick="redoTpl('book')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('book')">Restore default</button></div>
-            <textarea class="fta" id="tpl_book" style="min-height:150px;font-size:10px;"></textarea>
-          </div>
-          <div class="f"><label>Prepayment Received template</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('prepay')">Save</button><button class="tplb" onclick="redoTpl('prepay')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('prepay')">Restore default</button></div>
-            <textarea class="fta" id="tpl_prepay" style="min-height:150px;font-size:10px;"></textarea>
-          </div>
-          <div class="f"><label>Final Payment template</label>
-            <div class="tpl-bts"><button class="tplb or" onclick="saveTpl('final')">Save</button><button class="tplb" onclick="redoTpl('final')">Redo</button><button class="tplb rd" onclick="confirmRestoreTpl('final')">Restore default</button></div>
-            <textarea class="fta" id="tpl_final" style="min-height:130px;font-size:10px;"></textarea>
-          </div>
+        <div class="sp-hd"><div class="sp-ht">Payment link &amp; reference</div></div>
+        <div class="sp-bd open" id="sp-templates">
           <div class="fr"><div class="f"><label>Payment link</label><input class="fi" id="tpl_paylink" placeholder="https://..."></div><div class="f"><label>Pay ref prefix</label><input class="fi" id="tpl_payref_pfx"></div></div>
-          <button class="sbtn2" style="width:100%;" onclick="saveTplSettingsAndSync()">Save &amp; Sync to Sheet</button>
-          <div style="font-size:9px;color:var(--gr3);margin-top:7px;line-height:1.7;">Variables: {{ownerName}} {{dogs}} {{service}} {{dropoff}} {{pickup}} {{dropoffTime}} {{pickupTime}} {{nights}} {{ratePerNight}} {{addDogLine}} {{total}} {{prepayAmt}} {{finalAmt}} {{payRef}} {{payLink}} {{discount}} {{holidayDates}}</div>
+          <button class="sbtn2" style="width:100%;" onclick="saveTplSettingsAndSync()">Save &amp; Sync</button>
+          <div style="font-size:9px;color:var(--gr3);margin-top:7px;">Quote / payment message templates now live under the <b>💳 Payment</b> category above.</div>
+          <textarea id="tpl_quote" style="display:none;"></textarea><textarea id="tpl_book" style="display:none;"></textarea><textarea id="tpl_prepay" style="display:none;"></textarea><textarea id="tpl_final" style="display:none;"></textarea>
+        </div>
+      </div>
+      <div class="sp-panel" style="margin-top:12px;">
+        <div class="sp-hd"><div class="sp-ht">Payment fallback drafts (read-only)</div><span class="sp-tog" onclick="toggleSP('fallbacks')">Show</span></div>
+        <div class="sp-bd" id="sp-fallbacks">
+          <div style="font-size:9px;color:var(--gr3);margin-bottom:7px;">Built-in defaults used only if a Payment template is missing/empty (matched by stable key, so renaming is safe). To change what customers receive, edit the templates in the 💳 Payment category above.</div>
+          <div id="payFallbacks"></div>
         </div>
       </div>
     </div>
@@ -1233,7 +1250,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="tpl_eidx">
       <div class="f"><label>Template name <span class="req">*</span></label><input class="fi" id="tpl_name" placeholder="e.g. Booking confirmation"></div>
-      <div class="f"><label>Category <span class="req">*</span></label><select class="fs" id="tpl_cat"><option value="">Select category...</option><option>First Touch</option><option>Meet &amp; Greet</option><option>Require Info</option><option>Arrival/Departure</option><option>Review</option><option>Overlapped</option><option>Reject - Below 1yo</option><option>Reject - Fully Booked</option><option>Change of Mind</option><option>Others</option></select></div>
+      <div class="f"><label>Category <span class="req">*</span></label><select class="fs" id="tpl_cat"><option value="">Select category...</option><option>First Touch</option><option>Meet &amp; Greet</option><option>Payment</option><option>Require Info</option><option>Arrival/Departure</option><option>Review</option><option>Overlapped</option><option>Reject - Below 1yo</option><option>Reject - Fully Booked</option><option>Change of Mind</option><option>Others</option></select></div>
       <div class="f"><label>Content</label>
         <div class="tpl-bts"><button class="tplb or" onclick="saveTplHub()">Save</button><button class="tplb" onclick="redoTplHub()">Redo</button></div>
         <textarea class="fta" id="tpl_content" style="min-height:160px;font-size:11px;"></textarea>
