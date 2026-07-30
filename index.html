@@ -336,6 +336,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 .cw-bar .cw-nm{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cw-bar .cw-per{font-size:7px;font-weight:400;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cw-bar.cw-quo{background:repeating-linear-gradient(45deg,var(--gr4),var(--gr4) 4px,#fff 4px,#fff 8px);color:var(--gr2);border:1px dashed var(--gr3);font-style:italic;}
+.cw-svclbl{background:var(--gr5);font-size:12px;text-align:center;display:flex;align-items:center;justify-content:center;}
+.cw-visit{font-size:8px;line-height:1.25;background:var(--pul,#ede9fe);color:var(--pu,#6d28d9);border-radius:4px;padding:1px 4px;margin:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.cw-visit.cw-quo{background:repeating-linear-gradient(45deg,var(--gr4),var(--gr4) 3px,#fff 3px,#fff 6px);color:var(--gr2);font-style:italic;}
 .cal-cell.today{border-color:var(--or);border-width:2px;}
 .cal-cell.sel{outline:2px solid var(--bl);outline-offset:-2px;}
 .cal-week-day.today{background:var(--orxl,#fff7ed);}
@@ -470,7 +473,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v56b1</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v57b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -671,14 +674,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       </div>
       <span class="smsg" id="rateStatus" style="display:block;margin-top:5px;"></span>
     </div>
-    <div style="height:14px;"></div>
-  </div>
-</div>
-<!-- HOLIDAY RANGES -->
-<div class="screen" id="sc-holidays">
-  <div class="pg">
-    <div class="pg-t">🏝️ Holiday Date Ranges</div><div class="pg-s">Dates charged the holiday rate</div>
-    <div class="sp-bd open" id="sp-holidays" style="margin-top:11px;">
+    <div class="fsec" style="margin-top:18px;">🏝️ Holiday Date Ranges <span style="font-size:9px;font-weight:400;color:var(--gr3);">(dates charged the holiday rate)</span></div>
+    <div class="sp-bd open" id="sp-holidays" style="margin-top:8px;">
       <div class="hol-yr" id="holYrBtns"></div>
       <div class="hol-list" id="holList"></div>
       <div class="fr"><div class="f"><label>Range start</label><input class="fi" type="date" id="holStart"></div><div class="f"><label>Range end</label><input class="fi" type="date" id="holEnd"></div></div>
@@ -802,6 +799,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div style="flex:1;"></div>
       <button class="cal-view-btn active" data-v="month" onclick="setCalView('month')">Month</button>
       <button class="cal-view-btn" data-v="week" onclick="setCalView('week')">Week</button>
+      <button class="cal-view-btn" data-v="3day" onclick="setCalView('3day')">3-Day</button>
     </div>
     <div id="calBody"></div>
     <div style="height:18px;"></div>

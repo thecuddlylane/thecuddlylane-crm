@@ -181,8 +181,8 @@ function openAvail(){const p=document.getElementById('availPanel');if(p&&(p.styl
 function openSP(id){const e=document.getElementById('sp-'+id);if(e){e.classList.add('open');setTimeout(()=>{try{e.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}} ,60);}}
 // Section → ordered sub-tabs. sc = primary screen; after = optional panel to open on that screen.
 const SECTIONS={
-  dogs:[{k:'dogs',lbl:'🐾 Profiles',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'check',lbl:'🔎 Check Dates',sc:'sc-checkdates'},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
-  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-todo'},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-rates'},{k:'hol',lbl:'🏝️ Holidays',sc:'sc-holidays'}],
+  dogs:[{k:'dogs',lbl:'🐾 Profiles',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'check',lbl:'🔎 Dates',sc:'sc-checkdates'},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
+  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-todo'},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-rates'}],
   business:[{k:'an',lbl:'🔍 Analysis',sc:'sc-analysis'},{k:'cost',lbl:'💸 Costs',sc:'sc-costs'},{k:'pl',lbl:'📈 P&L',sc:'sc-pl'},{k:'train',lbl:'📚 Training',sc:'sc-training'}]
 };
 const SECTION_ROOTS=new Set(Object.values(SECTIONS).flat().map(t=>t.sc));
@@ -198,7 +198,7 @@ function showScreen(id,push=true){
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-calendar':'Availability Calendar','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}if(id==='sc-todo')renderPendingPanel();if(id==='sc-checkdates')initAvail();if(id==='sc-rates')loadQSettings();if(id==='sc-holidays')renderHolYrBtns();
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}if(id==='sc-todo')renderPendingPanel();if(id==='sc-checkdates')initAvail();if(id==='sc-rates'){loadQSettings();renderHolYrBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -291,8 +291,9 @@ function renderPendingPanel(){
   const subhd=t=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;padding:5px 10px 2px;background:var(--gr5);">'+t+'</div>';
   let html='';
   dogList.forEach(d=>{
+    const pri=d.up.length?'🟠':'⚪';// 🟠 = has an upcoming booking to-do (prioritise); ⚪ = past only
     html+='<div style="margin-bottom:11px;border:1px solid var(--gr4);border-radius:8px;overflow:hidden;">'+
-      '<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;font-size:12px;font-weight:800;color:var(--bl);padding:7px 10px;background:var(--gr5);text-decoration:underline;">🐾 '+d.name+'</div>';
+      '<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;font-size:12px;font-weight:800;color:var(--bl);padding:7px 10px;background:var(--gr5);text-decoration:underline;">'+pri+' '+d.name+'</div>';
     if(d.up.length){html+=subhd('🔜 Upcoming (soonest first)');d.up.forEach(x=>html+=bkRow(x));}
     if(d.past.length){html+=subhd('🕓 Past (most recent first)');d.past.forEach(x=>html+=bkRow(x));}
     if(d.missing)html+='<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;padding:6px 10px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--or);">⚠️ Missing daily logs ('+d.missing.length+')</div><div style="font-size:9px;color:var(--gr2);">'+d.missing.map(fmtDate).join(', ')+'</div></div>';
@@ -1681,7 +1682,7 @@ async function saveBk(){
   const existingWf=eid?(bkByRef(eid,ri)?.wf||{}):{};
   const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dog,id,svc:document.getElementById('bm_svc').value,sd,st:document.getElementById('bm_st').value,ed:document.getElementById('bm_ed').value,et:document.getElementById('bm_et').value,dropLoc:gv('bm_drop_loc'),pickLoc:gv('bm_pick_loc'),rev,tips,prepay:pre,finalPay:fin,unit,discNotes:document.getElementById('bm_disc_notes').value,roverPct:rPct,roverAmt:rAmt,ch,pay:document.getElementById('bm_pay').value,status:document.getElementById('bm_status').value,priv,month,rating:gv('bm_rating'),feedback:gv('bm_feedback'),rem:rems,wf:existingWf,bookingRef:gv('bm_ref'),prepayRef:gv('bm_prepay_ref'),finalPayRef:gv('bm_final_ref')}),TABS.BK.h);
   try{
-    if(eid&&ri)await updateRow(TABS.BK,ri,vals);else await appendRow(TABS.BK,vals);
+    if(eid){if(!ri)throw new Error('Could not find this booking row to update — tap Sync and retry. Nothing was saved (prevents a duplicate).');await updateRow(TABS.BK,ri,vals);}else await appendRow(TABS.BK,vals);
     const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>ri?r.ri===ri:r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
     st.textContent='Saved!';st.className='smsg ok';setTimeout(()=>{document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();renderBoard();updatePendingBadge();},1400);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';_bkSaving=false;}
@@ -1846,7 +1847,7 @@ function _computeNewRis(){const first={};bookings.forEach(b=>{if(!CAL_ACTIVE.inc
 function openDogByCid(cid){if(!cid)return;const d=allDogs.find(x=>x.cid===cid);if(d){openProfile(d);showScreen('sc-profile');}}
 function _dogChip(b){const nw=_calNewRis.has(b.ri)?'<span style="color:var(--or);">🆕</span>':'';return'<span class="cal-dog" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')">'+(b.dog||'')+nw+'</span>';}
 function setCalView(v){_calView=v;renderCalendar();}
-function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*7);_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
+function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*(_calView==='3day'?3:7));_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
 function calToday(){_calAnchor=todayStr();_calSelDay='';renderCalendar();}
 function _mondayOf(dateStr){const d=new Date(dateStr+'T12:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d;}
 function _dstr(d){return d.toISOString().slice(0,10);}
@@ -1857,7 +1858,7 @@ function renderCalendar(){
   const host=document.getElementById('sc-calendar');if(!host)return;
   _computeNewRis();
   document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===_calView));
-  document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calWeekHtml();
+  document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calView==='3day'?_cal3DayHtml():_calWeekHtml();
   if(_calView==='month'&&_calSelDay)document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(_calSelDay);
 }
 function selCalDay(ds){_calSelDay=ds;document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(ds);document.querySelectorAll('.cal-cell').forEach(c=>c.classList.toggle('sel',c.dataset.d===ds));}
@@ -1908,35 +1909,52 @@ function _calDayDetailHtml(ds){
   h+='</div>';
   return h;
 }
-// Week view = resource grid: 4 "places" (rows) × 7 days (columns); each booking is a bar spanning its nights.
-function _calWeekHtml(){
-  const start=_mondayOf(_calAnchor);const today=todayStr();
-  const end=new Date(start);end.setDate(start.getDate()+6);
-  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  const days=[];for(let i=0;i<7;i++){const d=new Date(start);d.setDate(start.getDate()+i);days.push(_dstr(d));}
-  // Boarding/dog-sit (nights sd..ed-1) + day-care (its day), committed OR quoted, present this week.
+// Resource grid: 4 "places" (rows) × N days (columns) for boarding/day-care, plus rows for other services.
+function _calGridHtml(start,nDays){
+  const today=todayStr();
+  const days=[];for(let i=0;i<nDays;i++){const d=new Date(start);d.setDate(start.getDate()+i);days.push(_dstr(d));}
+  // Overnight (boarding/dog-sit) + day-care as 4-place bars (committed OR quoted).
   const items=[];
   bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;const k=_svcKind(b);if(k==='visit')return;const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return;
-    const idx=[];days.forEach((ds,i)=>{const occ=(nsd<=ds&&ds<=(ned||nsd));if(occ)idx.push(i);});
+    const idx=[];days.forEach((ds,i)=>{if(nsd<=ds&&ds<=(ned||nsd))idx.push(i);});
     if(idx.length)items.push({b,quoted,k,s:idx[0],e:idx[idx.length-1]});});
-  // Greedy lane packing — committed take the low places (#1..), so ≤4 lanes normally.
   items.sort((a,c)=>(a.quoted-c.quoted)||(a.s-c.s)||((c.e-c.s)-(a.e-a.s)));
-  const lanes=[];
-  items.forEach(it=>{let L=lanes.findIndex(lane=>lane.every(x=>it.s>x.e||it.e<x.s));if(L<0){L=lanes.length;lanes.push([]);}lanes[L].push(it);it.lane=L;});
+  const lanes=[];items.forEach(it=>{let L=lanes.findIndex(lane=>lane.every(x=>it.s>x.e||it.e<x.s));if(L<0){L=lanes.length;lanes.push([]);}lanes[L].push(it);it.lane=L;});
   const nLanes=Math.max(CAL_CAP,lanes.length);
-  let g='<div class="cw-grid" style="grid-template-columns:30px repeat(7,minmax(0,1fr));">';
+  // Non-overnight services → their own rows (walk / drop-in / taxi / training) shown per day with times.
+  const SVC_ROWS=[['🐕 Walk',['walking','walk']],['🔑 Drop-in',['drop-in','dropin']],['🚕 Taxi',['taxi']],['🎓 Train',['training']]];
+  const svcRows=SVC_ROWS.map(([lbl,al])=>{const perDay=days.map(()=>[]);
+    bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;const s=(b.svc||'').toLowerCase();if(!al.some(a=>s.includes(a)))return;const di=days.indexOf(normDate(b.sd));if(di>=0)perDay[di].push({b,quoted});});
+    return{lbl,perDay,has:perDay.some(a=>a.length)};}).filter(r=>r.has);
+  let g='<div class="cw-grid" style="grid-template-columns:34px repeat('+nDays+',minmax(0,1fr));">';
   g+='<div class="cw-cell cw-corner" style="grid-row:1;grid-column:1;"></div>';
   days.forEach((ds,i)=>{const d=new Date(ds+'T12:00:00');const occ=occupantsOn(ds).length;const q=quotedOn(ds).length;
     g+='<div class="cw-cell cw-dayhd'+(ds===today?' cw-today':'')+'" style="grid-row:1;grid-column:'+(i+2)+';"><div>'+d.toLocaleDateString('en-GB',{weekday:'short'})+' '+d.getDate()+'</div><div style="font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+(q?' <span style="color:var(--gr3);">+'+q+'Q</span>':'')+'</div></div>';});
   for(let L=0;L<nLanes;L++){
     g+='<div class="cw-cell cw-lanelbl'+(L>=CAL_CAP?' cw-over':'')+'" style="grid-row:'+(L+2)+';grid-column:1;" title="'+(L>=CAL_CAP?'Overbooked':'Place '+(L+1))+'">'+(L>=CAL_CAP?'⚠':'#'+(L+1))+'</div>';
-    for(let i=0;i<7;i++)g+='<div class="cw-cell cw-bgcell'+(days[i]===today?' cw-today':'')+'" style="grid-row:'+(L+2)+';grid-column:'+(i+2)+';"></div>';
+    for(let i=0;i<nDays;i++)g+='<div class="cw-cell cw-bgcell'+(days[i]===today?' cw-today':'')+'" style="grid-row:'+(L+2)+';grid-column:'+(i+2)+';"></div>';
   }
-  items.forEach(it=>{const b=it.b;const nm=b.dog||'';const per=it.k==='day'?(_fmtT(b.st||'07:00')+'-'+_fmtT(b.et||'18:00')):(_fmtT(b.st||'09:00')+'-'+_fmtT(b.et||'18:00'));
+  items.forEach(it=>{const b=it.b;const nm=b.dog||'';const per=_fmtT(b.st||(it.k==='day'?'07:00':'09:00'))+'-'+_fmtT(b.et||'18:00');
     const bg=it.quoted?'':('background:'+(it.k==='day'?'var(--or)':'var(--sk)')+';');
     g+='<div class="cw-bar'+(it.quoted?' cw-quo':'')+'" style="grid-row:'+(it.lane+2)+';grid-column:'+(it.s+2)+' / '+(it.e+3)+';'+bg+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+nm+(it.quoted?' (QUOTED)':'')+' · '+per+'"><span class="cw-nm">'+nm+(it.quoted?' (Q)':'')+'</span><span class="cw-per">'+per+'</span></div>';});
+  svcRows.forEach((row,ri)=>{const R=nLanes+ri+2;
+    g+='<div class="cw-cell cw-svclbl" style="grid-row:'+R+';grid-column:1;" title="'+row.lbl+'">'+row.lbl.split(' ')[0]+'</div>';
+    for(let i=0;i<nDays;i++){const inner=row.perDay[i].map(x=>'<div class="cw-visit'+(x.quoted?' cw-quo':'')+'" onclick="openDogByCid(\''+(x.b.customerId||'')+'\')" title="'+(x.b.dog||'')+' · '+row.lbl+' · '+_fmtT(x.b.st||'')+'">'+_fmtT(x.b.st||'')+' '+(x.b.dog||'')+(x.quoted?' (Q)':'')+'</div>').join('');
+      g+='<div class="cw-cell cw-bgcell'+(days[i]===today?' cw-today':'')+'" style="grid-row:'+R+';grid-column:'+(i+2)+';">'+inner+'</div>';}
+  });
   g+='</div>';
-  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;"><span style="font-size:14px;font-weight:800;">'+title+'</span><span style="font-size:8px;color:var(--gr2);">4 places · blue=board · orange=daycare · hatched=quoted</span></div>'+g;
+  return g;
+}
+function _calGridHdr(title,note){return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;"><span style="font-size:14px;font-weight:800;">'+title+'</span><span style="font-size:8px;color:var(--gr2);">'+note+'</span></div>';}
+function _calWeekHtml(){
+  const start=_mondayOf(_calAnchor);const end=new Date(start);end.setDate(start.getDate()+6);
+  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  return _calGridHdr(title,'4 places · blue=board · orange=daycare · hatched=quoted · other services below')+_calGridHtml(start,7);
+}
+function _cal3DayHtml(){
+  const start=new Date(_calAnchor+'T12:00:00');const end=new Date(start);end.setDate(start.getDate()+2);
+  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  return _calGridHdr(title,'3-day detail · drop-off / pick-up times shown')+_calGridHtml(start,3);
 }
 
 // ==================== ANALYSIS ====================
