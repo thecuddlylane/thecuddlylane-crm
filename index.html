@@ -473,7 +473,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v57b1</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v58b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -828,7 +828,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div id="anAge" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Average Stay Length <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding only)</span></div>
     <div id="anAvgStay" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
-    <div class="fsec">Occupancy Rate by Day <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding nights / total days in month)</span></div>
+    <div class="fsec">Occupancy Rate by Day <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding days present / total days in month)</span></div>
     <div id="anOccupancy" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Occupancy Rate by Places <span style="font-size:9px;font-weight:400;color:var(--gr3);">(max 4 dogs/day · Boarding + Day Care)</span></div>
     <div id="anOccPlaces" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
@@ -961,10 +961,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="screen" id="sc-profile">
   <div class="p-hero">
     <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;">
-      <div class="phw" id="profPhotoWrap" onclick="trigPh()">
+      <div class="phw" id="profPhotoWrap" onclick="promptGdriveUrl('profile')">
         <span id="profEmoji" style="font-size:33px;">🐶</span>
         <div class="phe">📷</div>
-        <input type="file" id="profPhotoInput" accept="image/*" style="display:none;" onchange="handlePh(event)">
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
         <button onclick="promptGdriveUrl('profile')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">🔗 Drive URL</button>
@@ -1040,8 +1039,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
   <div class="pg">
     <div class="pg-t" id="regTitle">Register New Dog</div>
     <div style="display:flex;flex-direction:column;align-items:center;padding:12px 0;">
-      <div id="regPhotoCircle" onclick="document.getElementById('regPhotoInput').click()" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
-      <input type="file" id="regPhotoInput" accept="image/*" style="display:none;" onchange="handleRegPh(event)">
+      <div id="regPhotoCircle" onclick="promptGdriveUrl('register')" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
         <span style="font-size:9px;color:var(--gr3);">Tap circle to add photo</span>
         <button class="sbtn2" onclick="promptGdriveUrl('register')" style="font-size:11px;padding:4px 10px;">🔗 Drive URL</button>

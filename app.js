@@ -440,8 +440,7 @@ async function refreshBoard(){
     syncTargetsFromSheet().catch(()=>{});
     // Sync activities library from sheet so sheet edits show in app
     syncActsFromSheet(true).catch(()=>{});
-    // Sync dog photo URLs from Rates sheet so photos work across devices
-    readSheet(TABS.RATES,'A2:C').then(rr=>{let changed=false;rr.filter(r=>r[0]&&r[0].startsWith('photo_')).forEach(r=>{const cid=r[0].slice(6);const norm=gdriveDirect(r[1]||'');if(norm&&localStorage.getItem('dog_photo_'+cid)!==norm){localStorage.setItem('dog_photo_'+cid,norm);changed=true;}});if(changed){renderBoard();if(curDog){const photo=resolvePhotoUrl(curDog);if(photo){const w=document.getElementById('profPhotoWrap');let img=w&&w.querySelector('img.pl');if(img){img.onerror=()=>{img.style.display='none';};img.src=photo;img.style.display='block';}}}}}).catch(()=>{});
+    // Photos come from the dog's PhotoURL (Drive link) in the Dogs sheet — no local caching.
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();updatePendingBadge();
     await syncCurrentScreen();
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
@@ -527,7 +526,7 @@ function renderCards(entries,c,cls){
   if(!entries.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
   const scMap={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
   entries.forEach(({dog,bk})=>{
-    const photo=resolvePhotoUrl(dog);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=dog.med&&dog.med.toLowerCase()!=='none'&&dog.med.trim();
+    const photo=resolvePhotoUrl(dog);const td=JSON.parse(localStorage.getItem('log_'+dog.cid+'_'+todayStr())||'{}');const hasAlert=[dog.med,dog.medSchedule,dog.allerg].some(v=>{const s=(v||'').toLowerCase().trim();return s&&s!=='no'&&s!=='none'&&s!=='n/a'&&s!=='na'&&s!=='-';});
     const vaccExpired=dog.vacc?(()=>{try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);return vd<cutoff;}catch(e){return false;}})():false;
     // Birthday month celebration
     const bdMonth=dog.birthday?parseInt(dog.birthday.split('-')[1]):0;const isBdayMo=bdMonth&&bdMonth===(new Date().getMonth()+1);
@@ -903,7 +902,7 @@ function openEditProf(){
   s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_owner2',d.owner2||'');s('reg_phone2',d.phone2||'');s('reg_owner3',d.owner3||'');s('reg_phone3',d.phone3||'');s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
   document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
   _regEmoji='';
-  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl||localStorage.getItem('dog_photo_'+d.cid);if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';const re=document.getElementById('regPhotoEmoji');if(re)re.style.display='none';}
+  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl?gdriveDirect(d.photoUrl):'';if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';const re=document.getElementById('regPhotoEmoji');if(re)re.style.display='none';}
   showScreen('sc-register');
 }
 function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').value)||3;if(document.getElementById(pfx+'_nval'))document.getElementById(pfx+'_nval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--or)';for(let i=0;i<5;i++){const s=document.getElementById('rns'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
@@ -944,29 +943,22 @@ async function registerDog(){
       const targetRi=foundIdx>=0?foundIdx+2:ri;
       if(targetRi)await updateRow(TABS.DOGS,targetRi,vals);else await appendRow(TABS.DOGS,vals);
     }else await appendRow(TABS.DOGS,vals);
-    const pd=document.getElementById('regPhotoCircle')._pd;if(pd)try{localStorage.setItem('dog_photo_'+cid,pd);syncPhotoToSheet(cid,pd);}catch(e){}
     const dh=mkHdr(dogsHdrRow);if(!eid){allDogs.push(mapDog(vals,allDogs.length,dh));refreshDogDropdowns();}else if(curDog){const idx=allDogs.findIndex(d=>d.cid===eid);if(idx>=0){allDogs[idx]=mapDog(vals,idx,dh);curDog=allDogs[idx];}}
     st.textContent=eid?'Profile updated!':'Registered! ID: '+cid;st.className='smsg ok';
     setTimeout(()=>{goBack();renderBoard();if(eid&&curDog){buildProfInfo(curDog);buildSummary(curDog);}},1800);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Save Changes':'Register Dog';}
 }
-function compressPhoto(file,cb){const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const MAX=300;let w=img.width,h=img.height;if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.7));};img.src=ev.target.result;};r.readAsDataURL(file);}
-function trigPh(){document.getElementById('profPhotoInput').click();}
-function handlePh(e){const f=e.target.files[0];if(!f||!curDog)return;compressPhoto(f,data=>{try{localStorage.setItem('dog_photo_'+curDog.cid,data);}catch(err){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.src=data;img.style.display='block';syncPhotoToSheet(curDog.cid,data);});}
-function handleRegPh(e){const f=e.target.files[0];if(!f)return;compressPhoto(f,data=>{document.getElementById('regPhotoImg').src=data;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=data;});}
 function gdriveDirect(url){try{const m=url.match(/(?:\/d\/|id=)([-\w]{25,})/);if(m)return'https://lh3.googleusercontent.com/d/'+m[1];}catch(e){}return url;}
-function resolvePhotoUrl(dog){const raw=dog.photoUrl||localStorage.getItem('dog_photo_'+dog.cid)||'';return raw?gdriveDirect(raw):'';}
+function resolvePhotoUrl(dog){const raw=dog.photoUrl||'';return raw?gdriveDirect(raw):'';}
 
-function syncPhotoToSheet(cid,url){if(!cid||!url)return;const key='photo_'+cid;const ts=new Date().toISOString();readSheet(TABS.RATES,'A2:C').then(rr=>{const idx=rr.findIndex(r=>r[0]===key);if(idx>=0)updateRow(TABS.RATES,idx+2,[key,url,ts]).catch(()=>{});else appendRow(TABS.RATES,[key,url,ts]).catch(()=>{});}).catch(()=>{});}
-function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;try{localStorage.setItem('dog_photo_'+curDog.cid,direct);}catch(e){}const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.onerror=()=>{img.style.display='none';};img.src=direct;img.style.display='block';
-  // Save URL to dog record in Dogs sheet so it's visible on all devices
+function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.onerror=()=>{img.style.display='none';};img.src=direct;img.style.display='block';
+  // Save URL to the dog's Dogs-sheet row so it's visible on all devices
   curDog.photoUrl=direct;updateCopyPhotoBtn();
   if(curDog.rowIdx){updateRow(TABS.DOGS,curDog.rowIdx,Object.values(mapDogToRow(curDog))).catch(()=>{});}
-  syncPhotoToSheet(curDog.cid,direct);
 }else{_regPhotoUrl=direct;document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
 function promptGdriveUrl(context){const url=prompt('Paste your Google Drive photo link:\n(File > Share > Copy link)');if(url)setPhotoFromUrl(url,context);}
-function copyPhotoUrl(){const url=curDog?.photoUrl||localStorage.getItem('dog_photo_'+(curDog?.cid||''));if(!url){alert('No photo URL stored for this dog.');return;}navigator.clipboard.writeText(url).then(()=>alert('Photo URL copied!')).catch(()=>{prompt('Copy this URL:',url);});}
-function updateCopyPhotoBtn(){const url=curDog?.photoUrl||localStorage.getItem('dog_photo_'+(curDog?.cid||''));const btn=document.getElementById('copyPhotoUrlBtn');if(btn)btn.style.display=(url&&url.startsWith('http'))?'block':'none';}
+function copyPhotoUrl(){const url=curDog?.photoUrl;if(!url){alert('No Drive photo link stored for this dog.');return;}navigator.clipboard.writeText(url).then(()=>alert('Photo URL copied!')).catch(()=>{prompt('Copy this URL:',url);});}
+function updateCopyPhotoBtn(){const url=curDog?.photoUrl;const btn=document.getElementById('copyPhotoUrlBtn');if(btn)btn.style.display=(url&&url.startsWith('http'))?'block':'none';}
 
 // ==================== QUOTE ====================
 // ==================== MULTI-SERVICE QUOTE ====================
@@ -1143,10 +1135,11 @@ function calcMultiQ(){
     total+=amt;
   });
   const discType=document.getElementById('q_disc_t')?.value||'none';const discVal=parseFloat(document.getElementById('q_disc_v')?.value)||0;
-  let discLine='';
-  if(discType==='pct'&&discVal>0){const da=total*(discVal/100);total-=da;discLine='Discount '+discVal+'%: -'+fmtGBP(da);lines.push(['Discount '+discVal+'%',-da]);}
-  else if(discType==='gbp'&&discVal>0){total-=discVal;discLine='Discount: -'+fmtGBP(discVal);lines.push(['Discount',-discVal]);}
-  total=roundGBP(total); // whole-£ quote total (round after any discount)
+  // Shown discount = subtotal − final rounded total, so the line + total always reconcile (final = subtotal − shownDiscount).
+  let discLine='';const subtotal=roundGBP(total);let finalTotal=subtotal;
+  if(discType==='pct'&&discVal>0){finalTotal=roundGBP(subtotal*(1-discVal/100));const shown=subtotal-finalTotal;discLine='Discount '+discVal+'%: -'+fmtGBP(shown);lines.push(['Discount '+discVal+'%',-shown]);}
+  else if(discType==='gbp'&&discVal>0){finalTotal=roundGBP(subtotal-discVal);const shown=subtotal-finalTotal;discLine='Discount: -'+fmtGBP(shown);lines.push(['Discount',-shown]);}
+  total=finalTotal;
   const prepayPct=parseInt(document.getElementById('q_prepay_pct')?.value)||50;
   const prepayAmt=roundGBP(total*(prepayPct/100));const finalAmt=total-prepayAmt; // outstanding = remainder, so they sum exactly
   _cr={total,prepayAmt,finalAmt,lines,discLine,selDogs:_orderedSel().map(_nm),mainDog:_nm(_orderedSel()[0]||''),descParts,dogRevMap:_computeDogRevMap()};
@@ -1443,7 +1436,7 @@ function nextBkId(sd){
   return id;
 }
 function openBkModal(editId=null,fromProf=false,editRi=null){
-  const modal=document.getElementById('bkModal');const ed=editId&&(editRi?bookings.find(r=>r.id===editId&&r.ri===editRi):bookings.find(r=>r.id===editId));
+  const modal=document.getElementById('bkModal');const ed=editId?bkByRef(editId,editRi):null;// resolve by ri first (unique) so edits hit the right row even with dup ids
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
   document.getElementById('bkMTitle').textContent=ed?'Modify Booking':'Add Booking';document.getElementById('bkBtn').textContent=ed?'Modify Booking':'Save Booking';
   document.getElementById('bkDelBtn').style.display=ed?'block':'none';
@@ -1596,12 +1589,12 @@ function renderOverlapCheck(){
       const mEsc=mixedLabel.replace(/'/g,"\\'");
       const overlapEnd=(b.ed||b.sd)<bkEd?(b.ed||b.sd):bkEd;
       const existingLog=[...trialLogs].reverse().find(t=>{
-        const tCid=t.cid||'';
-        const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
-        const matchesPrimary=dogObj?tCid===dogObj.cid:(t.dog||'').toLowerCase()===(dog||'').toLowerCase();
-        const md=(b.dog||'').toLowerCase();const mc=(b.customerId||'').toLowerCase();
-        const matchesMixed=mc?mixedParts.some(m=>m===mc||m.startsWith(mc+' ')):mixedParts.some(m=>m===md||m.endsWith(' '+md));
-        return matchesPrimary&&matchesMixed&&t.date>=bkSd&&t.date<=bkEd;
+        if(!(t.date>=bkSd&&t.date<=bkEd))return false;
+        const myCid=(dogObj?dogObj.cid:'').toLowerCase();const otherCid=(b.customerId||'').toLowerCase();const tCid=(t.cid||'').toLowerCase();
+        const mwHas=cid=>!!cid&&(t.mixedWith||'').toLowerCase().split(/[,;]+/).some(p=>p.trim().split(/\s+/)[0]===cid);
+        if(myCid&&otherCid)return (tCid===myCid&&mwHas(otherCid))||(tCid===otherCid&&mwHas(myCid));// pair, either direction
+        const md=(b.dog||'').toLowerCase();const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
+        return (t.dog||'').toLowerCase()===(dog||'').toLowerCase()&&mixedParts.some(m=>m===md||m.endsWith(' '+md));
       });
       const curResult=existingLog?.suitable||'';
       const opts=[{v:'Friends',e:'🥰'},{v:'Good',e:'😊'},{v:'Ignore',e:'😐'},{v:'Not Good',e:'😒'},{v:'Fight',e:'😡'},{v:'Did not meet',e:'🚶'}];
@@ -1618,38 +1611,37 @@ function renderOverlapCheck(){
 }
 async function logCompatResult(dogName,mixedLabel,result,notes,logDate,bookingStart,bookingEnd){
   const dogObj=allDogs.find(d=>d.name===dogName);if(!dogObj)return;
+  if(!confirm('Confirm: log '+dogName+' + '+mixedLabel+' as "'+result+'"?'))return;// no accidental writes
   const today=logDate||todayStr();
   const suitMap={'Friends':'Friends','Good':'Good','Ignore':'Ignore','Not Good':'Not Good','Fight':'Fight','Did not meet':'Did not meet'};
   const suitable=suitMap[result]||result;
   const obs=notes||(result==='Friends'?'Happy together':result==='Fight'?'Fought':result==='Did not meet'?'Did not meet':'');
   const row=rowFromMap(trialHdrRow,{CustomerID:dogObj.cid,DogName:dogObj.name,Date:today,MixedWith:mixedLabel,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
-  const existing=trialLogs.find(t=>t.cid===dogObj.cid&&(t.mixedWith||'').trim().toLowerCase()===(mixedLabel||'').trim().toLowerCase()&&(!bookingStart||t.date>=bookingStart)&&(!bookingEnd||t.date<=bookingEnd));
+  // ONE record per unordered dog-pair per overlapping period — match in EITHER direction so we update, not duplicate.
+  const otherCid=(mixedLabel||'').trim().split(/\s+/)[0]||'';
+  const inPeriod=t=>(!bookingStart||t.date>=bookingStart)&&(!bookingEnd||t.date<=bookingEnd);
+  const mwHas=(mw,cid)=>!!cid&&(mw||'').toLowerCase().split(/[,;]+/).some(p=>p.trim().split(/\s+/)[0]===cid.toLowerCase());
+  const existing=trialLogs.find(t=>inPeriod(t)&&((t.cid===dogObj.cid&&mwHas(t.mixedWith,otherCid))||(t.cid===otherCid&&mwHas(t.mixedWith,dogObj.cid))));
+  const persist=cid=>{const bk=bookings.find(b=>b.customerId===cid&&b.sd<=today&&(b.ed||b.sd)>=today);if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});};
   if(existing){
-    const prevSuitable=existing.suitable;const prevObs=existing.obs;const prevDate=existing.date;
+    const prevSuitable=existing.suitable,prevObs=existing.obs,prevDate=existing.date;
     existing.suitable=suitable;existing.obs=obs;existing.date=today;
     renderOverlapCheck();renderWfChecklist();
     try{
-      await updateRow(TABS.TRIAL,existing.ri,row);
-      const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
-      if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
+      // keep the record's existing direction (its CustomerID/MixedWith); only change result/obs/date
+      const urow=rowFromMap(trialHdrRow,{CustomerID:existing.cid,DogName:_nm(existing.cid),Date:today,MixedWith:existing.mixedWith,Observations:obs,Suitable:suitable,Private:''},TABS.TRIAL.h);
+      await updateRow(TABS.TRIAL,existing.ri,urow);
+      persist(dogObj.cid);persist(otherCid);
     }catch(e){
       existing.suitable=prevSuitable;existing.obs=prevObs;existing.date=prevDate;
-      renderOverlapCheck();renderWfChecklist();
-      alert('Error saving: '+e.message);
+      renderOverlapCheck();renderWfChecklist();alert('Error saving: '+e.message);
     }
   }else{
     const entry={cid:dogObj.cid,dog:dogObj.name,date:today,mixedWith:mixedLabel,obs,suitable,ri:trialLogs.length+2};
     trialLogs.push(entry);
     renderOverlapCheck();renderWfChecklist();
-    try{
-      await appendRow(TABS.TRIAL,row);
-      const bk=bookings.find(b=>b.customerId===dogObj.cid&&b.sd<=today&&(b.ed||b.sd)>=today);
-      if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});
-    }catch(e){
-      const idx=trialLogs.indexOf(entry);if(idx>=0)trialLogs.splice(idx,1);
-      renderOverlapCheck();renderWfChecklist();
-      alert('Error saving: '+e.message);
-    }
+    try{await appendRow(TABS.TRIAL,row);persist(dogObj.cid);persist(otherCid);}
+    catch(e){const idx=trialLogs.indexOf(entry);if(idx>=0)trialLogs.splice(idx,1);renderOverlapCheck();renderWfChecklist();alert('Error saving: '+e.message);}
   }
   updatePendingBadge();
 }
@@ -2058,7 +2050,7 @@ function renderAnalysis(){
 
   // ── 9. Occupancy Rate by Day (+ yearly total) ──
   const boardingDays={};MOS.forEach(m=>boardingDays[m]=new Set());
-  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}});
+  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}});
   const totalOccDays=MOS.reduce((s,m)=>s+boardingDays[m].size,0);
   const yrOccPct=Math.round(totalOccDays/daysInYr*100);
   const yrOccCol=yrOccPct>=80?'var(--gn)':yrOccPct>=50?'var(--or)':'var(--gr3)';
@@ -2070,12 +2062,12 @@ function renderAnalysis(){
     const svcL=(b.svc||'').toLowerCase();const isB=svcL.includes('boarding');const isDC=svcL.includes('daycare')||svcL.includes('day care');
     if(!isB&&!isDC)return;
     const nsd=normDate(b.sd);const ned=normDate(b.ed);if(!nsd||!ned)return;
-    if(isB){let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
+    if(isB){let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
     else{let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
   });
   const totalPlacesUsed=MOS.reduce((s,m)=>s+placesMo[m],0);const totalCapYr=4*daysInYr;const yrPlacesPct=Math.round(totalPlacesUsed/totalCapYr*100);
   const yrPlacesCol=yrPlacesPct>=80?'var(--gn)':yrPlacesPct>=50?'var(--or)':'var(--gr3)';
-  document.getElementById('anOccPlaces').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const cap=4*dim;const occ=placesMo[m];const pct=Math.round(occ/cap*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+cap+'</div></div>';}).join('')+'</div><div style="border-top:1px solid var(--gr4);padding-top:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:10px;color:var(--gr2);font-weight:600;">'+yr+' Total</span><span style="font-size:16px;font-weight:800;color:'+yrPlacesCol+';">'+yrPlacesPct+'%</span><span style="font-size:9px;color:var(--gr3);">'+totalPlacesUsed+'/'+totalCapYr+' places</span></div><div style="font-size:8px;color:var(--gr3);text-align:center;">Capacity: 4 dogs × days in month · Boarding nights + Day Care visits</div></div>';
+  document.getElementById('anOccPlaces').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const cap=4*dim;const occ=placesMo[m];const pct=Math.round(occ/cap*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+cap+'</div></div>';}).join('')+'</div><div style="border-top:1px solid var(--gr4);padding-top:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:10px;color:var(--gr2);font-weight:600;">'+yr+' Total</span><span style="font-size:16px;font-weight:800;color:'+yrPlacesCol+';">'+yrPlacesPct+'%</span><span style="font-size:9px;color:var(--gr3);">'+totalPlacesUsed+'/'+totalCapYr+' places</span></div><div style="font-size:8px;color:var(--gr3);text-align:center;">Capacity: 4 dogs × days in month · Boarding days present + Day Care visits</div></div>';
 
   // ── 11. Customer LTV — Top 10, with next booking date ──
   const ltvMap={};
