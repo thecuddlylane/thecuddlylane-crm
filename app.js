@@ -63,7 +63,7 @@ const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
 
 // STATE
-let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],trialLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='',dailyLogSet=new Set(),dogsHdrRow=[],bkHdrRow=[],dailyHdrRow=[],trialHdrRow=[],actlogHdrRow=[],costsHdrRow=[],healthHdrRow=[],fightHdrRow=[],transportHdrRow=[],actsHdrRow=[];
+let curDog=null,allDogs=[],bookings=[],costs=[],msgTpls=[],activities=[],actLogs=[],trialLogs=[],histCache={},_svcLines=[],_logSelectedActs=[],_actMainCat='',_tplCat='',dailyLogSet=new Set(),dailyLogRows=[],dogsHdrRow=[],bkHdrRow=[],dailyHdrRow=[],trialHdrRow=[],actlogHdrRow=[],costsHdrRow=[],healthHdrRow=[],fightHdrRow=[],transportHdrRow=[],actsHdrRow=[];
 const WF_STEPS=[
   {k:'whatsapp',l:'WhatsApp group created'},
   {k:'docsReq',l:'Send docs request'},
@@ -434,12 +434,14 @@ async function refreshBoard(){
     const cr=await readSheet(TABS.COSTS,'A1:D').catch(()=>[]);costsHdrRow=cr[0]||[];const ch=mkHdr(cr[0]||[]);costs=cr.slice(1).map((r,i)=>({date:r[ch['Date']??-1]||'',cat:r[ch['Category']??-1]||'',amount:parseFloat(r[ch['Amount']??-1])||0,notes:r[ch['Notes']??-1]||'',ri:i+2}));
     const al=await readSheet(TABS.ACTLOG,'A1:G').catch(()=>[]);actlogHdrRow=al[0]||[];const alh=mkHdr(al[0]||[]);actLogs=al.slice(1).map(r=>({date:r[alh['Date']??-1]||'',activity:r[alh['Activity']??-1]||'',dogs:r[alh['DogName']??-1]||'',staff:r[alh['Staff']??-1]||'',dur:r[alh['Duration']??-1]||'',notes:r[alh['Notes']??-1]||''}));
     const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialHdrRow=tl[0]||[];trialLogs=tl.slice(1).map((r,i)=>{const rv=n=>tlh[n]!==undefined?r[tlh[n]]||'':'';return{cid:rv('CustomerID'),dog:rv('DogName'),date:rv('Date'),mixedWith:rv('MixedWith'),obs:rv('Observations'),suitable:rv('Suitable'),ri:i+2};});
-    const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyHdrRow=dl[0]||[];dailyLogSet=new Set(dl.slice(1).map(r=>(dlh['CustomerID']!==undefined?r[dlh['CustomerID']]||'':'')+'_'+(dlh['Date']!==undefined?r[dlh['Date']]||'':'')));
+    const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyHdrRow=dl[0]||[];dailyLogRows=dl.slice(1);dailyLogSet=new Set(dailyLogRows.map(r=>(dlh['CustomerID']!==undefined?r[dlh['CustomerID']]||'':'')+'_'+(dlh['Date']!==undefined?r[dlh['Date']]||'':'')));
     const [hlR,ftR,trR,acR]=await Promise.all([readSheet(TABS.HEALTH,'A1:Z1').catch(()=>[]),readSheet(TABS.FIGHT,'A1:Z1').catch(()=>[]),readSheet(TABS.TRANSPORT,'A1:Z1').catch(()=>[]),readSheet(TABS.ACTS,'A1:Z1').catch(()=>[])]);healthHdrRow=hlR[0]||[];fightHdrRow=ftR[0]||[];transportHdrRow=trR[0]||[];actsHdrRow=acR[0]||[];
     // Sync targets from sheet into localStorage
     syncTargetsFromSheet().catch(()=>{});
     // Sync activities library from sheet so sheet edits show in app
     syncActsFromSheet(true).catch(()=>{});
+    // Sync rates + holiday ranges from sheet so pricing is consistent across devices
+    await syncSettingsFromSheet();
     // Photos come from the dog's PhotoURL (Drive link) in the Dogs sheet — no local caching.
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();updatePendingBadge();
     await syncCurrentScreen();
@@ -457,6 +459,12 @@ async function syncCurrentScreen(){
   else if(id==='sc-training')await loadTraining();
   else if(id==='sc-profile'&&curDog){const fresh=allDogs.find(d=>d.cid===curDog.cid);if(fresh)openProfile(fresh);}
   else if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}
+  else if(id==='sc-rates')loadQSettings();            // refresh rate fields from freshly-synced cache
+  else if(id==='sc-holidays')renderHolYrBtns();        // refresh holiday list from freshly-synced cache
+  else if(id==='sc-calendar')renderCalendar();
+  else if(id==='sc-analysis')renderAnalysis();
+  else if(id==='sc-todo')renderPendingPanel();
+  else if(id==='sc-checkdates')initAvail();
 }
 function bkMatchesDog(b,d){return b.customerId?b.customerId===d.cid:b.dog.toLowerCase()===(d.name||'').toLowerCase();}
 function dogMatchesCidOrName(cid,name,dCid,dName){return cid?cid===dCid:(name||'').toLowerCase()===(dName||'').toLowerCase();}
@@ -566,7 +574,11 @@ function hasActiveBookingToday(dog){
 }
 function buildTodayLog(){
   _logSelectedActs=[];
-  const today=todayStr();const sv=JSON.parse(localStorage.getItem('log_'+(curDog&&curDog.cid)+'_'+today)||'{}');
+  const today=todayStr();
+  // Prefer the latest SAVED log from the sheet (shared across devices); fall back to the local working copy.
+  const cid=curDog&&curDog.cid;const sheetSv=svFromSheet(cid,today);
+  const sv=sheetSv||JSON.parse(localStorage.getItem('log_'+cid+'_'+today)||'{}');
+  if(sheetSv&&cid)localStorage.setItem('log_'+cid+'_'+today,JSON.stringify(sv));
   document.getElementById('logDateDisplay').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   if(!hasActiveBookingToday(curDog)){
     document.getElementById('logsBody').innerHTML='<div class="empty" style="padding:20px;text-align:center;"><p style="color:var(--gr3);font-size:12px;">No active booking today.<br>Log via History for past dates.</p></div>';
@@ -600,6 +612,16 @@ function buildTodayLog(){
     '</div>';
 }
 function parseState(v){return v==='[Y]'?'yes':v==='[Refused]'?'refused':v==='[To-do]'?'todo':v==='[N/A]'?'na':'';}
+// Load a saved daily-log (from the Daily-Log sheet, held in memory) into tile-state form, so every device
+// sees the latest saved log. Returns null if no row for that dog+date.
+const _DL_FIELD={breakfast:'Breakfast',medAm:'MedAM',dinner:'Dinner',medPm:'MedPM',snack:'Snack',walkAm:'WalkAM',garden:'Garden',walkPm:'WalkPM',beforeSleep:'BeforeSleep',game:'Game',bowl:'Bowl',room:'Room',garment:'Garment'};
+function svFromSheet(cid,date){
+  if(!cid||!date)return null;const h=mkHdr(dailyHdrRow);const ci=h['CustomerID']??0,di=h['Date']??2;
+  const r=(dailyLogRows||[]).find(x=>((x[ci]||'')===cid&&(x[di]||'')===date));
+  if(!r)return null;const gv2=n=>h[n]!==undefined?(r[h[n]]||''):'';
+  const sv={};Object.keys(_DL_FIELD).forEach(k=>{const st=parseState(gv2(_DL_FIELD[k]));if(st)sv[k]=st;});
+  sv.notes=gv2('Notes');sv.priv=(gv2('Private')==='Private');return sv;
+}
 function togTile(k){if(!curDog)return;const lk='log_'+curDog.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');const cycle=['','todo','yes','refused','na'];sv[k]=cycle[(cycle.indexOf(sv[k]||'')+1)%cycle.length];localStorage.setItem(lk,JSON.stringify(sv));const t=document.getElementById('tl_'+k);if(t){['done-yes','done-refused','done-todo','done-na'].forEach(c=>t.classList.remove(c));if(sv[k])t.classList.add('done-'+sv[k]);const lblEl=t.querySelector('.t-lbl');if(lblEl){const si=sv[k]==='yes'?' ✓':sv[k]==='refused'?' ✗':sv[k]==='todo'?' ○':sv[k]==='na'?' —':'';lblEl.textContent=(t.dataset.lbl||'')+si;}}}
 function togInc(k){const el=document.getElementById('inc_'+k);if(!el)return;el.classList.toggle('open');const lk='log_'+curDog.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');sv['inc_'+k]=el.classList.contains('open');localStorage.setItem(lk,JSON.stringify(sv));}
 function setImp(p,val,e){e.stopPropagation();const pfx=p==='health'?'ih':'if';document.querySelectorAll('#inc_'+p+' .ib').forEach(b=>{b.className='ib';if(b.textContent===val)b.classList.add(val==='Low'?'il':val==='Med'?'im':'ih');});const el=document.getElementById(pfx+'_imp');if(el)el.value=val;}
@@ -609,6 +631,8 @@ async function saveLog(){
   const st=document.getElementById('logStatus');st.style.display='block';st.style.color='var(--gr2)';st.textContent='Saving...';
   const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
   const row=rowFromMap(dailyHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,Breakfast:g('breakfast'),MedAM:g('medAm'),Dinner:g('dinner'),MedPM:g('medPm'),Snack:g('snack'),WalkAM:g('walkAm'),Garden:g('garden'),WalkPM:g('walkPm'),BeforeSleep:g('beforeSleep'),Game:g('game'),Bowl:g('bowl'),Room:g('room'),Garment:g('garment'),Notes:sv.notes||'',Private:priv},TABS.DAILY.h);
+  // Keep the in-memory Daily-Log cache in sync so re-opening shows the just-saved state (not a stale sheet read)
+  {const _h=mkHdr(dailyHdrRow);const _ci=_h['CustomerID']??0,_di=_h['Date']??2;const _mi=dailyLogRows.findIndex(x=>(x[_ci]||'')===curDog.cid&&(x[_di]||'')===today);if(_mi>=0)dailyLogRows[_mi]=row;else dailyLogRows.push(row);dailyLogSet.add(curDog.cid+'_'+today);}
   const rawDaily=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dh_sl=mkHdr(rawDaily[0]||[]);const allDaily=rawDaily.slice(1);
   const existIdx=allDaily.findIndex(r=>(r[dh_sl['Date']??2]===today&&r[dh_sl['CustomerID']??0]===curDog.cid)||(r[0]===today&&r[15]===curDog.cid));
   const saves=[existIdx>=0?updateRow(TABS.DAILY,existIdx+2,row):appendRow(TABS.DAILY,row)];
@@ -1156,6 +1180,19 @@ function getRates(){return JSON.parse(localStorage.getItem('tcl_rates')||JSON.st
 // Auto-fill the read-only holiday-rate fields from their base rate × 1.15 (rounded). Called on load + base-rate edit.
 function recalcHolFields(){const set=(id,base)=>{const el=document.getElementById(id),b=document.getElementById(base);if(el&&b)el.value=holRate(parseFloat(b.value)||0);};set('r_board_hol','r_board_std');set('r_board_addh','r_board_add');set('r_day_hol','r_day_std');}
 function getHolRanges(){return JSON.parse(localStorage.getItem('tcl_hol_ranges')||JSON.stringify(DEFAULT_RANGES));}
+// Rates + holiday ranges live in the Rates sheet (rows 'tcl_rates' / 'tcl_hol_ranges') so all devices share them.
+// Read on every sync into the localStorage cache; every save writes the sheet.
+async function syncSettingsFromSheet(){
+  try{const rows=await readSheet(TABS.RATES,'A2:C');
+    const rr=rows.find(r=>r[0]==='tcl_rates');if(rr&&rr[1])localStorage.setItem('tcl_rates',rr[1]);
+    const hr=rows.find(r=>r[0]==='tcl_hol_ranges');if(hr&&hr[1])localStorage.setItem('tcl_hol_ranges',hr[1]);
+  }catch(e){}
+}
+async function saveHolRangesToSheet(ranges){
+  try{const rows=await readSheet(TABS.RATES,'A2:C').catch(()=>[]);const idx=rows.findIndex(r=>r[0]==='tcl_hol_ranges');const vals=['tcl_hol_ranges',JSON.stringify(ranges),new Date().toISOString()];
+    if(idx>=0)await updateRow(TABS.RATES,idx+2,vals);else await appendRow(TABS.RATES,vals);
+  }catch(e){}
+}
 function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');return{quote:s.quote||TP_QUOTE,book:s.book||TP_BOOK,prepay:s.prepay||TP_PREPAY,final:s.final||TP_FINAL,avail:s.avail||TP_AVAIL,payLink:s.payLink||'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:s.payRefPfx||'KCHEUNG'};}
 function isHol(d){return getHolRanges().some(r=>d>=r.start&&d<=r.end);}
 function getHolDates(sd,ed){const ranges=getHolRanges();const dates=[];let d=new Date(sd+'T12:00:00');const e=new Date(ed+'T12:00:00');while(d<e){const ds=d.toISOString().split('T')[0];if(ranges.some(r=>ds>=r.start&&ds<=r.end))dates.push(ds);d.setDate(d.getDate()+1);}return dates;}
@@ -1180,8 +1217,8 @@ let _holYrFilter=null;
 function renderHolYrBtns(){const yrs=[...new Set(getHolRanges().map(r=>r.start.slice(0,4)))].sort();const el=document.getElementById('holYrBtns');if(!el)return;el.innerHTML=yrs.map(y=>{const oc="setHolYr('"+y+"')";return'<button class="hyrb'+(_holYrFilter===y?' active':'')+'" onclick="'+oc+'">'+y+'</button>';}).join('');renderHolList();}
 function setHolYr(y){_holYrFilter=_holYrFilter===y?null:y;renderHolYrBtns();}
 function renderHolList(){const ranges=getHolRanges();const f=_holYrFilter?ranges.filter(r=>r.start.startsWith(_holYrFilter)):ranges;const el=document.getElementById('holList');if(!el)return;el.innerHTML=f.map(r=>{const oc="removeHolRange('"+r.start+"','"+r.end+"')";return'<div class="hol-rng">'+r.label+' ('+r.start+' to '+r.end+')<button onclick="'+oc+'">x</button></div>';}).join('')||'<span style="font-size:9px;color:var(--gr3);">No holiday ranges</span>';}
-function addHolRange(){const s=document.getElementById('holStart').value,e=document.getElementById('holEnd').value;if(!s||!e||e<s){alert('Select valid start and end dates');return;}const ranges=getHolRanges();ranges.push({start:s,end:e,label:'Holiday '+new Date(s+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'})});localStorage.setItem('tcl_hol_ranges',JSON.stringify(ranges));renderHolList();renderHolYrBtns();document.getElementById('holStart').value='';document.getElementById('holEnd').value='';calcMultiQ();}
-function removeHolRange(start,end){localStorage.setItem('tcl_hol_ranges',JSON.stringify(getHolRanges().filter(r=>!(r.start===start&&r.end===end))));renderHolList();renderHolYrBtns();calcMultiQ();}
+function addHolRange(){const s=document.getElementById('holStart').value,e=document.getElementById('holEnd').value;if(!s||!e||e<s){alert('Select valid start and end dates');return;}const ranges=getHolRanges();ranges.push({start:s,end:e,label:'Holiday '+new Date(s+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'})});localStorage.setItem('tcl_hol_ranges',JSON.stringify(ranges));saveHolRangesToSheet(ranges);renderHolList();renderHolYrBtns();document.getElementById('holStart').value='';document.getElementById('holEnd').value='';calcMultiQ();}
+function removeHolRange(start,end){const ranges=getHolRanges().filter(r=>!(r.start===start&&r.end===end));localStorage.setItem('tcl_hol_ranges',JSON.stringify(ranges));saveHolRangesToSheet(ranges);renderHolList();renderHolYrBtns();calcMultiQ();}
 async function saveTpl(k){const c=document.getElementById('tpl_'+k)?.value;const t=getTpls();t['_prev_'+k]=t[k];t[k]=c;localStorage.setItem('tcl_tpls',JSON.stringify(t));await saveTplSettingsAndSync();}
 function redoTpl(k){const t=getTpls();if(t['_prev_'+k]){const tmp=t[k];t[k]=t['_prev_'+k];t['_prev_'+k]=tmp;localStorage.setItem('tcl_tpls',JSON.stringify(t));document.getElementById('tpl_'+k).value=t[k];alert('Reverted.');}else alert('No previous version.');}
 function confirmRestoreTpl(k){_restoreTplKey=k;document.getElementById('restoreInput').value='';document.getElementById('restoreConfirm').classList.add('open');}
@@ -2071,12 +2108,12 @@ function renderAnalysis(){
 
   // ── 11. Customer LTV — Top 10, with next booking date ──
   const ltvMap={};
-  bookings.filter(b=>paid.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;ltvMap[k].total+=actualRev(b);const ned=normDate(b.ed)||'';if(ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});
+  bookings.filter(b=>paid.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;ltvMap[k].total+=actualRev(b);const ned=normDate(b.ed)||'';const nsd=normDate(b.sd)||'';if(nsd&&nsd<=today&&ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});// 'last' = most recent booking that has already started (never a future one)
   const nextBk={};
   bookings.filter(b=>b.sd&&normDate(b.sd)>today&&!['Cancelled','Canceled'].includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!nextBk[k]||nsd<nextBk[k])nextBk[k]=nsd;});
   const top10=Object.values(ltvMap).sort((a,b)=>b.total-a.total).slice(0,10);
   const maxLtv=top10[0]?.total||1;
-  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;const nxt=nextBk[c.cid||c.dog];return'<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:3px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="display:flex;gap:10px;font-size:8px;color:var(--gr3);"><span>'+c.count+' booking'+(c.count!==1?'s':'')+'</span><span>last: '+(c.lastDate||'–')+'</span>'+(nxt?'<span style="color:var(--gn);font-weight:700;">next: '+nxt+'</span>':'<span>no upcoming</span>')+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
+  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;const nxt=nextBk[c.cid||c.dog];return'<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:3px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="display:flex;gap:10px;font-size:8px;color:var(--gr3);"><span>'+c.count+' booking'+(c.count!==1?'s':'')+'</span>'+(c.lastDate?'<span>last: '+c.lastDate+'</span>':'')+(nxt?'<span style="color:var(--gn);font-weight:700;">next: '+nxt+'</span>':(c.lastDate&&c.count>1?'<span>no upcoming</span>':''))+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
 }
 
 // ==================== TRAINING ====================
