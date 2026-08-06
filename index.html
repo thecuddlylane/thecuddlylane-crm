@@ -327,6 +327,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 .act-item:hover{background:var(--gr5)!important;}
 .act-cat{font-size:7px;padding:2px 6px;border-radius:99px;font-weight:700;display:inline-block;margin-bottom:3px;margin-right:3px;}
 .act-main-cat-btn.active{background:var(--pu)!important;color:#fff!important;border-color:var(--pu)!important;}
+.af-grp{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:7px;}
+.af-lbl{font-size:9px;font-weight:700;color:var(--gr3);text-transform:uppercase;letter-spacing:.3px;width:60px;flex-shrink:0;}
+.af-chip{font-size:10px;padding:4px 11px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;}
+.af-chip.on{background:var(--or);border-color:var(--or);color:#fff;font-weight:700;}
+.act-log-btn{flex-shrink:0;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--or);background:var(--orxl);color:var(--or);font-size:16px;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;}
 .tpl-cat-btn.active{background:var(--or)!important;color:#fff!important;border-color:var(--or)!important;}
 .cal-nav,.cal-today,.cal-view-btn{font-family:var(--fb);font-size:11px;border-radius:8px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);cursor:pointer;padding:5px 10px;}
 .cal-nav{font-size:16px;line-height:1;padding:3px 10px;font-weight:700;}
@@ -487,7 +492,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v66b1</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v67b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -939,37 +944,44 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div><div class="pg-t">Activities</div><div class="pg-s">Activity library &amp; smart picker</div></div>
       <button class="sbtn2" style="font-size:11px;padding:6px 11px;" onclick="openActModal(null)">+ Add</button>
     </div>
-    <!-- MAIN CATEGORY CHIPS -->
-    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch;">
-      <button class="act-main-cat-btn active" data-cat="" onclick="setActMainCat('')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--pu);background:var(--pul);color:var(--pu);font-family:var(--fb);cursor:pointer;white-space:nowrap;">All</button>
-      <button class="act-main-cat-btn" data-cat="Out of house (outdoor)" onclick="setActMainCat('Out of house (outdoor)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🌳 Out (outdoor)</button>
-      <button class="act-main-cat-btn" data-cat="Out of house (indoor)" onclick="setActMainCat('Out of house (indoor)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🏢 Out (indoor)</button>
-      <button class="act-main-cat-btn" data-cat="In house (for fun)" onclick="setActMainCat('In house (for fun)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🎉 In house (fun)</button>
-      <button class="act-main-cat-btn" data-cat="In house (practical)" onclick="setActMainCat('In house (practical)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🔧 In house (practical)</button>
-      <button class="act-main-cat-btn" data-cat="In house (game)" onclick="setActMainCat('In house (game)')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">🎮 In house (game)</button>
-      <button class="act-main-cat-btn" data-cat="Others" onclick="setActMainCat('Others')" style="flex-shrink:0;font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">📎 Others</button>
-    </div>
     <!-- FILTER -->
     <div class="fbar">
-      <div class="fbar-lbl">Filter Activities</div>
-      <div class="fbar-row">
-        <select class="fs" id="act_fIO" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">In &amp; Outdoor</option><option>Indoor</option><option>Outdoor</option></select>
-        <select class="fs" id="act_fEnergy" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All energy</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="fbar-lbl" style="margin:0;">Filter Activities</div>
+        <div style="display:flex;gap:9px;align-items:center;">
+          <span id="actMatchCount" style="font-size:9px;color:var(--gr2);font-weight:700;"></span>
+          <button onclick="clearActFilters()" style="font-size:9px;background:none;border:none;color:var(--or);cursor:pointer;font-family:var(--fb);text-decoration:underline;">Clear all</button>
+        </div>
       </div>
-      <div class="fbar-row" style="margin-top:6px;">
-        <select class="fs" id="act_fWeather" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;width:auto;" onchange="renderActs()"><option value="">All weather</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select>
+      <div class="af-grp"><span class="af-lbl">Location</span>
+        <button class="af-chip" data-facet="loc" data-val="Home" onclick="toggleActChip(this)">🏠 Home</button>
+        <button class="af-chip" data-facet="loc" data-val="Garden" onclick="toggleActChip(this)">🌿 Garden</button>
+        <button class="af-chip" data-facet="loc" data-val="Indoor" onclick="toggleActChip(this)">🏢 Indoor</button>
+        <button class="af-chip" data-facet="loc" data-val="Outdoor" onclick="toggleActChip(this)">🌳 Outdoor</button>
       </div>
-      <div class="fbar-row" style="margin-top:6px;">
-        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Max duration:</div>
-        <input class="fi" type="number" id="act_fDur" placeholder="mins" style="font-size:10px;padding:4px 8px;width:70px;" oninput="renderActs()">
-        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Max drive:</div>
-        <input class="fi" type="number" id="act_fDist" placeholder="mins" style="font-size:10px;padding:4px 8px;width:70px;" oninput="renderActs()">
-        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Max cost:</div>
-        <input class="fi" type="number" id="act_fCost" placeholder="£" style="font-size:10px;padding:4px 8px;width:60px;" oninput="renderActs()">
+      <div class="af-grp"><span class="af-lbl">Energy</span>
+        <button class="af-chip" data-facet="energy" data-val="Low" onclick="toggleActChip(this)">Low</button>
+        <button class="af-chip" data-facet="energy" data-val="Medium" onclick="toggleActChip(this)">Medium</button>
+        <button class="af-chip" data-facet="energy" data-val="High" onclick="toggleActChip(this)">High</button>
       </div>
-      <div class="fbar-row" style="margin-top:6px;">
-        <div style="font-size:9px;color:var(--gr3);flex-shrink:0;">Sort:</div>
-        <select class="fs" id="act_sort" style="font-size:10px;padding:5px 24px 5px 8px;border-radius:7px;flex:1;" onchange="renderActs()">
+      <div class="af-grp"><span class="af-lbl">Cost</span>
+        <button class="af-chip" data-facet="cost" data-val="Paid" onclick="toggleActChip(this)">Paid</button>
+        <button class="af-chip" data-facet="cost" data-val="Free" onclick="toggleActChip(this)">Free</button>
+      </div>
+      <div class="af-grp"><span class="af-lbl">Duration</span>
+        <button class="af-chip" data-facet="dur" data-val="30" onclick="toggleActChip(this,true)">≤30 min</button>
+        <button class="af-chip" data-facet="dur" data-val="60" onclick="toggleActChip(this,true)">≤1 hr</button>
+        <button class="af-chip" data-facet="dur" data-val="120" onclick="toggleActChip(this,true)">≤2 hr</button>
+        <button class="af-chip" data-facet="dur" data-val="over" onclick="toggleActChip(this,true)">&gt; 2 hr</button>
+      </div>
+      <div class="af-grp"><span class="af-lbl">Travel</span>
+        <button class="af-chip" data-facet="travel" data-val="15" onclick="toggleActChip(this,true)">&lt; 15 min</button>
+        <button class="af-chip" data-facet="travel" data-val="30" onclick="toggleActChip(this,true)">≤30 min</button>
+        <button class="af-chip" data-facet="travel" data-val="60" onclick="toggleActChip(this,true)">≤1 hr</button>
+        <button class="af-chip" data-facet="travel" data-val="over" onclick="toggleActChip(this,true)">&gt; 1 hr</button>
+      </div>
+      <div class="af-grp"><span class="af-lbl">Sort</span>
+        <select class="fs" id="act_sort" style="font-size:10px;padding:4px 20px 4px 8px;border-radius:7px;" onchange="renderActs()">
           <option value="title">A–Z</option>
           <option value="least_recent">Least recently done</option>
           <option value="least_freq">Least frequently done</option>
@@ -979,8 +991,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         </select>
       </div>
       <div style="display:flex;gap:6px;margin-top:8px;">
-        <button class="sbtn2" style="flex:1;font-size:11px;padding:7px;" onclick="showAllActs()">Show All Matching</button>
-        <button class="sbtn2 grey" style="flex:1;font-size:11px;padding:7px;" onclick="surpriseAct()">🎲 Surprise Me</button>
+        <button class="sbtn2" style="flex:1;font-size:11px;padding:7px;" onclick="showAllActs()">Show all matches</button>
+        <button class="sbtn2 grey" style="flex:1;font-size:11px;padding:7px;" onclick="surpriseAct()">🎲 Surprise me</button>
         <button class="hbtn" onclick="syncActsFromSheet()" style="font-size:10px;">&#8635; Sync</button>
       </div>
     </div>
@@ -1048,7 +1060,10 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
   </div>
   <div class="ptc" id="ptab-info">
     <div style="display:flex;gap:6px;margin-bottom:4px;">
-      <button class="epb" onclick="openEditProf()" style="flex:1;">Edit Profile</button>
+      <button class="epb" onclick="openEditProf()" style="flex:1;">✏️ Edit Full Profile</button>
+      <button class="epb" onclick="openStaffNotes()" style="flex:1;background:var(--cnl);color:var(--cn);">📝 Edit Staff Notes</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
       <button class="epb" onclick="duplicateDog()" style="flex:1;background:var(--gr4);color:var(--gr2);">+ Duplicate (same owner)</button>
     </div>
     <div id="profInfoBody"></div>
@@ -1263,6 +1278,30 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy" id="editModalBody"></div>
   </div>
 </div>
+<!-- STAFF NOTES MODAL (quick edit of the Staff Remarks section only) -->
+<div class="modal" id="staffNotesModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl" id="snTitle">Staff Notes</div><button class="mcl" onclick="document.getElementById('staffNotesModal').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy">
+      <div class="f"><label>Nervous level (1–5) · <b id="sn_nervval">3</b></label><input type="range" id="sn_nervous" min="1" max="5" value="3" oninput="document.getElementById('sn_nervval').textContent=this.value" style="width:100%;"></div>
+      <div class="f"><label>Separation anxiety (1–5) · <b id="sn_anxval">1</b></label><input type="range" id="sn_anxiety" min="1" max="5" value="1" oninput="document.getElementById('sn_anxval').textContent=this.value" style="width:100%;"></div>
+      <div class="f"><label>Jogging suitability (1–5) · <b id="sn_jogval">3</b></label><input type="range" id="sn_jog" min="1" max="5" value="3" oninput="document.getElementById('sn_jogval').textContent=this.value" style="width:100%;"></div>
+      <div class="f"><label>Barking level (1–5) · <b id="sn_barkval">1</b></label><input type="range" id="sn_barking" min="1" max="5" value="1" oninput="document.getElementById('sn_barkval').textContent=this.value" style="width:100%;"></div>
+      <div class="f"><label>At home</label><textarea class="fta" id="sn_rm_home" style="min-height:42px;"></textarea></div>
+      <div class="f"><label>Outdoor</label><textarea class="fta" id="sn_rm_out" style="min-height:42px;"></textarea></div>
+      <div class="f"><label>Indoor</label><textarea class="fta" id="sn_rm_in" style="min-height:42px;"></textarea></div>
+      <div class="f"><label>Sleeping pattern</label><textarea class="fta" id="sn_rm_sleep" style="min-height:42px;"></textarea></div>
+      <div class="f"><label>Food</label><textarea class="fta" id="sn_rm_food" style="min-height:42px;"></textarea></div>
+      <div class="f"><label>With other dogs</label><textarea class="fta" id="sn_rm_dogs" style="min-height:42px;"></textarea></div>
+      <div class="f"><label>General remarks</label><textarea class="fta" id="sn_remarks" style="min-height:42px;"></textarea></div>
+      <div class="srow" style="margin-top:10px;">
+        <button class="sbtn2" id="snSaveBtn" onclick="saveStaffNotes()" style="flex:1;">Save Staff Notes</button>
+        <button class="sbtn2 grey" onclick="document.getElementById('staffNotesModal').classList.remove('open')" style="flex:1;">Cancel</button>
+      </div>
+      <span class="smsg" id="snStatus"></span>
+    </div>
+  </div>
+</div>
 <!-- TEMPLATE MODAL -->
 <div class="modal" id="copyTplPanel" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
@@ -1304,15 +1343,33 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="act_eidx">
       <div class="f"><label>Title <span class="req">*</span></label><input class="fi" id="act_title" placeholder="e.g. Oldbury Court field walk"></div>
-      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Paid dog field</option><option>Out of house (outdoor)</option><option>Out of house (indoor)</option><option>In house (for fun)</option><option>In house (practical)</option><option>In house (game)</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
-<div class="f"><label>Energy level</label><select class="fs" id="act_energy"><option value="">Select...</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select></div>
-<div class="f"><label>Weather suitability</label><select class="fs" id="act_weather"><option value="">Select...</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select></div>
+      <div class="f"><label>Location</label><select class="fs" id="act_io"><option value="">Select…</option><option>Home</option><option>Garden</option><option>Indoor</option><option>Outdoor</option></select><div style="font-size:8px;color:var(--gr3);margin-top:3px;">Home = indoors at home · Garden = outdoors at home · Indoor/Outdoor = out of the house</div></div>
+<div class="f"><label>Energy level</label><select class="fs" id="act_energy"><option value="">Select...</option><option>Low</option><option>Medium</option><option>High</option></select></div>
       <div class="fr"><div class="f"><label>Duration (mins)</label><input class="fi" type="number" id="act_dur"></div><div class="f"><label>Distance from home (mins drive)</label><input class="fi" type="number" id="act_dist"></div></div>
       <div class="f"><label>Location</label><input class="fi" id="act_location" placeholder="e.g. Oldbury Court Estate, BS16 2JP"></div>
       <div class="f"><label>Google Maps URL</label><input class="fi" id="act_maps" placeholder="https://maps.google.com/..."></div>
       <div class="f"><label>Cost (£) if any</label><input class="fi" type="number" id="act_cost" placeholder="0" step="0.01"></div>
       <div class="f"><label>Notes</label><textarea class="fta" id="act_notes"></textarea></div>
       <div class="srow"><button class="sbtn2" onclick="saveAct()">Save Activity</button><span class="smsg" id="actStatus"></span></div>
+    </div>
+  </div>
+</div>
+<!-- ACTIVITY LOG MODAL (log an activity for one or more dogs) -->
+<div class="modal" id="actLogModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="msh" onclick="event.stopPropagation()"><div class="mhnd"></div>
+    <div class="mhdr"><div class="mttl" id="alTitle">Log Activity</div><button class="mcl" onclick="document.getElementById('actLogModal').classList.remove('open')">&#x2715;</button></div>
+    <div class="mbdy">
+      <div class="f"><label>Date</label><input class="fi" type="date" id="al_date"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 3px;">
+        <label style="font-size:11px;font-weight:600;">Dogs <span class="req">*</span></label>
+        <button onclick="fillOnSiteDogs()" style="font-size:9px;background:var(--orxl);border:1px solid var(--or);color:var(--or);border-radius:99px;padding:3px 9px;cursor:pointer;font-family:var(--fb);">↩ Fill today's on-site dogs</button>
+      </div>
+      <input class="fi" id="al_dog_search" placeholder="Search dog name / breed / ID..." oninput="renderAlDogs()" style="margin-bottom:5px;">
+      <div id="al_dog_ms" style="max-height:150px;overflow-y:auto;padding:2px;"></div>
+      <div class="fr" style="margin-top:7px;"><div class="f"><label>Duration (mins)</label><input class="fi" type="number" id="al_dur"></div><div class="f"><label>Staff</label><input class="fi" id="al_staff"></div></div>
+      <div class="f"><label>Notes</label><textarea class="fta" id="al_notes" style="min-height:44px;"></textarea></div>
+      <div class="srow" style="margin-top:9px;"><button class="sbtn2" id="alSaveBtn" onclick="saveActLog()" style="flex:1;">Save Log</button><button class="sbtn2 grey" onclick="document.getElementById('actLogModal').classList.remove('open')" style="flex:1;">Cancel</button></div>
+      <span class="smsg" id="alStatus"></span>
     </div>
   </div>
 </div>

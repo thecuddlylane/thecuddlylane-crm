@@ -295,7 +295,7 @@ function renderPendingPanel(){
   dogList.forEach(d=>{d.up.sort((a,c)=>(a.bk.sd||'').localeCompare(c.bk.sd||''));d.past.sort((a,c)=>((c.bk.ed||c.bk.sd)||'').localeCompare((a.bk.ed||a.bk.sd)||''));});
   dogList.sort((a,c)=>((a.up[0]?a.up[0].bk.sd:'9999')).localeCompare(c.up[0]?c.up[0].bk.sd:'9999'));
   const dates=x=>fmtDate(x.bk.sd)+(x.bk.ed&&x.bk.ed!==x.bk.sd?' → '+fmtDate(x.bk.ed):'');
-  const bkRow=x=>'<div onclick="openBkModal(\''+x.bk.id+'\',false,'+x.bk.ri+')" style="cursor:pointer;padding:6px 10px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--bk);">'+x.bk.svc+' · '+dates(x)+' <span style="font-size:11px;">✏️</span></div><div style="font-size:9px;color:var(--gr2);">'+x.tasks.join(' · ')+'</div></div>';
+  const bkRow=x=>'<div onclick="openBkModal(\''+x.bk.id+'\',false,'+x.bk.ri+',2)" style="cursor:pointer;padding:6px 10px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--bk);">'+x.bk.svc+' · '+dates(x)+' <span style="font-size:11px;">✏️</span></div><div style="font-size:9px;color:var(--gr2);">'+x.tasks.join(' · ')+'</div></div>';
   const subhd=t=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;padding:5px 10px 2px;background:var(--gr5);">'+t+'</div>';
   let html='';
   dogList.forEach(d=>{
@@ -948,6 +948,33 @@ function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').val
 function updAnxBar(){const v=parseInt(document.getElementById('reg_anxiety').value)||1;if(document.getElementById('reg_axval'))document.getElementById('reg_axval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--pu)':'var(--bl)';for(let i=0;i<5;i++){const s=document.getElementById('axs'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function updJogBar(){const v=parseInt(document.getElementById('reg_jog').value)||3;if(document.getElementById('reg_jogval'))document.getElementById('reg_jogval').textContent=v;const col=v>=4?'var(--gn)':v>=3?'var(--hn)':'var(--gr3)';for(let i=0;i<5;i++){const s=document.getElementById('jgs'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function updBarkBar(){const v=parseInt(document.getElementById('reg_barking').value)||1;if(document.getElementById('reg_barkval'))document.getElementById('reg_barkval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--gr3)';for(let i=0;i<5;i++){const s=document.getElementById('bks'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
+// Quick-edit only the Staff Remarks section (4 levels + 6 remark fields + general) without opening the full profile form.
+function openStaffNotes(){
+  if(!curDog)return;const d=curDog;
+  document.getElementById('snTitle').textContent='Staff Notes — '+d.name;
+  const sr=(id,v,vid)=>{const el=document.getElementById(id);if(el){el.value=v;const b=document.getElementById(vid);if(b)b.textContent=v;}};
+  sr('sn_nervous',d.nervous||3,'sn_nervval');sr('sn_anxiety',d.anxiety||1,'sn_anxval');sr('sn_jog',d.jog||3,'sn_jogval');sr('sn_barking',d.barking||1,'sn_barkval');
+  const st=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  st('sn_rm_home',d.rmHome);st('sn_rm_out',d.rmOut);st('sn_rm_in',d.rmIn);st('sn_rm_sleep',d.rmSleep);st('sn_rm_food',d.rmFood);st('sn_rm_dogs',d.rmDogs);st('sn_remarks',d.remarks);
+  const s=document.getElementById('snStatus');s.textContent='';s.className='smsg';
+  document.getElementById('staffNotesModal').classList.add('open');
+}
+async function saveStaffNotes(){
+  if(!curDog)return;const d=curDog;const st=document.getElementById('snStatus');const btn=document.getElementById('snSaveBtn');
+  btn.disabled=true;btn.textContent='Saving...';st.textContent='';st.className='smsg';
+  d.nervous=gv('sn_nervous');d.anxiety=gv('sn_anxiety');d.jog=gv('sn_jog');d.barking=gv('sn_barking');
+  d.rmHome=gv('sn_rm_home');d.rmOut=gv('sn_rm_out');d.rmIn=gv('sn_rm_in');d.rmSleep=gv('sn_rm_sleep');d.rmFood=gv('sn_rm_food');d.rmDogs=gv('sn_rm_dogs');d.remarks=gv('sn_remarks');
+  const vals=rowFromMap(dogsHdrRow,dogToFieldMap(d),TABS.DOGS.h);
+  try{
+    // Resolve the real sheet row by CID (row-shift safe), falling back to the cached rowIdx
+    const cidCol=await readSheet(TABS.DOGS,'A2:A').catch(()=>[]);const found=cidCol.findIndex(r=>r[0]===d.cid);const ri=found>=0?found+2:d.rowIdx;
+    if(!ri)throw new Error('Could not find this dog row to update — tap Sync and retry.');
+    await updateRow(TABS.DOGS,ri,vals);
+    const idx=allDogs.findIndex(x=>x.cid===d.cid);if(idx>=0)allDogs[idx]=d;
+    st.textContent='Saved!';st.className='smsg ok';
+    setTimeout(()=>{document.getElementById('staffNotesModal').classList.remove('open');if(curDog){buildProfInfo(curDog);buildSummary(curDog);}},900);
+  }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent='Save Staff Notes';}
+}
 function startReg(){
   document.getElementById('reg_eid').value='';document.getElementById('reg_ridx').value='';
   document.querySelector('#sc-register .pg-t').textContent='Register New Dog';document.getElementById('regBtn').textContent='Register Dog';
@@ -1464,7 +1491,7 @@ function nextBkId(sd){
   let id,guard=0;do{id='BK-BD-'+yymm+'-'+Array.from({length:4},()=>A[Math.floor(Math.random()*36)]).join('');}while(used.has(id)&&++guard<50);
   return id;
 }
-function openBkModal(editId=null,fromProf=false,editRi=null){
+function openBkModal(editId=null,fromProf=false,editRi=null,tab=1){
   const modal=document.getElementById('bkModal');const ed=editId?bkByRef(editId,editRi):null;// resolve by ri first (unique) so edits hit the right row even with dup ids
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
   document.getElementById('bkMTitle').textContent=ed?'Modify Booking':'Add Booking';document.getElementById('bkBtn').textContent=ed?'Modify Booking':'Save Booking';
@@ -1479,7 +1506,7 @@ function openBkModal(editId=null,fromProf=false,editRi=null){
     ['bm_rev','bm_tips','bm_prepay','bm_final','bm_unit','bm_disc_notes','bm_drop_loc','bm_pick_loc','bm_rating','bm_feedback','bm_ref','bm_prepay_ref','bm_final_ref'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('bm_rpct').value='15';document.getElementById('bm_sd').value=todayStr();document.getElementById('bm_ed').value=todayStr();document.getElementById('bm_channel').value='TCL';document.getElementById('bm_pay').value='';document.getElementById('bm_status').value='Quoted';document.getElementById('bm_priv').checked=false;
   }
-  calcBal();toggleRover();updateStatusFlow();renderOverlapCheck();renderWfChecklist();switchBkTab(1);modal.classList.add('open');
+  calcBal();toggleRover();updateStatusFlow();renderOverlapCheck();renderWfChecklist();switchBkTab(tab);modal.classList.add('open');
 }
 function switchBkTab(n){
   document.getElementById('bkTab1').style.display=n===1?'':'none';
@@ -1536,6 +1563,8 @@ function wfStepValue(bk,key){
   if(key==='logs'){const v=sv.logs;return v!==undefined&&v!==''?!!v:wfAutoLogs(bk);}
   if(key==='compat'){const v=sv.compat;return v!==undefined&&v!==''?!!v:wfAutoCompat(bk);}
   if(key==='review')return sv.review==='done'||sv.review==='na';
+  // Final-payment reminder is auto-satisfied once the booking is settled — no balance left to chase.
+  if(key==='finalpay'){if(sv.finalpay)return true;return['Fully Paid','Credit','Completed'].includes(bk.status);}
   return !!sv[key];
 }
 function wfCompletion(bk){
@@ -2334,11 +2363,25 @@ async function syncTplsFromSheet(){
 // ==================== ACTIVITIES ====================
 function saveActivities(){localStorage.setItem('tcl_acts',JSON.stringify(activities));}
 function loadActivities(){activities=JSON.parse(localStorage.getItem('tcl_acts')||'[]');}
-function setActMainCat(cat){_actMainCat=cat;document.querySelectorAll('.act-main-cat-btn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));renderActs();}
+// Activity filter state. loc/energy/cost = multi-select (OR within a facet, AND across facets); dur/travel = single-select max caps.
+let _actF={loc:new Set(),energy:new Set(),cost:new Set(),dur:'',travel:''};
+function toggleActChip(btn,single){
+  const facet=btn.dataset.facet,val=btn.dataset.val;
+  if(single){_actF[facet]=(_actF[facet]===val)?'':val;document.querySelectorAll('.af-chip[data-facet="'+facet+'"]').forEach(b=>b.classList.toggle('on',b.dataset.val===_actF[facet]));}
+  else{const set=_actF[facet];if(set.has(val))set.delete(val);else set.add(val);btn.classList.toggle('on',set.has(val));}
+  renderActs();
+}
+function clearActFilters(){_actF={loc:new Set(),energy:new Set(),cost:new Set(),dur:'',travel:''};document.querySelectorAll('.af-chip').forEach(b=>b.classList.remove('on'));renderActs();}
 function getFilteredActs(){
-  const cat=_actMainCat||'';const io=document.getElementById('act_fIO')?.value||'';const energy=document.getElementById('act_fEnergy')?.value||'';const weather=document.getElementById('act_fWeather')?.value||'';
-  const maxDur=parseFloat(document.getElementById('act_fDur')?.value)||Infinity;const maxDist=parseFloat(document.getElementById('act_fDist')?.value)||Infinity;const maxCost=parseFloat(document.getElementById('act_fCost')?.value)||Infinity;
-  return activities.filter(a=>{if(cat&&a.cat!==cat)return false;if(io&&a.io!==io)return false;if(energy&&a.energy!==energy)return false;if(weather&&a.weather!==weather)return false;if(maxDur<Infinity&&(parseFloat(a.dur)||0)>maxDur)return false;if(maxDist<Infinity&&(parseFloat(a.dist)||0)>maxDist)return false;if(maxCost<Infinity&&(parseFloat(a.cost)||0)>maxCost)return false;return true;});
+  const f=_actF;const durCap={'30':30,'60':60,'120':120};const travCap={'15':15,'30':30,'60':60};
+  return activities.filter(a=>{
+    if(f.loc.size&&!f.loc.has(a.io))return false;// Location stored in a.io (Home/Garden/Indoor/Outdoor)
+    if(f.energy.size){const e=(a.energy||'').replace(/\s*energy/i,'').trim();if(!f.energy.has(e))return false;}
+    if(f.cost.size){const want=(parseFloat(a.cost)||0)>0?'Paid':'Free';if(!f.cost.has(want))return false;}
+    if(f.dur){const d=parseFloat(a.dur)||0;if(f.dur==='over'){if(d<=120)return false;}else if(d>durCap[f.dur])return false;}
+    if(f.travel){const t=parseFloat(a.dist)||0;if(f.travel==='over'){if(t<=60)return false;}else if(f.travel==='15'){if(t>=15)return false;}else if(t>travCap[f.travel])return false;}
+    return true;
+  });
 }
 function sortActs(acts){
   const sortBy=document.getElementById('act_sort')?.value||'title';
@@ -2351,33 +2394,72 @@ function sortActs(acts){
 }
 function renderActs(){
   document.getElementById('surpriseWrap').style.display='none';const filtered=sortActs(getFilteredActs());const el=document.getElementById('actList');
+  const mc=document.getElementById('actMatchCount');if(mc)mc.textContent=filtered.length+' / '+activities.length+' match';
   if(!activities.length){el.innerHTML='<div class="hload">No activities yet - tap + Add to build your library</div>';return;}
   if(!filtered.length){el.innerHTML='<div class="hload">No activities match these filters</div>';return;}
-  const energyCls={'Low':'cat-low','Medium':'cat-med','High':'cat-high'};const weatherCls={'Sunny / Dry':'cat-sun','Rainy / Wet':'cat-rain','Any weather':'cat-any'};
+  const energyCls={'Low':'cat-low','Medium':'cat-med','High':'cat-high'};
   el.innerHTML=filtered.map(a=>{
     const idx=activities.indexOf(a);const lastLog=actLogs.filter(l=>l.activity===a.title).sort((x,y)=>y.date.localeCompare(x.date))[0];
     const lastStr=lastLog?fmtDate(lastLog.date)+' - '+lastLog.dogs:'Never done yet';
-    return'<div class="act-item" onclick="openActModal('+idx+')">'+
+    const en=(a.energy||'').replace(/\s*energy/i,'').trim();
+    return'<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px;">'+
+      '<div class="act-item" style="flex:1;margin-bottom:0;" onclick="openActModal('+idx+')">'+
       '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px;">'+
-      '<span class="act-cat cat-'+(a.cat||'walk').toLowerCase().replace(/[^a-z0-9]/g,'-')+'">'+(a.cat||'Walk')+'</span>'+
-      (a.io?'<span class="act-cat cat-'+(a.io==='Indoor'?'in':'out')+'">'+a.io+'</span>':'')+
-      (a.energy?'<span class="act-cat '+(energyCls[a.energy]||'cat-any')+'">'+a.energy+' energy</span>':'')+
-      (a.weather?'<span class="act-cat '+(weatherCls[a.weather]||'cat-any')+'">'+a.weather+'</span>':'')+
+      (a.io?'<span class="act-cat cat-'+((a.io==='Indoor'||a.io==='Home')?'in':'out')+'">'+a.io+'</span>':'')+
+      (en?'<span class="act-cat '+(energyCls[en]||'cat-any')+'">'+en+' energy</span>':'')+
+      '<span class="act-cat cat-any">'+((parseFloat(a.cost)||0)>0?fmtGBP(a.cost):'Free')+'</span>'+
       '</div>'+
       '<div class="act-title">'+a.title+'</div>'+
       '<div class="act-meta">'+
       (a.location?'<span class="act-m">'+a.location+'</span>':'')+
       (a.dur?'<span class="act-m">⏱️ '+a.dur+' mins</span>':'')+
       (a.dist!==undefined&&a.dist!==null&&a.dist!==''?'<span class="act-m">'+(parseInt(a.dist)>0?'🚗 '+a.dist+' mins drive':'🏠 At home')+'</span>':'')+
-      (a.cost?'<span class="act-m">'+fmtGBP(a.cost)+'</span>':'')+
       (a.mapsUrl?'<a class="maps-btn" href="'+a.mapsUrl+'" target="_blank" onclick="event.stopPropagation()">Map</a>':'')+
       '<span class="act-last">'+lastStr+'</span>'+
       '</div>'+
       (a.notes?'<div style="font-size:9px;color:var(--gr3);margin-top:4px;">'+a.notes+'</div>':'')+
+      '</div>'+
+      '<button class="act-log-btn" title="Log this activity for dogs" onclick="event.stopPropagation();openActLog('+idx+')">+</button>'+
       '</div>';
   }).join('');
 }
 function showAllActs(){renderActs();}
+// ---- Per-activity quick logger: pick ≥1 dog + date, append to Activity-Log (one row per dog) ----
+let _actLogIdx=null;const _actLogDogs=new Set();
+function openActLog(idx){
+  _actLogIdx=idx;_actLogDogs.clear();const a=activities[idx];
+  document.getElementById('alTitle').textContent='Log: '+(a?a.title:'Activity');
+  document.getElementById('al_date').value=todayStr();
+  document.getElementById('al_dog_search').value='';document.getElementById('al_dur').value=(a&&a.dur)?a.dur:'';document.getElementById('al_staff').value='';document.getElementById('al_notes').value='';
+  const s=document.getElementById('alStatus');s.textContent='';s.className='smsg';
+  renderAlDogs();document.getElementById('actLogModal').classList.add('open');
+}
+function renderAlDogs(){
+  const q=(document.getElementById('al_dog_search').value||'').toLowerCase();const el=document.getElementById('al_dog_ms');if(!el)return;
+  const list=allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||(d.breed||'').toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  el.innerHTML=list.length?list.map(d=>'<button class="af-chip'+(_actLogDogs.has(d.cid)?' on':'')+'" style="margin:2px;" onclick="toggleAlDog(\''+d.cid+'\',this)">'+(d.name||'')+'</button>').join(''):'<div style="font-size:9px;color:var(--gr3);padding:6px;">No dogs found</div>';
+}
+function toggleAlDog(cid,btn){if(_actLogDogs.has(cid))_actLogDogs.delete(cid);else _actLogDogs.add(cid);if(btn)btn.classList.toggle('on',_actLogDogs.has(cid));}
+// Pre-select the dogs on-site today (boarding/day-care occupants) — staff can then edit before saving.
+function fillOnSiteDogs(){
+  const today=todayStr();
+  bookings.forEach(b=>{if(!CAL_ACTIVE.includes(b.status))return;if(_svcKind(b)==='visit')return;const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(nsd&&nsd<=today&&today<=(ned||nsd)&&b.customerId)_actLogDogs.add(b.customerId);});
+  renderAlDogs();
+}
+async function saveActLog(){
+  if(_actLogIdx===null)return;const a=activities[_actLogIdx];const st=document.getElementById('alStatus');const btn=document.getElementById('alSaveBtn');
+  if(!_actLogDogs.size){st.textContent='Pick at least one dog';st.className='smsg err';return;}
+  const date=gv('al_date')||todayStr();const dur=gv('al_dur');const staff=gv('al_staff');const notes=gv('al_notes');
+  btn.disabled=true;btn.textContent='Saving...';st.textContent='';st.className='smsg';
+  const saves=[],names=[];
+  _actLogDogs.forEach(cid=>{const d=allDogs.find(x=>x.cid===cid);const nm=d?d.name:cid;names.push(nm);
+    saves.push(appendRow(TABS.ACTLOG,rowFromMap(actlogHdrRow,{CustomerID:cid,DogName:nm,Date:date,Activity:a.title,Staff:staff,Duration:dur,Notes:notes},TABS.ACTLOG.h)));});
+  try{await Promise.all(saves);
+    names.forEach(nm=>actLogs.push({date,activity:a.title,dogs:nm,staff,dur,notes}));histCache={};
+    st.textContent='Logged for '+names.length+' dog'+(names.length>1?'s':'')+'!';st.className='smsg ok';
+    setTimeout(()=>{document.getElementById('actLogModal').classList.remove('open');renderActs();},1000);
+  }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent='Save Log';}
+}
 function filterLogActs(){
   const q=(document.getElementById('log_act_search')?.value||'').toLowerCase();
   const res=document.getElementById('log_act_results');if(!res)return;
@@ -2405,20 +2487,20 @@ function surpriseAct(){
   const pool=getFilteredActs();if(!pool.length){alert('No activities match these filters');return;}
   const a=pool[Math.floor(Math.random()*pool.length)];const w=document.getElementById('surpriseWrap');w.style.display='block';
   const distStr=a.dist!==undefined&&a.dist!==null&&a.dist!==''?(parseInt(a.dist)>0?'🚗 '+a.dist+' mins drive':'🏠 At home'):'';
-  const meta=[a.cat,a.io,a.energy?a.energy+' energy':'',a.weather,a.dur?'⏱️ '+a.dur+' mins':'',distStr,a.cost?fmtGBP(a.cost):'',a.location].filter(Boolean).join(' - ');
+  const en=(a.energy||'').replace(/\s*energy/i,'').trim();const meta=[a.io,en?en+' energy':'',a.dur?'⏱️ '+a.dur+' mins':'',distStr,(parseFloat(a.cost)||0)>0?fmtGBP(a.cost):'Free',a.location].filter(Boolean).join(' - ');
   w.innerHTML='<div class="surprise-card"><div style="font-size:8px;color:var(--hnl);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">Today&#39;s Activity Pick</div><div class="surprise-title">'+a.title+'</div><div class="surprise-meta">'+meta+'</div>'+(a.notes?'<div style="font-size:10px;color:rgba(255,255,255,.6);margin-bottom:13px;">'+a.notes+'</div>':'')+(a.mapsUrl?'<a class="maps-btn" href="'+a.mapsUrl+'" target="_blank" style="margin-bottom:12px;display:inline-flex;">Map</a><br>':'')+'<button class="surprise-btn" onclick="surpriseAct()">Try another</button></div>';
   document.getElementById('actList').innerHTML='';
 }
 function openActModal(idx){
   document.getElementById('act_eidx').value=idx!==null?idx:'';document.getElementById('actMTitle').textContent=idx!==null?'Edit Activity':'New Activity';
   const a=idx!==null?activities[idx]:{};const ss=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
-  ss('act_title',a.title);ss('act_cat',a.cat);ss('act_io',a.io);ss('act_energy',a.energy);ss('act_weather',a.weather);ss('act_dur',a.dur);ss('act_dist',a.dist);ss('act_location',a.location);ss('act_maps',a.mapsUrl);ss('act_cost',a.cost);ss('act_notes',a.notes);
+  ss('act_title',a.title);ss('act_io',a.io);ss('act_energy',a.energy);ss('act_dur',a.dur);ss('act_dist',a.dist);ss('act_location',a.location);ss('act_maps',a.mapsUrl);ss('act_cost',a.cost);ss('act_notes',a.notes);
   document.getElementById('actModal').classList.add('open');
 }
 async function saveAct(){
   const title=document.getElementById('act_title').value.trim();if(!title){alert('Title required');return;}
   const idx2=document.getElementById('act_eidx').value;const st=document.getElementById('actStatus');
-  const act={title,cat:gv('act_cat'),io:gv('act_io'),energy:gv('act_energy'),weather:gv('act_weather'),dur:gv('act_dur'),dist:gv('act_dist'),location:gv('act_location'),mapsUrl:gv('act_maps'),cost:gv('act_cost'),notes:gv('act_notes')};
+  const act={title,cat:'',io:gv('act_io'),energy:gv('act_energy'),weather:'',dur:gv('act_dur'),dist:gv('act_dist'),location:gv('act_location'),mapsUrl:gv('act_maps'),cost:gv('act_cost'),notes:gv('act_notes')};
   if(idx2!=='')activities[parseInt(idx2)]=act;else activities.push(act);saveActivities();
   st.textContent='Saving...';st.className='smsg';
   try{
