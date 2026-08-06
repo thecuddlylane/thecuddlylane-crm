@@ -202,6 +202,18 @@ body{
 .sum-t{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--or);margin-bottom:3px;}
 .sum-x{font-size:10px;color:var(--gr2);line-height:1.6;}
 .alert-r{display:flex;align-items:flex-start;gap:5px;background:var(--rdl)!important;border:1px solid #FCA5A5;border-radius:6px;padding:6px 8px;margin-top:5px;font-size:9px;color:var(--rd);line-height:1.4;}
+/* PROFILE — colour-coded, emoji-led sections for easier scanning */
+.psec{--sc:var(--or);background:var(--wh);border:1px solid var(--gr4);border-left:4px solid var(--sc);border-radius:var(--r);padding:8px 11px 5px;margin-bottom:9px;}
+.psec-h{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--sc);margin-bottom:6px;letter-spacing:.01em;}
+.psec-ic{font-size:14px;line-height:1;}
+/* TOAST — non-blocking feedback (replaces some alert()/silent failures) */
+.toast-wrap{position:fixed;left:0;right:0;bottom:70px;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:4000;pointer-events:none;padding:0 16px;}
+.toast{max-width:340px;width:fit-content;background:var(--gr);color:#fff;font-size:11px;font-weight:600;padding:9px 14px;border-radius:var(--r);box-shadow:0 4px 16px rgba(0,0,0,.22);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:auto;line-height:1.35;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.err{background:var(--rd);}
+.toast.ok{background:var(--gn);}
+/* Header last-synced label */
+.sync-info{font-size:8px;color:rgba(255,255,255,.45);white-space:nowrap;margin-right:2px;}
 /* CONSENT */
 .cfld{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gr4);}
 .cfld:last-child{border-bottom:none;}
@@ -452,9 +464,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
   <button class="hdr-back" id="backBtn" onclick="goBack()">&#8592; Back</button>
   <div id="hdrTitle"><div class="hdr-logo">THE CUDDLY LANE</div><div class="hdr-sub" id="hdrSub">Staff Portal</div></div>
   <div class="hsp"></div>
+  <span class="sync-info" id="syncInfo"></span>
   <button class="hbtn or" onclick="refreshBoard()" id="refreshBtn" title="Sync with Google Sheet">&#8635; Sync</button>
   <button class="hbtn" onclick="toggleSetup()">Settings</button>
 </div>
+<div class="toast-wrap" id="toastWrap"></div>
 <!-- SETTINGS -->
 <div class="setup-bar" id="setupBar">
   <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Google Sheets &amp; PIN</div>
@@ -473,7 +487,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v59b3</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v62b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -771,6 +785,12 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="kpi"><div class="kpi-l">Total Costs</div><div class="kpi-v" id="kpi_cost">£0</div><div class="kpi-s" id="kpi_cost_s"></div></div>
       <div class="kpi"><div class="kpi-l">Net Profit</div><div class="kpi-v" id="kpi_net" style="color:var(--gn);">£0</div><div class="kpi-s" id="kpi_net_s">After all costs</div></div>
     </div>
+    <div style="display:flex;gap:7px;margin-top:9px;">
+      <div style="flex:1;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:8px 9px;"><div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.3px;">Avg Cash In / mo</div><div style="font-size:15px;font-weight:800;color:var(--gr);" id="avg_cash">£0</div></div>
+      <div style="flex:1;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:8px 9px;"><div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.3px;">Avg Cost / mo</div><div style="font-size:15px;font-weight:800;color:var(--gr);" id="avg_cost">£0</div></div>
+      <div style="flex:1;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:8px 9px;"><div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.3px;">Avg Profit / mo</div><div style="font-size:15px;font-weight:800;color:var(--gn);" id="avg_profit">£0</div></div>
+    </div>
+    <div style="font-size:8px;color:var(--gr3);margin-top:4px;" id="avg_note"></div>
     <div class="fsec">Revenue &amp; Cost Trends</div>
     <div class="chart-w">
       <svg id="plChart" viewBox="0 0 560 190" style="width:100%;display:block;"></svg>
@@ -796,10 +816,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="cal-nav" onclick="calShift(-1)">‹</button>
       <button class="cal-today" onclick="calToday()">Today</button>
       <button class="cal-nav" onclick="calShift(1)">›</button>
+      <button class="cal-nav" onclick="showScreen('sc-checkdates')" title="Search a date range / availability">🔎</button>
       <div style="flex:1;"></div>
       <button class="cal-view-btn active" data-v="month" onclick="setCalView('month')">Month</button>
       <button class="cal-view-btn" data-v="week" onclick="setCalView('week')">Week</button>
-      <button class="cal-view-btn" data-v="3day" onclick="setCalView('3day')">3-Day</button>
+      <button class="cal-view-btn" data-v="slots" onclick="setCalView('slots')">Hour</button>
     </div>
     <div id="calBody"></div>
     <div style="height:18px;"></div>
@@ -813,26 +834,37 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <select class="fs" id="anYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="renderAnalysis()"><option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
     </div>
     <div class="fsec">Revenue by Service <span style="font-size:9px;font-weight:400;color:var(--gr3);">(stacked by month)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">💰 Cash in — Fully Paid + Prepaid deposits (+ Credit/Completed)</div>
     <div id="anRevBreakdown" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Service Type Revenue Share <span style="font-size:9px;font-weight:400;color:var(--gr3);">(% of total revenue)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">💰 Cash in — Fully Paid + Prepaid deposits (+ Credit/Completed)</div>
     <div id="anSvcCount" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Bookings Count &amp; AOV</div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">✅ Fully Paid bookings only</div>
     <div id="anBkCount" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Rover vs Direct</div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">✅ Fully Paid bookings only</div>
     <div id="anChannel" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Repeat vs New Bookings</div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">✅ Fully Paid bookings only</div>
     <div id="anRepeat" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Breed Distribution <span style="font-size:9px;font-weight:400;color:var(--gr3);">(dogs with bookings)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">✅ Fully Paid bookings only</div>
     <div id="anBreed" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Dog Age at Booking</div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">✅ Fully Paid bookings only</div>
     <div id="anAge" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Average Stay Length <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding only)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">✅ Fully Paid boarding stays only</div>
     <div id="anAvgStay" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Occupancy Rate by Day <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Boarding days present / total days in month)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anOccupancy" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Occupancy Rate by Places <span style="font-size:9px;font-weight:400;color:var(--gr3);">(max 4 dogs/day · Boarding + Day Care)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anOccPlaces" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(All time · Top 10)</span></div>
+    <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anLTV" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div style="height:18px;"></div>
   </div>
@@ -879,7 +911,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="tpl-cat-btn" data-cat="Others" onclick="setTplCat('Others')" style="font-size:10px;padding:5px 12px;border-radius:99px;border:1.5px solid var(--gr4);background:var(--wh);color:var(--gr2);font-family:var(--fb);cursor:pointer;white-space:nowrap;">📎 Others</button>
     </div>
     <div id="tplHubList"><div class="hload">Loading templates from sheet...</div></div>
-    <div style="margin-top:16px;">
+    <div id="paySettingsWrap" style="margin-top:16px;display:none;">
       <div class="sp-panel">
         <div class="sp-hd"><div class="sp-ht">Payment link &amp; reference</div></div>
         <div class="sp-bd open" id="sp-templates">
@@ -1263,7 +1295,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="act_eidx">
       <div class="f"><label>Title <span class="req">*</span></label><input class="fi" id="act_title" placeholder="e.g. Oldbury Court field walk"></div>
-      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Out of house (outdoor)</option><option>Out of house (indoor)</option><option>In house (for fun)</option><option>In house (practical)</option><option>In house (game)</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
+      <div class="fr"><div class="f"><label>Category</label><select class="fs" id="act_cat"><option value="">Select</option><option>Paid dog field</option><option>Out of house (outdoor)</option><option>Out of house (indoor)</option><option>In house (for fun)</option><option>In house (practical)</option><option>In house (game)</option><option>Others</option></select></div><div class="f"><label>Indoor / Outdoor</label><select class="fs" id="act_io"><option value="">Select</option><option>Indoor</option><option>Outdoor</option></select></div></div>
 <div class="f"><label>Energy level</label><select class="fs" id="act_energy"><option value="">Select...</option><option>Low Energy</option><option>Medium Energy</option><option>High Energy</option></select></div>
 <div class="f"><label>Weather suitability</label><select class="fs" id="act_weather"><option value="">Select...</option><option>Sunny / Dry</option><option>Rainy / Wet</option><option>Any weather</option></select></div>
       <div class="fr"><div class="f"><label>Duration (mins)</label><input class="fi" type="number" id="act_dur"></div><div class="f"><label>Distance from home (mins drive)</label><input class="fi" type="number" id="act_dist"></div></div>

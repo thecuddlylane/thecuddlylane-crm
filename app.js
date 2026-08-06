@@ -1,7 +1,9 @@
 // THE CUDDLY LANE CRM v8 - app.js
 
 // ==================== UTILITIES ====================
-function todayStr(){return new Date().toISOString().split('T')[0];}
+// Local calendar date (YYYY-MM-DD). Uses the device's LOCAL date, not UTC — otherwise in the evening under BST/DST the
+// "today" used by the board, calendar anchor, pending-actions and occupancy could jump a day ahead of the wall clock.
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function fmtDate(d){if(!d)return'-';try{const dt=new Date(d+'T12:00:00');const dy=String(dt.getDate()).padStart(2,'0');const mo=String(dt.getMonth()+1).padStart(2,'0');const yr=dt.getFullYear();return dy+'/'+mo+'/'+yr;}catch(e){return d;}}
 function fmtDateFull(d){if(!d)return'-';try{return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
 function gv(id){const el=document.getElementById(id);return el?el.value||'':(console.warn('gv:',id),'');}
@@ -45,6 +47,12 @@ function roundGBP(n){return Math.round(parseFloat(n)||0);}
 function holRate(base){return roundGBP((parseFloat(base)||0)*1.15);}
 function copyText(msg){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(msg).catch(()=>{});}else{const ta=document.createElement('textarea');ta.value=msg;ta.style.cssText='position:fixed;top:-9999px;opacity:0;';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}}
 function maskKey(k){if(!k||k.length<12)return k?'****':'';return k.slice(0,6)+'...****...'+k.slice(-4);}
+// Non-blocking toast feedback — used for background save failures and quick confirmations instead of a blocking alert().
+function toast(msg,type){const w=document.getElementById('toastWrap');if(!w){alert(msg);return;}const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;w.appendChild(t);requestAnimationFrame(()=>t.classList.add('show'));setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),260);},type==='err'?4200:2600);}
+// Header "last synced" indicator so staff can see how fresh the on-screen data is.
+let _lastSync=0;
+function updateSyncInfo(){const el=document.getElementById('syncInfo');if(!el)return;if(!_lastSync){el.textContent='';return;}const s=Math.floor((Date.now()-_lastSync)/1000);el.textContent=s<60?'Synced just now':s<3600?'Synced '+Math.floor(s/60)+'m ago':'Synced '+Math.floor(s/3600)+'h ago';}
+setInterval(updateSyncInfo,60000);
 // ---- Dog description helpers (used by message templates, e.g. "🐾 3 y/o spayed female Schnauzer") ----
 function ageYears(bday){if(!bday)return null;try{const dob=new Date(bday+'T12:00:00'),now=new Date();let y=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))y--;return y<0?null:y;}catch(e){return null;}}
 function genderPhrase(gs){const s=(gs||'').toLowerCase();const sex=s.includes('female')?'female':s.includes('male')?'male':'';let mod='';if(s.includes('spay'))mod='spayed';else if(s.includes('neuter')||s.includes('castrat'))mod='neutered';return((mod?mod+' ':'')+sex).trim();}
@@ -181,7 +189,7 @@ function openAvail(){const p=document.getElementById('availPanel');if(p&&(p.styl
 function openSP(id){const e=document.getElementById('sp-'+id);if(e){e.classList.add('open');setTimeout(()=>{try{e.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}} ,60);}}
 // Section → ordered sub-tabs. sc = primary screen; after = optional panel to open on that screen.
 const SECTIONS={
-  dogs:[{k:'dogs',lbl:'🐾 Profiles',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'check',lbl:'🔎 Dates',sc:'sc-checkdates'},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
+  dogs:[{k:'dogs',lbl:'🐾 Profiles',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
   customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-todo'},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-rates'}],
   business:[{k:'an',lbl:'🔍 Analysis',sc:'sc-analysis'},{k:'cost',lbl:'💸 Costs',sc:'sc-costs'},{k:'pl',lbl:'📈 P&L',sc:'sc-pl'},{k:'train',lbl:'📚 Training',sc:'sc-training'}]
 };
@@ -431,7 +439,7 @@ async function refreshBoard(){
   try{
     const dogRows=await readSheet(TABS.DOGS,'A1:BG');const dh=mkHdr(dogRows[0]||[]);dogsHdrRow=dogRows[0]||[];allDogs=dogRows.slice(1).map((r,i)=>mapDog(r,i,dh)).filter(d=>d.name.trim());
     const bkRows=await readSheet(TABS.BK,'A1:AZ').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bkHdrRow=bkRows[0]||[];bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
-    const cr=await readSheet(TABS.COSTS,'A1:D').catch(()=>[]);costsHdrRow=cr[0]||[];const ch=mkHdr(cr[0]||[]);costs=cr.slice(1).map((r,i)=>({date:r[ch['Date']??-1]||'',cat:r[ch['Category']??-1]||'',amount:parseFloat(r[ch['Amount']??-1])||0,notes:r[ch['Notes']??-1]||'',ri:i+2}));
+    const cr=await readSheet(TABS.COSTS,'A1:D').catch(()=>[]);costsHdrRow=cr[0]||[];const ch=mkHdr(cr[0]||[]);costs=cr.slice(1).map((r,i)=>({date:r[ch['Date']??-1]||'',cat:r[ch['Category']??-1]||'',amount:parseFloat(r[ch['Amount']??-1])||0,notes:r[ch['Notes']??-1]||'',ri:i+2})).filter(c=>c.date||c.notes||c.amount);// drop blank/cleared rows so a deleted cost doesn't reappear as an empty row after sync (map before filter keeps ri = real sheet row)
     const al=await readSheet(TABS.ACTLOG,'A1:G').catch(()=>[]);actlogHdrRow=al[0]||[];const alh=mkHdr(al[0]||[]);actLogs=al.slice(1).map(r=>({date:r[alh['Date']??-1]||'',activity:r[alh['Activity']??-1]||'',dogs:r[alh['DogName']??-1]||'',staff:r[alh['Staff']??-1]||'',dur:r[alh['Duration']??-1]||'',notes:r[alh['Notes']??-1]||''}));
     const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialHdrRow=tl[0]||[];trialLogs=tl.slice(1).map((r,i)=>{const rv=n=>tlh[n]!==undefined?r[tlh[n]]||'':'';return{cid:rv('CustomerID'),dog:rv('DogName'),date:rv('Date'),mixedWith:rv('MixedWith'),obs:rv('Observations'),suitable:rv('Suitable'),ri:i+2};});
     const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyHdrRow=dl[0]||[];dailyLogRows=dl.slice(1);dailyLogSet=new Set(dailyLogRows.map(r=>(dlh['CustomerID']!==undefined?r[dlh['CustomerID']]||'':'')+'_'+(dlh['Date']!==undefined?r[dlh['Date']]||'':'')));
@@ -445,6 +453,7 @@ async function refreshBoard(){
     // Photos come from the dog's PhotoURL (Drive link) in the Dogs sheet — no local caching.
     renderBoard();updatePL();renderCostTable();refreshDogDropdowns();updatePendingBadge();
     await syncCurrentScreen();
+    _lastSync=Date.now();updateSyncInfo();
   }catch(e){document.getElementById('todayCards').innerHTML='<div class="empty"><p style="color:var(--rd)">'+e.message+'</p></div>';}
   finally{btn.style.opacity='1';btn.style.pointerEvents='';}
 }
@@ -667,13 +676,13 @@ function buildProfInfo(dog){
   const vaccBanner=vaccExpired?'<div style="background:var(--rdl,#fff0f0);border:1px solid var(--rd);border-radius:8px;padding:10px 14px;margin-bottom:10px;color:var(--rd);font-weight:600;font-size:13px;">⚠️ Vaccination expired — please ask owners to update records before the next visit.</div>':'';
   document.getElementById('profInfoBody').innerHTML=
     vaccBanner+
-    '<div class="isec"><div class="isec-t">Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
-    '<div class="isec"><div class="isec-t">Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
-    '<div class="isec"><div class="isec-t">Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
-    (dog.notes?'<div class="isec"><div class="isec-t">Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
-    (dog.remarks?'<div class="isec" style="border-left:3px solid var(--or);"><div class="isec-t" style="color:var(--or);">Staff Remarks</div>'+ir('Remarks',dog.remarks)+'</div>':'')+
-    '<div class="isec"><div class="isec-t">Owners</div>'+ir('Owner 1',dog.owner)+(dog.phone?'<div class="irow"><span class="ikey">Phone 1</span><span class="ival">'+waLink(dog.phone)+'</span></div>':'')+ir('Owner 2',dog.owner2)+(dog.phone2?'<div class="irow"><span class="ikey">Phone 2</span><span class="ival">'+waLink(dog.phone2)+'</span></div>':'')+ir('Owner 3',dog.owner3)+(dog.phone3?'<div class="irow"><span class="ikey">Phone 3</span><span class="ival">'+waLink(dog.phone3)+'</span></div>':'')+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency',dog.emergency)+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
-    '<div class="isec"><div class="isec-t">Identifiers</div>'+ir('Customer ID',dog.cid)+ir('Microchip',dog.chip)+'</div>';
+    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
+    '<div class="psec" style="--sc:var(--rd);"><div class="psec-h"><span class="psec-ic">🩺</span>Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
+    '<div class="psec" style="--sc:var(--hn);"><div class="psec-h"><span class="psec-ic">🦴</span>Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
+    (dog.notes?'<div class="psec" style="--sc:var(--gr2);"><div class="psec-h"><span class="psec-ic">📝</span>Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
+    (dog.remarks?'<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks</div>'+ir('Remarks',dog.remarks)+'</div>':'')+
+    '<div class="psec" style="--sc:var(--bl);"><div class="psec-h"><span class="psec-ic">📞</span>Owners &amp; Contacts</div>'+ir('Owner 1',dog.owner)+(dog.phone?'<div class="irow"><span class="ikey">Phone 1</span><span class="ival">'+waLink(dog.phone)+'</span></div>':'')+ir('Owner 2',dog.owner2)+(dog.phone2?'<div class="irow"><span class="ikey">Phone 2</span><span class="ival">'+waLink(dog.phone2)+'</span></div>':'')+ir('Owner 3',dog.owner3)+(dog.phone3?'<div class="irow"><span class="ikey">Phone 3</span><span class="ival">'+waLink(dog.phone3)+'</span></div>':'')+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency',dog.emergency)+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
+    '<div class="psec" style="--sc:var(--gr3);"><div class="psec-h"><span class="psec-ic">🆔</span>Identifiers</div>'+ir('Customer ID',dog.cid)+ir('Microchip',dog.chip)+'</div>';
 }
 async function filtHist(type,btn){
   document.querySelectorAll('.hfb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(!curDog)return;
@@ -1191,7 +1200,8 @@ async function syncSettingsFromSheet(){
 async function saveHolRangesToSheet(ranges){
   try{const rows=await readSheet(TABS.RATES,'A2:C').catch(()=>[]);const idx=rows.findIndex(r=>r[0]==='tcl_hol_ranges');const vals=['tcl_hol_ranges',JSON.stringify(ranges),new Date().toISOString()];
     if(idx>=0)await updateRow(TABS.RATES,idx+2,vals);else await appendRow(TABS.RATES,vals);
-  }catch(e){}
+    toast('Holiday dates saved to sheet','ok');
+  }catch(e){toast('Could not save holidays to the sheet — change is local only. '+e.message,'err');}
 }
 function getTpls(){const s=JSON.parse(localStorage.getItem('tcl_tpls')||'{}');return{quote:s.quote||TP_QUOTE,book:s.book||TP_BOOK,prepay:s.prepay||TP_PREPAY,final:s.final||TP_FINAL,avail:s.avail||TP_AVAIL,payLink:s.payLink||'https://paymentrequest.natwestpayit.com/reusable-links/80b66e1d-90d1-4893-8441-c23a30cb5d1d',payRefPfx:s.payRefPfx||'KCHEUNG'};}
 function isHol(d){return getHolRanges().some(r=>d>=r.start&&d<=r.end);}
@@ -1375,7 +1385,9 @@ function genQuote(type){
   const balanceDue=Math.max(0,_cr.total-actualPrepay);
   // clear the other output boxes
   ['q_out_quote','q_out_book','q_out_prepay','q_out_final'].forEach(id=>{if('q_out_'+type!==id){const el=document.getElementById(id);if(el){el.style.display='none';el.textContent='';}}});
-  if(type==='quote')markBookingsQuotedFromQuote();
+  // NOTE: copying a quote no longer writes Quoted rows to the Bookings sheet (v60). Generating/copying a quote is now a
+  // read-only action — bookings are created only via the explicit "Create booking(s) from quote" button or Add Booking.
+  // This removes the surprise side-effect and the quote-driven duplicate-booking rows (old markBookingsQuotedFromQuote).
   const disc=_cr.discLine?('\n\n'+_cr.discLine):'';
   const vars={ownerName,dogs:allDogNames,service:serviceBlock,discount:disc,total:fmtGBP(_cr.total),rateBlock:genRateBlock(),prepayAmt:fmtGBP(type==='book'?_cr.prepayAmt:actualPrepay),finalAmt:fmtGBP(balanceDue),payRef,payLink:(t.payLink||'[payment link]')};
   let msg=fillQuoteVars(paymentTpl(type),vars);
@@ -1387,35 +1399,8 @@ function genQuote(type){
   allBtns.forEach(b=>{if(b.dataset.qtype===type){b.textContent='Copied!';setTimeout(()=>b.textContent=btnLabels[type]||'Copy',2000);}});
 }
 
-async function markBookingsQuotedFromQuote(){
-  try{
-    const svcN={boarding:'Boarding',daycare:'DayCare',walk:'Walking',dropin:'Drop-in',dogsit:'Dog Sit',taxi:'Pet Taxi',training:'Training'};
-    const mainLine=_svcLines.find(l=>l.svc!=='extra');if(!mainLine)return;
-    const sd=mainLine.sd||'';const ed=mainLine.ed||sd;const svcLabel=svcN[mainLine.svc]||mainLine.svc;
-    const dogs=(_selDogs&&_selDogs.length)?_selDogs:(mainLine.dogs||[]);
-    let changed=false;
-    for(const cid of dogs){
-      if(!cid)continue;
-      const customerId=cid;const dogName=_nm(cid);
-      const existing=bookings.find(b=>(customerId?b.customerId===customerId:b.dog.toLowerCase()===dogName.toLowerCase())&&b.sd===sd&&(b.ed||b.sd)===(ed||sd)&&!['Cancelled','Canceled'].includes(b.status));
-      if(existing){
-        if(!existing.status){
-          const fullVals=rowFromMap(bkHdrRow,bkFieldMap({...existing,dog:dogName,status:'Quoted'}),TABS.BK.h);
-          const hdr=(bkHdrRow&&bkHdrRow.length)?bkHdrRow:TABS.BK.h;const cut=hdr.indexOf('Rem5')+1;
-          const vals=fullVals.slice(0,cut>0?cut:fullVals.length);
-          await updateRow(TABS.BK,existing.ri,vals);
-          existing.status='Quoted';changed=true;
-        }
-      }else if(sd){
-        const id=nextBkId(sd);const month=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'});
-        const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dogName,id,svc:svcLabel,sd,st:mainLine.st2||'09:00',ed:ed||sd,et:mainLine.et||'18:00',dropLoc:'',pickLoc:'',rev:0,tips:0,prepay:0,finalPay:0,unit:0,discNotes:'',roverPct:0,roverAmt:0,ch:'TCL',pay:'',status:'Quoted',priv:false,month,rating:'',feedback:'',rem:['','','','','']}),TABS.BK.h);
-        await appendRow(TABS.BK,vals);
-        bookings.push(mapBk(vals,bookings.length,mkHdr(bkHdrRow)));changed=true;
-      }
-    }
-    if(changed){renderBoard();updatePendingBadge();}
-  }catch(e){}
-}
+// (removed v60) markBookingsFromQuote — copying a quote used to append Quoted rows to the Bookings sheet on every copy,
+// which polluted Bookings with duplicate quote rows. Bookings are now created only via createBookingsFromQuote / Add Booking.
 async function createBookingsFromQuote(){
   if(!_svcLines.length){alert('Complete the quote first');return;}
   if(_bkSaving)return;_bkSaving=true;
@@ -1444,7 +1429,7 @@ async function createBookingsFromQuote(){
     }
   }
   _bkSaving=false;
-  if(created){renderBoard();alert(created+' booking'+(created>1?'s':'')+' created with revenue pre-filled. Check Bookings to adjust.');}
+  if(created){renderBoard();toast(created+' booking'+(created>1?'s':'')+' created with revenue pre-filled — check Bookings to adjust.','ok');}
 }
 function quoteFromBk(){
   const dog=document.getElementById('bm_dog').value;const svc=document.getElementById('bm_svc').value;const sd=document.getElementById('bm_sd').value;const ed=document.getElementById('bm_ed').value;const bst=document.getElementById('bm_st').value;const et=document.getElementById('bm_et').value;
@@ -1707,8 +1692,11 @@ async function saveBk(){
   const ch=document.getElementById('bm_channel').value;const rPct=ch==='Rover'?(parseFloat(document.getElementById('bm_rpct').value)||0):0;const rAmt=ch==='Rover'?(parseFloat(document.getElementById('bm_ramt').value)||0):0;
   const priv=document.getElementById('bm_priv').checked;const id=eid||nextBkId(document.getElementById('bm_sd').value);const rems=eid?(bkByRef(eid,ri)?.rem||['','','','','']):['','','','',''];
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
-  const dogData=allDogs.find(d=>d.name===dog);const customerId=dogData?dogData.cid:'';
-  const existingWf=eid?(bkByRef(eid,ri)?.wf||{}):{};
+  const existingBk=eid?bkByRef(eid,ri):null;
+  const dogData=allDogs.find(d=>d.name===dog);let customerId=dogData?dogData.cid:'';
+  // On edit, if the dog wasn't changed, keep the booking's original CustomerID so two same-name dogs never get reassigned
+  if(existingBk&&existingBk.dog===dog&&existingBk.customerId)customerId=existingBk.customerId;
+  const existingWf=eid?(existingBk?.wf||{}):{};
   const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dog,id,svc:document.getElementById('bm_svc').value,sd,st:document.getElementById('bm_st').value,ed:document.getElementById('bm_ed').value,et:document.getElementById('bm_et').value,dropLoc:gv('bm_drop_loc'),pickLoc:gv('bm_pick_loc'),rev,tips,prepay:pre,finalPay:fin,unit,discNotes:document.getElementById('bm_disc_notes').value,roverPct:rPct,roverAmt:rAmt,ch,pay:document.getElementById('bm_pay').value,status:document.getElementById('bm_status').value,priv,month,rating:gv('bm_rating'),feedback:gv('bm_feedback'),rem:rems,wf:existingWf,bookingRef:gv('bm_ref'),prepayRef:gv('bm_prepay_ref'),finalPayRef:gv('bm_final_ref')}),TABS.BK.h);
   try{
     if(eid){if(!ri)throw new Error('Could not find this booking row to update — tap Sync and retry. Nothing was saved (prevents a duplicate).');await updateRow(TABS.BK,ri,vals);}else await appendRow(TABS.BK,vals);
@@ -1768,9 +1756,12 @@ function renderCostTable(){
   if(!document.getElementById('cost_fYear')?.value&&!document.getElementById('cost_fMonth')?.value)initCostFilters();
   const filtered=getFilteredCosts();drawCostPie(filtered);
   const inStyle='border:none;background:transparent;font-size:9px;font-family:var(--fb);color:var(--gr);outline:none;';
-  document.getElementById('costBody').innerHTML=filtered.map(c=>{const i=costs.indexOf(c);return'<tr><td><input type="date" value="'+(normDate(c.date)||'')+'" oninput="costs['+i+'].date=this.value" style="'+inStyle+'width:100px;"></td><td><select onchange="costs['+i+'].cat=this.value" style="'+inStyle+'">'+COST_CATS.map(o=>'<option'+(o===c.cat?' selected':'')+'>'+o+'</option>').join('')+'</select></td><td><input type="number" value="'+(c.amount||0)+'" oninput="costs['+i+'].amount=parseFloat(this.value)||0" style="'+inStyle+'width:56px;"></td><td><input type="text" value="'+(c.notes||'')+'" oninput="costs['+i+'].notes=this.value" style="'+inStyle+'width:100px;"></td><td style="white-space:nowrap;"><button onclick="dupCostRow('+i+')" title="Duplicate" style="background:none;border:none;cursor:pointer;color:var(--or);font-size:13px;padding:0 3px;">⧉</button><button onclick="costs.splice('+i+',1);renderCostTable()" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;padding:0;">✕</button></td></tr>';}).join('');
+  document.getElementById('costBody').innerHTML=filtered.map(c=>{const i=costs.indexOf(c);return'<tr><td><input type="date" value="'+(normDate(c.date)||'')+'" oninput="costs['+i+'].date=this.value" style="'+inStyle+'width:100px;"></td><td><select onchange="costs['+i+'].cat=this.value" style="'+inStyle+'">'+COST_CATS.map(o=>'<option'+(o===c.cat?' selected':'')+'>'+o+'</option>').join('')+'</select></td><td><input type="number" value="'+(c.amount||0)+'" oninput="costs['+i+'].amount=parseFloat(this.value)||0" style="'+inStyle+'width:56px;"></td><td><input type="text" value="'+(c.notes||'')+'" oninput="costs['+i+'].notes=this.value" style="'+inStyle+'width:100px;"></td><td style="white-space:nowrap;"><button onclick="dupCostRow('+i+')" title="Duplicate" style="background:none;border:none;cursor:pointer;color:var(--or);font-size:13px;padding:0 3px;">⧉</button><button onclick="deleteCostRow('+i+')" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:13px;padding:0;">✕</button></td></tr>';}).join('');
 }
 function dupCostRow(i){const o=costs[i];costs.push({date:o.date,cat:o.cat,amount:o.amount,notes:o.notes,ri:null});renderCostTable();document.getElementById('costBody').lastElementChild?.scrollIntoView({behavior:'smooth'});}
+// Delete a cost row. If it's already saved (has a sheet row-index), clear that row in the sheet too — otherwise the
+// deletion is local-only and the cost reappears on the next Sync. Unsaved rows (ri=null) just drop from the array.
+async function deleteCostRow(i){const c=costs[i];if(!c)return;if(!confirm('Delete this cost row?'))return;if(c.ri){try{await clearRow(TABS.COSTS,c.ri);}catch(e){alert('Error deleting from sheet: '+e.message);return;}}costs.splice(i,1);renderCostTable();updatePL();}
 function addCostRow(){costs.push({date:todayStr(),cat:'Other',amount:0,notes:'',ri:null});renderCostTable();document.getElementById('costBody').lastElementChild?.scrollIntoView({behavior:'smooth'});}
 async function saveCosts(){const st=document.getElementById('costStatus');st.textContent='Saving...';st.className='smsg';try{const upd=costs.filter(c=>c.ri).map(c=>({ri:c.ri,vals:rowFromMap(costsHdrRow,{Date:c.date,Category:c.cat,Amount:c.amount,Notes:c.notes},TABS.COSTS.h)}));const newc=costs.filter(c=>!c.ri);if(upd.length)await batchUpd(TABS.COSTS,upd);for(const c of newc)await appendRow(TABS.COSTS,rowFromMap(costsHdrRow,{Date:c.date,Category:c.cat,Amount:c.amount,Notes:c.notes},TABS.COSTS.h));st.textContent='All costs saved!';st.className='smsg ok';setTimeout(()=>st.className='smsg',3000);updatePL();}catch(e){st.textContent=e.message;st.className='smsg err';}}
 
@@ -1818,6 +1809,16 @@ function updatePL(){
   document.getElementById('kpi_cost_s').textContent='vs '+fmtGBP(costTgt)+' target'+(totalRover>0?' (incl '+fmtGBP(totalRover)+' Rover)':'');
   const netTgt=revTgt-costTgt;const netEl=document.getElementById('kpi_net');netEl.textContent=fmtGBP(net);netEl.style.color=net>=0?'var(--gn)':'var(--rd)';
   const netDiff=net-netTgt;document.getElementById('kpi_net_s').textContent='vs '+fmtGBP(netTgt)+' target'+(netTgt>0?' ('+(netDiff>=0?'+':'')+fmtGBP(netDiff)+')':'');
+  // Monthly averages — divide the year's totals by the number of months that actually had any cash-in or cost
+  const moAgg={};MOS.forEach(m=>{moAgg[m]={rev:0,cost:0};});
+  bookings.forEach(r=>{const rev=actualRev(r),rov=r.roverAmt||0,isA=active.includes(r.status);bkMonthFractions(r).forEach(s=>{if(s.y!==yr||!moAgg[s.mo])return;moAgg[s.mo].rev+=rev*s.frac;if(isA)moAgg[s.mo].cost+=rov*s.frac;});});
+  normCosts.forEach(c=>{if(!c._nd||!c._nd.startsWith(yr))return;const mo=new Date(c._nd+'T12:00:00').toLocaleString('en-GB',{month:'short'});if(moAgg[mo])moAgg[mo].cost+=(c.amount||0);});
+  const activeMonths=MOS.filter(m=>moAgg[m].rev>0||moAgg[m].cost>0).length||1;
+  const avgProfit=net/activeMonths;
+  document.getElementById('avg_cash').textContent=fmtGBP(totalRev/activeMonths);
+  document.getElementById('avg_cost').textContent=fmtGBP(totalCost/activeMonths);
+  const apEl=document.getElementById('avg_profit');apEl.textContent=fmtGBP(avgProfit);apEl.style.color=avgProfit>=0?'var(--gn)':'var(--rd)';
+  document.getElementById('avg_note').textContent='Averaged over '+activeMonths+' active month'+(activeMonths!==1?'s':'')+' (months with any cash-in or cost)';
   buildPLTable(yr);drawChart(yr,tgts);
 }
 function drawChart(yr,tgts){
@@ -1876,7 +1877,7 @@ function _computeNewRis(){const first={};bookings.forEach(b=>{if(!CAL_ACTIVE.inc
 function openDogByCid(cid){if(!cid)return;const d=allDogs.find(x=>x.cid===cid);if(d){openProfile(d);showScreen('sc-profile');}}
 function _dogChip(b){const nw=_calNewRis.has(b.ri)?'<span style="color:var(--or);">🆕</span>':'';return'<span class="cal-dog" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')">'+(b.dog||'')+nw+'</span>';}
 function setCalView(v){_calView=v;renderCalendar();}
-function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*(_calView==='3day'?3:7));_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
+function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*(_calView==='slots'?1:7));_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
 function calToday(){_calAnchor=todayStr();_calSelDay='';renderCalendar();}
 function _mondayOf(dateStr){const d=new Date(dateStr+'T12:00:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d;}
 function _dstr(d){return d.toISOString().slice(0,10);}
@@ -1887,7 +1888,7 @@ function renderCalendar(){
   const host=document.getElementById('sc-calendar');if(!host)return;
   _computeNewRis();
   document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===_calView));
-  document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calView==='3day'?_cal3DayHtml():_calWeekHtml();
+  document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calView==='slots'?_calSlotsHtml():_calWeekHtml();
   if(_calView==='month'&&_calSelDay)document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(_calSelDay);
 }
 function selCalDay(ds){_calSelDay=ds;document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(ds);document.querySelectorAll('.cal-cell').forEach(c=>c.classList.toggle('sel',c.dataset.d===ds));}
@@ -1980,10 +1981,71 @@ function _calWeekHtml(){
   const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   return _calGridHdr(title,'4 places · blue=board · orange=daycare · hatched=quoted · other services below')+_calGridHtml(start,7);
 }
-function _cal3DayHtml(){
-  const start=new Date(_calAnchor+'T12:00:00');const end=new Date(start);end.setDate(start.getDate()+2);
-  const title=start.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  return _calGridHdr(title,'3-day detail · drop-off / pick-up times shown')+_calGridHtml(start,3);
+// ---- 30-min view: how many dogs are on-site in each half-hour slot of the anchor day ----
+function _minOf(t){const p=String(t||'').split(':');const h=parseInt(p[0],10),m=parseInt(p[1],10);return isNaN(h)?NaN:h*60+(isNaN(m)?0:m);}
+// Is booking b present during the [slotStart, slotStart+30) minutes window on day ds?
+function _slotPresent(b,ds,slotStart){
+  const k=_svcKind(b);const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd)return false;
+  if(!(nsd<=ds&&ds<=(ned||nsd)))return false;
+  const stM=_minOf(b.st),etM=_minOf(b.et);const slotEnd=slotStart+30;
+  if(k==='stay'){// boarding/dog-sit: present overnight; bounded by drop-off on arrival day and pick-up on departure day
+    let from=0,to=1440;if(ds===nsd&&!isNaN(stM))from=stM;if(ds===ned&&!isNaN(etM))to=etM;
+    return slotStart<to&&slotEnd>from;}
+  if(k==='day'){const from=isNaN(stM)?7*60:stM;const to=isNaN(etM)?18*60:etM;return slotStart<to&&slotEnd>from;}
+  // visit (walk/drop-in/taxi/training): only on its own day, within its time window
+  if(ds!==nsd)return false;const from=isNaN(stM)?9*60:stM;let to=isNaN(etM)?from+60:etM;if(to<=from)to=from+30;
+  return slotStart<to&&slotEnd>from;
+}
+function _slotDogs(ds,slotStart){return bookings.filter(b=>CAL_ACTIVE.includes(b.status)&&_slotPresent(b,ds,slotStart));}
+// Hour view: places = COLUMNS (#1–#4), hours = ROWS. "Other services" and "Overbooked" appear as extra columns only
+// when that day has such data. Each cell = the dog occupying that place at that hour (blue=board, orange=daycare).
+function _calSlotsHtml(){
+  const ds=_calAnchor;const d=new Date(ds+'T12:00:00');
+  const title=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+  const H0=6,H1=22;// hourly rows 06:00–21:00
+  const overlaps=(from,to,h)=>from<(h+1)*60&&to>h*60;
+  // Overnight (boarding/dog-sit) + day-care → assign each to a place lane; extra lanes beyond CAL_CAP = overbooked
+  const items=[];
+  bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;const k=_svcKind(b);if(k==='visit')return;const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd||!(nsd<=ds&&ds<=(ned||nsd)))return;
+    const stM=_minOf(b.st),etM=_minOf(b.et);let from,to;
+    if(k==='stay'){from=(ds===nsd&&!isNaN(stM))?stM:0;to=(ds===ned&&!isNaN(etM))?etM:1440;}
+    else{from=isNaN(stM)?7*60:stM;to=isNaN(etM)?18*60:etM;}
+    items.push({b,quoted,k,from,to});});
+  items.sort((a,c)=>(a.quoted-c.quoted)||(a.from-c.from)||((c.to-c.from)-(a.to-a.from)));
+  const lanes=[];items.forEach(it=>{let L=lanes.findIndex(lane=>lane.every(x=>it.from>=x.to||it.to<=x.from));if(L<0){L=lanes.length;lanes.push([]);}lanes[L].push(it);it.lane=L;});
+  // Other services (walk / drop-in / taxi / training) on this day
+  const visits=[];
+  bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;if(_svcKind(b)!=='visit')return;if(normDate(b.sd)!==ds)return;const stM=_minOf(b.st);let etM=_minOf(b.et);if(isNaN(stM))return;if(isNaN(etM)||etM<=stM)etM=stM+60;visits.push({b,quoted,from:stM,to:etM});});
+  const hasOther=visits.length>0,hasOver=lanes.length>CAL_CAP;
+  // build columns: 4 places, then (if data) Overbooked, then Other
+  const cols=[];for(let p=0;p<CAL_CAP;p++)cols.push({type:'place',lane:p,lbl:'#'+(p+1)});
+  if(hasOver)cols.push({type:'over',lbl:'⚠ Over'});
+  if(hasOther)cols.push({type:'other',lbl:'Other'});
+  const nCol=cols.length;
+  let g='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><div class="cw-grid" style="grid-template-columns:40px repeat('+nCol+',minmax(48px,1fr));min-width:'+(40+nCol*52)+'px;">';
+  g+='<div class="cw-cell cw-corner"></div>';
+  cols.forEach(c=>g+='<div class="cw-cell cw-dayhd"'+(c.type==='over'?' style="color:var(--rd);"':'')+'>'+c.lbl+'</div>');
+  for(let h=H0;h<H1;h++){
+    g+='<div class="cw-cell cw-lanelbl" style="font-size:9px;">'+String(h).padStart(2,'0')+':00</div>';
+    cols.forEach(c=>{
+      if(c.type==='place'){
+        const it=(lanes[c.lane]||[]).find(x=>overlaps(x.from,x.to,h));
+        if(it){const b=it.b;const solid=it.k==='day'?'var(--or)':'var(--sk)';
+          g+='<div class="cw-cell" style="cursor:pointer;font-size:8px;font-weight:700;'+(it.quoted?'border:1px dashed var(--gr3);color:var(--gr2);':'background:'+solid+';color:#fff;')+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+(b.dog||'')+'">'+(b.dog||'')+(it.quoted?' (Q)':'')+'</div>';}
+        else g+='<div class="cw-cell cw-bgcell"></div>';
+      }else if(c.type==='over'){
+        const cnt=lanes.slice(CAL_CAP).reduce((s,lane)=>s+(lane.some(x=>overlaps(x.from,x.to,h))?1:0),0);
+        g+='<div class="cw-cell" style="font-size:10px;font-weight:800;'+(cnt?'background:var(--rdl);color:var(--rd);':'color:var(--gr3);')+'">'+(cnt||'')+'</div>';
+      }else{
+        const vs=visits.filter(x=>overlaps(x.from,x.to,h));
+        g+='<div class="cw-cell" style="font-size:7px;line-height:1.15;'+(vs.length?'background:var(--pul);color:var(--pu);cursor:pointer;':'')+'"'+(vs.length?' onclick="openDogByCid(\''+(vs[0].b.customerId||'')+'\')"':'')+'>'+vs.map(x=>(x.b.dog||'')+(x.quoted?' (Q)':'')).join(', ')+'</div>';
+      }
+    });
+  }
+  g+='</div></div>';
+  const pre=bookings.filter(b=>CAL_ACTIVE.includes(b.status)&&_svcKind(b)==='stay'&&_slotPresent(b,ds,5*60)).length;
+  return _calGridHdr(title,'Places = columns · hours = rows · blue=board · orange=daycare · ‹ › = other days')+
+    '<div style="font-size:9px;color:var(--gr2);margin-bottom:6px;background:var(--gr5);padding:5px 8px;border-radius:var(--r);">🌙 Overnight (before 06:00): <b>'+pre+'</b> boarder'+(pre!==1?'s':'')+' on-site</div>'+g;
 }
 
 // ==================== ANALYSIS ====================
@@ -1996,7 +2058,8 @@ function renderAnalysis(){
   const active=['Booked','Prepaid','Fully Paid','Credit','Completed']; // occupancy = physical presence
   const svcCols={Boarding:'#F97316',DayCare:'#EAB308',Walking:'#22C55E','Drop-in':'#8B5CF6','Dog Sit':'#06B6D4','Pet Taxi':'#EC4899',Training:'#6366F1',Other:'#A8A29E'};
   // Cross-year/month split: a booking is in-year if any night falls in yr; revenue counts only its in-year portion.
-  const yBks=bookings.filter(b=>paid.includes(b.status)&&bkMonthFractions(b).some(s=>s.y===yr));
+  const yBks=bookings.filter(b=>paid.includes(b.status)&&bkMonthFractions(b).some(s=>s.y===yr));// cash-in reports (Prepaid deposit + Fully Paid/Credit/Completed)
+  const fpBks=bookings.filter(b=>b.status==='Fully Paid'&&bkMonthFractions(b).some(s=>s.y===yr));// "Fully Paid only" reports
   const fracInYr=b=>bkMonthFractions(b).filter(s=>s.y===yr);
   const revY=b=>actualRev(b)*fracInYr(b).reduce((a,s)=>a+s.frac,0);
   const yrN=parseInt(yr);
@@ -2021,8 +2084,8 @@ function renderAnalysis(){
 
   // ── 2. Bookings Count & AOV (numbers outside bar to the right) ──
   const moBkCnt={};const moBkRev={};MOS.forEach(m=>{moBkCnt[m]=0;moBkRev[m]=0;});
-  yBks.forEach(b=>{const segs=fracInYr(b);if(!segs.length)return;const rev=actualRev(b);if(moBkCnt[segs[0].mo]!==undefined)moBkCnt[segs[0].mo]++;segs.forEach(seg=>{if(moBkRev[seg.mo]!==undefined)moBkRev[seg.mo]+=rev*seg.frac;});});
-  const totalBks=yBks.length,totalRevY=yBks.reduce((s,b)=>s+revY(b),0),aov=totalBks>0?Math.round(totalRevY/totalBks):0;
+  fpBks.forEach(b=>{const segs=fracInYr(b);if(!segs.length)return;const rev=actualRev(b);if(moBkCnt[segs[0].mo]!==undefined)moBkCnt[segs[0].mo]++;segs.forEach(seg=>{if(moBkRev[seg.mo]!==undefined)moBkRev[seg.mo]+=rev*seg.frac;});});
+  const totalBks=fpBks.length,totalRevY=fpBks.reduce((s,b)=>s+revY(b),0),aov=totalBks>0?Math.round(totalRevY/totalBks):0;
   const maxCnt=Math.max(...MOS.map(m=>moBkCnt[m]),1);
   document.getElementById('anBkCount').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:flex;gap:8px;margin-bottom:10px;"><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--bl);">'+totalBks+'</div><div style="font-size:8px;color:var(--gr2);">Bookings</div></div><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--or);">'+fmtGBP(totalRevY)+'</div><div style="font-size:8px;color:var(--gr2);">Revenue</div></div><div style="flex:1;text-align:center;background:var(--gr5);border-radius:var(--r);padding:8px 4px;"><div style="font-size:20px;font-weight:800;color:var(--gn);">'+fmtGBP(aov)+'</div><div style="font-size:8px;color:var(--gr2);">Avg Order</div></div></div>'+MOS.map(m=>{const cnt=moBkCnt[m];const pct=cnt/maxCnt*100;const ov=cnt>0?fmtGBP(Math.round(moBkRev[m]/cnt)):'-';return'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><div style="font-size:9px;color:var(--gr2);width:22px;flex-shrink:0;">'+m+'</div><div style="flex:1;height:12px;background:var(--gr4);border-radius:3px;"><div style="height:12px;background:var(--bl);border-radius:3px;width:'+pct+'%;min-width:'+(cnt?2:0)+'px;"></div></div><div style="font-size:8px;color:var(--gr);min-width:90px;text-align:right;white-space:nowrap;">'+cnt+(cnt>0?' · AOV '+ov:'')+'</div></div>';}).join('')+'</div>';
 
@@ -2034,7 +2097,7 @@ function renderAnalysis(){
 
   // ── 4. Rover vs Direct (with % of total revenue) ──
   const chMap={};
-  yBks.forEach(b=>{const k=(b.ch||'TCL').toLowerCase().includes('rover')?'Rover':'Direct (TCL)';if(!chMap[k])chMap[k]={count:0,rev:0};chMap[k].count++;chMap[k].rev+=revY(b);});
+  fpBks.forEach(b=>{const k=(b.ch||'TCL').toLowerCase().includes('rover')?'Rover':'Direct (TCL)';if(!chMap[k])chMap[k]={count:0,rev:0};chMap[k].count++;chMap[k].rev+=revY(b);});
   const chCols={'Direct (TCL)':'#F97316',Rover:'#1E40AF'};
   const totalChRev=Object.values(chMap).reduce((s,d)=>s+d.rev,0);
   const chEntries=Object.entries(chMap).sort((a,b)=>b[1].rev-a[1].rev);
@@ -2049,7 +2112,7 @@ function renderAnalysis(){
 
   // ── 5. Breed Distribution (dogs with bookings in this year only) ──
   const breedMap={};const _seenBreedDogs=new Set();
-  yBks.forEach(b=>{const k=b.customerId||b.dog;if(!k||_seenBreedDogs.has(k))return;_seenBreedDogs.add(k);const d=allDogs.find(x=>x.cid===b.customerId)||allDogs.find(x=>(x.name||'').toLowerCase()===(b.dog||'').toLowerCase());const br=((d&&d.breed||'').trim()||'Unknown');breedMap[br]=(breedMap[br]||0)+1;});
+  fpBks.forEach(b=>{const k=b.customerId||b.dog;if(!k||_seenBreedDogs.has(k))return;_seenBreedDogs.add(k);const d=allDogs.find(x=>x.cid===b.customerId)||allDogs.find(x=>(x.name||'').toLowerCase()===(b.dog||'').toLowerCase());const br=((d&&d.breed||'').trim()||'Unknown');breedMap[br]=(breedMap[br]||0)+1;});
   const breedSorted=Object.entries(breedMap).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const maxBreed=breedSorted[0]?.[1]||1,totalDogs=_seenBreedDogs.size;
   document.getElementById('anBreed').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(breedSorted.length?breedSorted.map(([b,v])=>'<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+b+'</span><span style="color:var(--sk);">'+v+' dog'+(v!==1?'s':'')+' ('+(v/totalDogs*100).toFixed(0)+'%)</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;"><div style="height:5px;background:var(--sk);border-radius:3px;width:'+(v/maxBreed*100).toFixed(0)+'%;"></div></div></div>').join('')+'<div style="border-top:1px solid var(--gr4);margin-top:7px;padding-top:6px;font-size:9px;color:var(--gr2);">'+totalDogs+' booked dog'+(totalDogs!==1?'s':'')+(Object.keys(breedMap).length>12?' · top 12 shown':'')+'</div>':'<div style="color:var(--gr3);font-size:11px;">No booked dogs for '+yr+'</div>')+'</div>';
@@ -2058,7 +2121,7 @@ function renderAnalysis(){
   const dogBdays={};allDogs.forEach(d=>{if(d.birthday){const k=(d.cid||'')+'_'+(d.name||'').toLowerCase();dogBdays[k]=d.birthday;}});
   const ageBuckets={'Puppy (<1yr)':0,'1–2 yrs':0,'3–5 yrs':0,'6–9 yrs':0,'10+ yrs':0,'Unknown':0};
   const ageCols={'Puppy (<1yr)':'#F97316','1–2 yrs':'#EAB308','3–5 yrs':'#22C55E','6–9 yrs':'#0284C7','10+ yrs':'#8B5CF6','Unknown':'#A8A29E'};
-  yBks.forEach(b=>{const bday=dogBdays[(b.customerId||'')+'_'+(b.dog||'').toLowerCase()];if(!bday){ageBuckets['Unknown']++;return;}const ageYrs=(new Date((normDate(b.sd)||yr+'-01-01')+'T12:00:00Z')-new Date(normDate(bday)+'T12:00:00Z'))/(365.25*864e5);if(ageYrs<1)ageBuckets['Puppy (<1yr)']++;else if(ageYrs<3)ageBuckets['1–2 yrs']++;else if(ageYrs<6)ageBuckets['3–5 yrs']++;else if(ageYrs<10)ageBuckets['6–9 yrs']++;else ageBuckets['10+ yrs']++;});
+  fpBks.forEach(b=>{const bday=dogBdays[(b.customerId||'')+'_'+(b.dog||'').toLowerCase()];if(!bday){ageBuckets['Unknown']++;return;}const ageYrs=(new Date((normDate(b.sd)||yr+'-01-01')+'T12:00:00Z')-new Date(normDate(bday)+'T12:00:00Z'))/(365.25*864e5);if(ageYrs<1)ageBuckets['Puppy (<1yr)']++;else if(ageYrs<3)ageBuckets['1–2 yrs']++;else if(ageYrs<6)ageBuckets['3–5 yrs']++;else if(ageYrs<10)ageBuckets['6–9 yrs']++;else ageBuckets['10+ yrs']++;});
   const maxAge=Math.max(...Object.values(ageBuckets),1);
   document.getElementById('anAge').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+['Puppy (<1yr)','1–2 yrs','3–5 yrs','6–9 yrs','10+ yrs','Unknown'].map(k=>{const v=ageBuckets[k];const col=ageCols[k];return'<div style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+k+'</span><span style="color:'+col+';">'+v+' booking'+(v!==1?'s':'')+'</span></div><div style="height:8px;background:var(--gr4);border-radius:3px;"><div style="height:8px;background:'+col+';border-radius:3px;width:'+(v/maxAge*100).toFixed(0)+'%;"></div></div></div>';}).join('')+'</div>';
 
@@ -2066,15 +2129,15 @@ function renderAnalysis(){
   // First-ever booking per dog = New. Tie-break by row index (ri) so two bookings sharing the same sd
   // don't both count as New — exactly one booking per dog is the "first".
   const firstBk={};
-  bookings.filter(b=>paid.includes(b.status)&&b.sd).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const cur=firstBk[k];if(!cur||nsd<cur.sd||(nsd===cur.sd&&(b.ri||0)<cur.ri))firstBk[k]={sd:nsd,ri:b.ri||0};});
+  bookings.filter(b=>b.status==='Fully Paid'&&b.sd).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const cur=firstBk[k];if(!cur||nsd<cur.sd||(nsd===cur.sd&&(b.ri||0)<cur.ri))firstBk[k]={sd:nsd,ri:b.ri||0};});
   let newBks=0,repBks=0,newRev=0,repRev=0;
-  yBks.forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const rev=revY(b);const f=firstBk[k];if(f&&f.sd===nsd&&f.ri===(b.ri||0)){newBks++;newRev+=rev;}else{repBks++;repRev+=rev;}});
+  fpBks.forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';const rev=revY(b);const f=firstBk[k];if(f&&f.sd===nsd&&f.ri===(b.ri||0)){newBks++;newRev+=rev;}else{repBks++;repRev+=rev;}});
   const totalRN=newBks+repBks;
   const newPct=totalRN>0?Math.round(newBks/totalRN*100):0,repPct=totalRN>0?Math.round(repBks/totalRN*100):0;
   document.getElementById('anRepeat').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;"><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--gn);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🆕 New</div><div style="font-size:24px;font-weight:800;color:var(--gn);">'+newBks+'</div><div style="font-size:10px;font-weight:700;color:var(--gn);">'+newPct+'% of bookings</div><div style="font-size:9px;color:var(--or);font-weight:700;margin-top:4px;">'+fmtGBP(newRev)+'</div></div><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--bl);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🔄 Repeat</div><div style="font-size:24px;font-weight:800;color:var(--bl);">'+repBks+'</div><div style="font-size:10px;font-weight:700;color:var(--bl);">'+repPct+'% of bookings</div><div style="font-size:9px;color:var(--or);font-weight:700;margin-top:4px;">'+fmtGBP(repRev)+'</div></div></div><div style="display:flex;height:8px;border-radius:4px;overflow:hidden;"><div style="width:'+newPct+'%;background:var(--gn);"></div><div style="flex:1;background:var(--bl);"></div></div><div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gr3);margin-top:3px;"><span>New</span><span>Repeat</span></div></div>';
 
   // ── 8. Average Stay Length — fixed order ──
-  const stays=bookings.filter(b=>b.sd&&b.ed&&normDate(b.ed).startsWith(yr)&&paid.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);}).filter(n=>n>0);
+  const stays=bookings.filter(b=>b.sd&&b.ed&&normDate(b.ed).startsWith(yr)&&b.status==='Fully Paid'&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);}).filter(n=>n>0);
   let stayHtml='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">';
   if(stays.length){
     const avg=(stays.reduce((s,v)=>s+v,0)/stays.length).toFixed(1);
@@ -2108,9 +2171,9 @@ function renderAnalysis(){
 
   // ── 11. Customer LTV — Top 10, with next booking date ──
   const ltvMap={};
-  bookings.filter(b=>paid.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;ltvMap[k].total+=actualRev(b);const ned=normDate(b.ed)||'';const nsd=normDate(b.sd)||'';if(nsd&&nsd<=today&&ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});// 'last' = most recent booking that has already started (never a future one)
+  bookings.filter(b=>active.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;ltvMap[k].total+=actualRev(b);const ned=normDate(b.ed)||'';const nsd=normDate(b.sd)||'';if(nsd&&nsd<=today&&ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});// 'last' = most recent booking that has already started (never a future one)
   const nextBk={};
-  bookings.filter(b=>b.sd&&normDate(b.sd)>today&&!['Cancelled','Canceled'].includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!nextBk[k]||nsd<nextBk[k])nextBk[k]=nsd;});
+  bookings.filter(b=>b.sd&&normDate(b.sd)>today&&active.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!nextBk[k]||nsd<nextBk[k])nextBk[k]=nsd;});
   const top10=Object.values(ltvMap).sort((a,b)=>b.total-a.total).slice(0,10);
   const maxLtv=top10[0]?.total||1;
   document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;const nxt=nextBk[c.cid||c.dog];return'<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:3px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="display:flex;gap:10px;font-size:8px;color:var(--gr3);"><span>'+c.count+' booking'+(c.count!==1?'s':'')+'</span>'+(c.lastDate?'<span>last: '+c.lastDate+'</span>':'')+(nxt?'<span style="color:var(--gn);font-weight:700;">next: '+nxt+'</span>':(c.lastDate&&c.count>1?'<span>no upcoming</span>':''))+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
@@ -2159,7 +2222,7 @@ function exportTraining(){const recs=trainRecords.length?trainRecords:[{date:'',
 
 // ==================== MESSAGE TEMPLATES ====================
 function saveMsgTpls(){localStorage.setItem('tcl_msg_tpls',JSON.stringify(msgTpls));}
-function setTplCat(cat){_tplCat=cat;document.querySelectorAll('.tpl-cat-btn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));renderTplHub();}
+function setTplCat(cat){_tplCat=cat;document.querySelectorAll('.tpl-cat-btn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));const pw=document.getElementById('paySettingsWrap');if(pw)pw.style.display=(cat==='Payment')?'block':'none';renderTplHub();}
 function renderTplHub(){
   const el=document.getElementById('tplHubList');if(!msgTpls.length){el.innerHTML='<div class="hload">No templates - tap + New or wait for sync</div>';return;}
   const filtered=_tplCat?msgTpls.filter(t=>(t.cat||'').toLowerCase()===_tplCat.toLowerCase()):msgTpls;
