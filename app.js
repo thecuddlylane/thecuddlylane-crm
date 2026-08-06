@@ -160,7 +160,7 @@ async function doCreateSheet(){
   const s=document.getElementById('cfgStatus');s.textContent='Creating structure...';
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
-    {n:TABS.DOGS,h:['CustomerID','DogName','Breed','GenderStatus','Birthday','BirthdayType','Weight','ChipID','Rescue','Nervous','SepAnxiety','Jogging','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','Motivation','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','VaccinationURL','PhotoURL']},
+    {n:TABS.DOGS,h:['CustomerID','DogName','Breed','GenderStatus','Birthday','BirthdayType','Weight','ChipID','Rescue','Nervous','SepAnxiety','Jogging','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','Motivation','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','VaccinationURL','PhotoURL','Barking','RemarkAtHome','RemarkOutdoor','RemarkIndoor','RemarkSleeping','RemarkFood','RemarkWithDogs']},
     {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_PackingList','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','WF_DailyLogs','WF_Compat','WF_DocsReq','WF_ConsentSent','BookingRef','PrepaymentRef','FinalPaymentRef']},
     {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','BeforeSleep','Game','Bowl','Room','Garment','Notes','Private']},
     {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','','NextStep','Private']},
@@ -190,7 +190,7 @@ function openSP(id){const e=document.getElementById('sp-'+id);if(e){e.classList.
 // Section → ordered sub-tabs. sc = primary screen; after = optional panel to open on that screen.
 const SECTIONS={
   dogs:[{k:'dogs',lbl:'🐾 Profiles',sc:'sc-board'},{k:'cal',lbl:'📅 Calendar',sc:'sc-calendar'},{k:'bk',lbl:'📋 Bookings',sc:'sc-bookings'},{k:'act',lbl:'🎯 Activities',sc:'sc-activities'}],
-  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-todo'},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🧮 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-rates'}],
+  customers:[{k:'todo',lbl:'✅ To-Do',sc:'sc-todo'},{k:'tpl',lbl:'✉️ Templates',sc:'sc-templates'},{k:'quote',lbl:'🔢 Quote',sc:'sc-quote'},{k:'rates',lbl:'💷 Rates',sc:'sc-rates'}],
   business:[{k:'an',lbl:'🔍 Analysis',sc:'sc-analysis'},{k:'cost',lbl:'💸 Costs',sc:'sc-costs'},{k:'pl',lbl:'📈 P&L',sc:'sc-pl'},{k:'train',lbl:'📚 Training',sc:'sc-training'}]
 };
 const SECTION_ROOTS=new Set(Object.values(SECTIONS).flat().map(t=>t.sc));
@@ -494,7 +494,9 @@ function mapDog(r,i,h){
     addr:g('Address'),postcode:g('Postcode'),emergency:g('Emergency'),vet:g('Vet'),ins:g('Insurance'),
     meetgreet:g('MeetGreetDate'),referral:g('Referral'),refNotes:g('ReferralNotes'),svc:g('Service'),
     status:g('Status'),remarks:g('Remarks'),emoji:'',jog:g('Jogging'),vaccUrl:g('VaccinationURL'),
-    photoUrl:g('PhotoURL'),motivation:g('Motivation'),rowIdx:i+2};
+    photoUrl:g('PhotoURL'),motivation:g('Motivation'),
+    barking:g('Barking'),rmHome:g('RemarkAtHome'),rmOut:g('RemarkOutdoor'),rmIn:g('RemarkIndoor'),rmSleep:g('RemarkSleeping'),rmFood:g('RemarkFood'),rmDogs:g('RemarkWithDogs'),
+    rowIdx:i+2};
 }
 function mapBk(r,i,h){
   const gi=n=>h&&h[n]!==undefined?h[n]:null;
@@ -523,7 +525,7 @@ function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();
   const in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().split('T')[0];
   const validBks=bookings.filter(b=>!['Cancelled','Canceled'].includes(b.status));
-  let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)):allDogs;
+  let dogs=q?allDogs.filter(d=>d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)||(d.breed||'').toLowerCase().includes(q)):allDogs;
   const active=[],week=[],upcoming=[],other=[];
   dogs.forEach(d=>{
     const dogBks=validBks.filter(b=>bkMatchesDog(b,d));
@@ -676,11 +678,11 @@ function buildProfInfo(dog){
   const vaccBanner=vaccExpired?'<div style="background:var(--rdl,#fff0f0);border:1px solid var(--rd);border-radius:8px;padding:10px 14px;margin-bottom:10px;color:var(--rd);font-weight:600;font-size:13px;">⚠️ Vaccination expired — please ask owners to update records before the next visit.</div>':'';
   document.getElementById('profInfoBody').innerHTML=
     vaccBanner+
-    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+ir('Relationships',dog.rel)+'</div>'+
+    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+ir('Relationships',dog.rel)+'</div>'+
     '<div class="psec" style="--sc:var(--rd);"><div class="psec-h"><span class="psec-ic">🩺</span>Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="psec" style="--sc:var(--hn);"><div class="psec-h"><span class="psec-ic">🦴</span>Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="psec" style="--sc:var(--gr2);"><div class="psec-h"><span class="psec-ic">📝</span>Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
-    (dog.remarks?'<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks</div>'+ir('Remarks',dog.remarks)+'</div>':'')+
+    '<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks</div>'+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+(dog.barking?'<div class="irow"><span class="ikey">Barking level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.barking,parseInt(dog.barking)>=4?'var(--rd)':'var(--hn)')+'</span></div>':'')+ir('At home',dog.rmHome)+ir('Outdoor',dog.rmOut)+ir('Indoor',dog.rmIn)+ir('Sleeping pattern',dog.rmSleep)+ir('Food',dog.rmFood)+ir('With other dogs',dog.rmDogs)+ir('General',dog.remarks)+'</div>'+
     '<div class="psec" style="--sc:var(--bl);"><div class="psec-h"><span class="psec-ic">📞</span>Owners &amp; Contacts</div>'+ir('Owner 1',dog.owner)+(dog.phone?'<div class="irow"><span class="ikey">Phone 1</span><span class="ival">'+waLink(dog.phone)+'</span></div>':'')+ir('Owner 2',dog.owner2)+(dog.phone2?'<div class="irow"><span class="ikey">Phone 2</span><span class="ival">'+waLink(dog.phone2)+'</span></div>':'')+ir('Owner 3',dog.owner3)+(dog.phone3?'<div class="irow"><span class="ikey">Phone 3</span><span class="ival">'+waLink(dog.phone3)+'</span></div>':'')+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency',dog.emergency)+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
     '<div class="psec" style="--sc:var(--gr3);"><div class="psec-h"><span class="psec-ic">🆔</span>Identifiers</div>'+ir('Customer ID',dog.cid)+ir('Microchip',dog.chip)+'</div>';
 }
@@ -918,7 +920,7 @@ function useCustomEmoji(){
   if(!v){alert('Type an emoji first');return;}
   selectEmoji(v);
 }
-function dogToFieldMap(d){return{CustomerID:d.cid,Name:d.name,DogName:d.name,Breed:d.breed,Gender:d.gender,Birthday:d.birthday,BirthdayType:d.bdayType,Weight:d.weight,Neutered:d.neut,GenderStatus:d.genderStatus||'',Motivation:d.motivation||'',ChipID:d.chip,Rescue:d.rescue,Nervous:d.nervous,SepAnxiety:d.anxiety,DogFriends:d.dogfriends,FoodType:d.food,FoodMeasure:d.foodMeasure,DietNotes:d.dietNotes,Allergies:d.allerg,Medical:d.med,MedSchedule:d.medSchedule,Fears:d.fears,Untouchable:d.notouch,Vaccination:d.vacc,Flea:d.flea,Behaviour:d.behav,WalkSchedule:d.walk,CarSeat:d.car,SleepLocation:d.sleep,EscapeAttempts:d.escape,ToiletTrained:d.toilet,AloneHours:d.alone,TrainingCommands:d.commands,PrevSitters:d.sitters,UpdateFrequency:d.updates,Relationships:d.rel,AdditionalNotes:d.notes,Owner1:d.owner,Phone1:sheetPhone(d.phone),Owner2:d.owner2||'',Phone2:sheetPhone(d.phone2),Owner3:d.owner3||'',Phone3:sheetPhone(d.phone3),Address:d.addr,Postcode:d.postcode,Emergency:sheetPhone(d.emergency),Vet:d.vet,Insurance:d.ins,MeetGreetDate:d.meetgreet,Referral:d.referral,ReferralNotes:d.refNotes,Service:d.svc,Status:d.status,Remarks:d.remarks,Jogging:d.jog||'',VaccinationURL:d.vaccUrl||'',PhotoURL:d.photoUrl||''};}
+function dogToFieldMap(d){return{CustomerID:d.cid,Name:d.name,DogName:d.name,Breed:d.breed,Gender:d.gender,Birthday:d.birthday,BirthdayType:d.bdayType,Weight:d.weight,Neutered:d.neut,GenderStatus:d.genderStatus||'',Motivation:d.motivation||'',ChipID:d.chip,Rescue:d.rescue,Nervous:d.nervous,SepAnxiety:d.anxiety,DogFriends:d.dogfriends,FoodType:d.food,FoodMeasure:d.foodMeasure,DietNotes:d.dietNotes,Allergies:d.allerg,Medical:d.med,MedSchedule:d.medSchedule,Fears:d.fears,Untouchable:d.notouch,Vaccination:d.vacc,Flea:d.flea,Behaviour:d.behav,WalkSchedule:d.walk,CarSeat:d.car,SleepLocation:d.sleep,EscapeAttempts:d.escape,ToiletTrained:d.toilet,AloneHours:d.alone,TrainingCommands:d.commands,PrevSitters:d.sitters,UpdateFrequency:d.updates,Relationships:d.rel,AdditionalNotes:d.notes,Owner1:d.owner,Phone1:sheetPhone(d.phone),Owner2:d.owner2||'',Phone2:sheetPhone(d.phone2),Owner3:d.owner3||'',Phone3:sheetPhone(d.phone3),Address:d.addr,Postcode:d.postcode,Emergency:sheetPhone(d.emergency),Vet:d.vet,Insurance:d.ins,MeetGreetDate:d.meetgreet,Referral:d.referral,ReferralNotes:d.refNotes,Service:d.svc,Status:d.status,Remarks:d.remarks,Jogging:d.jog||'',VaccinationURL:d.vaccUrl||'',PhotoURL:d.photoUrl||'',Barking:d.barking||'',RemarkAtHome:d.rmHome||'',RemarkOutdoor:d.rmOut||'',RemarkIndoor:d.rmIn||'',RemarkSleeping:d.rmSleep||'',RemarkFood:d.rmFood||'',RemarkWithDogs:d.rmDogs||''};}
 function mapDogToRow(d){return rowFromMap(dogsHdrRow,dogToFieldMap(d),TABS.DOGS.h);}
 function openEditProf(){
   if(!curDog)return;const d=curDog;
@@ -933,20 +935,25 @@ function openEditProf(){
   s('reg_dogfriends',d.dogfriends);s('reg_food',d.food);s('reg_food_measure',d.foodMeasure);s('reg_diet',d.dietNotes);s('reg_allergies',d.allerg);s('reg_medical',d.med);s('reg_med_schedule',d.medSchedule);s('reg_fears',d.fears);s('reg_touch',d.notouch);s('reg_vacc',d.vacc);s('reg_vacc_url',d.vaccUrl||'');s('reg_flea',d.flea);
   s('reg_behaviour',d.behav);s('reg_walk',d.walk);s('reg_car',d.car);s('reg_sleep',d.sleep);s('reg_escape',d.escape);s('reg_toilet',d.toilet);s('reg_alone',d.alone);s('reg_commands',d.commands);s('reg_sitters',d.sitters);s('reg_updates',d.updates);s('reg_rel',d.rel);s('reg_notes',d.notes);
   s('reg_owner',d.owner);s('reg_phone',d.phone);s('reg_owner2',d.owner2||'');s('reg_phone2',d.phone2||'');s('reg_owner3',d.owner3||'');s('reg_phone3',d.phone3||'');s('reg_address',d.addr);s('reg_postcode',d.postcode);s('reg_emergency',d.emergency);s('reg_vet',d.vet);s('reg_insurance',d.ins);s('reg_meetgreet',d.meetgreet);s('reg_referral',d.referral);s('reg_ref_notes',d.refNotes);setSvcChips(d.svc);s('reg_status',d.status);s('reg_remarks',d.remarks);
-  document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();
+  document.getElementById('reg_nervous').value=d.nervous||3;updNB('reg');document.getElementById('reg_anxiety').value=d.anxiety||1;updAnxBar();document.getElementById('reg_jog').value=d.jog||3;updJogBar();document.getElementById('reg_barking').value=d.barking||1;updBarkBar();
+  s('reg_rm_home',d.rmHome);s('reg_rm_out',d.rmOut);s('reg_rm_in',d.rmIn);s('reg_rm_sleep',d.rmSleep);s('reg_rm_food',d.rmFood);s('reg_rm_dogs',d.rmDogs);
   _regEmoji='';
-  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl?gdriveDirect(d.photoUrl):'';if(p){document.getElementById('regPhotoImg').src=p;document.getElementById('regPhotoImg').style.display='block';const re=document.getElementById('regPhotoEmoji');if(re)re.style.display='none';}
+  _regPhotoUrl=d.photoUrl||'';const p=d.photoUrl?gdriveDirect(d.photoUrl):'';
+  const _rimg=document.getElementById('regPhotoImg'),_remo=document.getElementById('regPhotoEmoji');
+  if(p){_rimg.src=p;_rimg.style.display='block';if(_remo)_remo.style.display='none';document.getElementById('regPhotoCircle')._pd=p;}
+  else{_rimg.src='';_rimg.style.display='none';if(_remo){_remo.textContent='+';_remo.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;}// reset circle when the dog has no photo, else the previously-edited dog's image lingers (wrong-image bug)
   showScreen('sc-register');
 }
 function updNB(pfx){const v=parseInt(document.getElementById(pfx+'_nervous').value)||3;if(document.getElementById(pfx+'_nval'))document.getElementById(pfx+'_nval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--or)';for(let i=0;i<5;i++){const s=document.getElementById('rns'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function updAnxBar(){const v=parseInt(document.getElementById('reg_anxiety').value)||1;if(document.getElementById('reg_axval'))document.getElementById('reg_axval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--pu)':'var(--bl)';for(let i=0;i<5;i++){const s=document.getElementById('axs'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function updJogBar(){const v=parseInt(document.getElementById('reg_jog').value)||3;if(document.getElementById('reg_jogval'))document.getElementById('reg_jogval').textContent=v;const col=v>=4?'var(--gn)':v>=3?'var(--hn)':'var(--gr3)';for(let i=0;i<5;i++){const s=document.getElementById('jgs'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
+function updBarkBar(){const v=parseInt(document.getElementById('reg_barking').value)||1;if(document.getElementById('reg_barkval'))document.getElementById('reg_barkval').textContent=v;const col=v>=4?'var(--rd)':v>=3?'var(--hn)':'var(--gr3)';for(let i=0;i<5;i++){const s=document.getElementById('bks'+i);if(s)s.style.background=i<v?col:'var(--gr4)';}}
 function startReg(){
   document.getElementById('reg_eid').value='';document.getElementById('reg_ridx').value='';
   document.querySelector('#sc-register .pg-t').textContent='Register New Dog';document.getElementById('regBtn').textContent='Register Dog';
-  ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_owner2','reg_phone2','reg_owner3','reg_phone3','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['reg_name','reg_breed','reg_weight','reg_chip','reg_dogfriends','reg_food_measure','reg_diet','reg_allergies','reg_medical','reg_med_schedule','reg_behaviour','reg_walk','reg_rel','reg_owner','reg_phone','reg_owner2','reg_phone2','reg_owner3','reg_phone3','reg_address','reg_postcode','reg_emergency','reg_vet','reg_insurance','reg_fears','reg_touch','reg_flea','reg_remarks','reg_sleep','reg_escape','reg_toilet','reg_alone','reg_commands','reg_sitters','reg_updates','reg_notes','reg_ref_notes','reg_meetgreet','reg_jog','reg_rm_home','reg_rm_out','reg_rm_in','reg_rm_sleep','reg_rm_food','reg_rm_dogs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['reg_gender_status','reg_rescue','reg_car','reg_food','reg_svc','reg_referral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setSvcChips('');
-  document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();document.getElementById('reg_jog').value=3;updJogBar();
+  document.getElementById('reg_status').value='Active';document.getElementById('reg_nervous').value=3;updNB('reg');document.getElementById('reg_anxiety').value=1;updAnxBar();document.getElementById('reg_jog').value=3;updJogBar();document.getElementById('reg_barking').value=1;updBarkBar();
   _regEmoji='';_regPhotoUrl='';initBdayType();document.getElementById('regPhotoImg').style.display='none';const re=document.getElementById('regPhotoEmoji');if(re){re.textContent='+';re.style.display='block';}document.getElementById('regPhotoCircle')._pd=null;showScreen('sc-register');
 }
 function duplicateDog(){
@@ -965,7 +972,7 @@ async function registerDog(){
   const cid=eid||genId(name);
   // photoUrl: prefer new URL from Drive link; for edit fall back to existing; for new reg start empty
   const photoUrlVal=_regPhotoUrl||(eid?curDog?.photoUrl||'':'');
-  const fieldMap={CustomerID:cid,Name:name,DogName:name,Breed:gv('reg_breed'),Birthday:bday,BirthdayType:bt,Weight:gv('reg_weight'),GenderStatus:gv('reg_gender_status'),ChipID:gv('reg_chip'),Rescue:gv('reg_rescue'),Nervous:document.getElementById('reg_nervous').value,SepAnxiety:document.getElementById('reg_anxiety').value,DogFriends:gv('reg_dogfriends'),FoodType:gv('reg_food'),FoodMeasure:gv('reg_food_measure'),DietNotes:gv('reg_diet'),Allergies:gv('reg_allergies'),Medical:gv('reg_medical'),MedSchedule:gv('reg_med_schedule'),Fears:gv('reg_fears'),Untouchable:gv('reg_touch'),Vaccination:gv('reg_vacc'),Flea:gv('reg_flea'),Behaviour:gv('reg_behaviour'),WalkSchedule:gv('reg_walk'),CarSeat:gv('reg_car'),SleepLocation:gv('reg_sleep'),EscapeAttempts:gv('reg_escape'),ToiletTrained:gv('reg_toilet'),AloneHours:gv('reg_alone'),TrainingCommands:gv('reg_commands'),PrevSitters:gv('reg_sitters'),UpdateFrequency:gv('reg_updates'),Relationships:gv('reg_rel'),AdditionalNotes:gv('reg_notes'),Owner1:owner,Phone1:sheetPhone(gv('reg_phone')),Owner2:gv('reg_owner2'),Phone2:sheetPhone(gv('reg_phone2')),Owner3:gv('reg_owner3'),Phone3:sheetPhone(gv('reg_phone3')),Address:gv('reg_address'),Postcode:gv('reg_postcode'),Emergency:sheetPhone(gv('reg_emergency')),Vet:gv('reg_vet'),Insurance:gv('reg_insurance'),MeetGreetDate:gv('reg_meetgreet'),Referral:gv('reg_referral'),ReferralNotes:gv('reg_ref_notes'),Service:gv('reg_svc'),Status:gv('reg_status'),Remarks:gv('reg_remarks'),Jogging:gv('reg_jog'),VaccinationURL:gv('reg_vacc_url'),PhotoURL:photoUrlVal,Motivation:gv('reg_motivation')};
+  const fieldMap={CustomerID:cid,Name:name,DogName:name,Breed:gv('reg_breed'),Birthday:bday,BirthdayType:bt,Weight:gv('reg_weight'),GenderStatus:gv('reg_gender_status'),ChipID:gv('reg_chip'),Rescue:gv('reg_rescue'),Nervous:document.getElementById('reg_nervous').value,SepAnxiety:document.getElementById('reg_anxiety').value,DogFriends:gv('reg_dogfriends'),FoodType:gv('reg_food'),FoodMeasure:gv('reg_food_measure'),DietNotes:gv('reg_diet'),Allergies:gv('reg_allergies'),Medical:gv('reg_medical'),MedSchedule:gv('reg_med_schedule'),Fears:gv('reg_fears'),Untouchable:gv('reg_touch'),Vaccination:gv('reg_vacc'),Flea:gv('reg_flea'),Behaviour:gv('reg_behaviour'),WalkSchedule:gv('reg_walk'),CarSeat:gv('reg_car'),SleepLocation:gv('reg_sleep'),EscapeAttempts:gv('reg_escape'),ToiletTrained:gv('reg_toilet'),AloneHours:gv('reg_alone'),TrainingCommands:gv('reg_commands'),PrevSitters:gv('reg_sitters'),UpdateFrequency:gv('reg_updates'),Relationships:gv('reg_rel'),AdditionalNotes:gv('reg_notes'),Owner1:owner,Phone1:sheetPhone(gv('reg_phone')),Owner2:gv('reg_owner2'),Phone2:sheetPhone(gv('reg_phone2')),Owner3:gv('reg_owner3'),Phone3:sheetPhone(gv('reg_phone3')),Address:gv('reg_address'),Postcode:gv('reg_postcode'),Emergency:sheetPhone(gv('reg_emergency')),Vet:gv('reg_vet'),Insurance:gv('reg_insurance'),MeetGreetDate:gv('reg_meetgreet'),Referral:gv('reg_referral'),ReferralNotes:gv('reg_ref_notes'),Service:gv('reg_svc'),Status:gv('reg_status'),Remarks:gv('reg_remarks'),Jogging:gv('reg_jog'),VaccinationURL:gv('reg_vacc_url'),PhotoURL:photoUrlVal,Motivation:gv('reg_motivation'),Barking:document.getElementById('reg_barking').value,RemarkAtHome:gv('reg_rm_home'),RemarkOutdoor:gv('reg_rm_out'),RemarkIndoor:gv('reg_rm_in'),RemarkSleeping:gv('reg_rm_sleep'),RemarkFood:gv('reg_rm_food'),RemarkWithDogs:gv('reg_rm_dogs')};
   const vals=rowFromMap(dogsHdrRow,fieldMap,TABS.DOGS.h);
   try{
     if(eid){
@@ -1889,9 +1896,9 @@ function renderCalendar(){
   _computeNewRis();
   document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===_calView));
   document.getElementById('calBody').innerHTML=_calView==='month'?_calMonthHtml():_calView==='slots'?_calSlotsHtml():_calWeekHtml();
-  if(_calView==='month'&&_calSelDay)document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(_calSelDay);
 }
-function selCalDay(ds){_calSelDay=ds;document.getElementById('calDayDetail').innerHTML=_calDayDetailHtml(ds);document.querySelectorAll('.cal-cell').forEach(c=>c.classList.toggle('sel',c.dataset.d===ds));}
+// Tapping a day in Month view jumps straight to that day's Hour view.
+function openDayHour(ds){_calAnchor=ds;_calSelDay='';_calView='slots';renderCalendar();}
 function _calMonthHtml(){
   const anchor=new Date(_calAnchor+'T12:00:00');const y=anchor.getFullYear(),m=anchor.getMonth();
   const title=anchor.toLocaleString('en-GB',{month:'long',year:'numeric'});
@@ -1903,7 +1910,7 @@ function _calMonthHtml(){
     const names=occs.map(b=>_dogChip(b)).join('')+quo.map(b=>'<span class="cal-dog cal-quo" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')" title="Quoted — not yet committed">'+(b.dog||'')+' (Q)</span>').join('');
     const newArr=ev.arrivals.some(a=>_calNewRis.has(a.b.ri));
     const foot=(ev.arrivals.length?'<span style="color:var(--gn);font-weight:800;">▲'+ev.arrivals.length+'</span> ':'')+(ev.departures.length?'<span style="color:var(--sk);font-weight:800;">▼'+ev.departures.length+'</span>':'')+(quo.length?' <span title="Quoted, not committed" style="color:var(--gr3);font-weight:800;">'+quo.length+'Q</span>':'')+(newArr?' <span title="New (non-returning) dog" style="color:var(--or);font-weight:800;">🆕</span>':'');
-    cells+='<div class="cal-cell'+(inMo?'':' out')+(isToday?' today':'')+(ds===_calSelDay?' sel':'')+'" data-d="'+ds+'" onclick="selCalDay(\''+ds+'\')" style="background:'+bg+';">'+
+    cells+='<div class="cal-cell'+(inMo?'':' out')+(isToday?' today':'')+'" data-d="'+ds+'" onclick="openDayHour(\''+ds+'\')" style="background:'+bg+';cursor:pointer;">'+
       '<div class="cal-cell-hd"><span style="font-weight:700;'+(inMo?'':'color:var(--gr3);')+'">'+d.getDate()+'</span>'+
       (occ>0?'<span style="font-weight:800;color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+
       '<div class="cal-names">'+names+'</div>'+
@@ -1911,34 +1918,11 @@ function _calMonthHtml(){
   }
   const hdr=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-align:center;padding:2px 0;">'+d+'</div>').join('');
   return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;"><span style="font-size:14px;font-weight:800;">'+title+'</span>'+
-    '<span style="font-size:8px;color:var(--gr2);">▲ arrive · ▼ depart · 🆕 new dog · tap a day</span></div>'+
-    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">'+hdr+cells+'</div>'+
-    '<div id="calDayDetail" style="margin-top:10px;"></div>';
+    '<span style="font-size:8px;color:var(--gr2);">▲ arrive · ▼ depart · 🆕 new dog · tap a day → hour view</span></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">'+hdr+cells+'</div>';
 }
 // Normalise any time to HH:MM (strip seconds, pad hour) so the calendar shows 09:00-19:00 consistently.
 function _fmtT(t){if(!t)return'';const p=String(t).split(':');const h=(p[0]||'0').padStart(2,'0');const m=(p[1]||'00').slice(0,2).padStart(2,'0');return h+':'+m;}
-function _calDayDetailHtml(ds){
-  const ev=eventsOn(ds);const occ=occupantsOn(ds);const remaining=Math.max(0,CAL_CAP-occ.length);
-  const d=new Date(ds+'T12:00:00');const dTitle=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
-  const row=(icon,txt,time,col)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--gr4);"><span style="font-size:11px;">'+icon+' '+txt+'</span><span style="font-size:10px;font-weight:700;color:'+(col||'var(--gr2)')+';">'+time+'</span></div>';
-  let h='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:800;">'+dTitle+'</span>'+
-    '<span style="font-size:10px;font-weight:800;color:'+_capCol(occ.length)+';">'+occ.length+'/'+CAL_CAP+' places'+(remaining>0?' · '+remaining+' free':' · FULL')+'</span></div>';
-  const lnk=b=>'<span class="cal-dog" onclick="openDogByCid(\''+(b.customerId||'')+'\')">'+(b.dog||'')+'</span>'+(_calNewRis.has(b.ri)?' 🆕':'');
-  if(!ev.arrivals.length&&!ev.departures.length&&!ev.daycare.length&&!ev.visits.length&&!occ.length)h+='<div style="font-size:10px;color:var(--gr3);">No bookings this day.</div>';
-  ev.arrivals.forEach(a=>h+=row('🟢 Arrive',lnk(a.b)+' (boarding)','⬇ '+_fmtT(a.t),'var(--gn)'));
-  ev.departures.forEach(a=>h+=row('🔵 Depart',lnk(a.b)+' (boarding)','⬆ '+_fmtT(a.t),'var(--sk)'));
-  ev.daycare.forEach(a=>h+=row('☀️ Day care',lnk(a.b),_fmtT(a.drop)+' → '+_fmtT(a.pick),'var(--or)'));
-  ev.visits.forEach(a=>h+=row('🐕 Visit',lnk(a.b)+' ('+(a.b.svc||'')+')',_fmtT(a.t),'var(--pu)'));
-  // continuing stays (present but not arriving/departing today)
-  const arrDepIds=new Set([...ev.arrivals,...ev.departures].map(x=>x.b.ri));
-  const staying=occ.filter(b=>_svcKind(b)==='stay'&&!arrDepIds.has(b.ri));
-  if(staying.length)h+='<div style="font-size:9px;color:var(--gr2);margin-top:6px;">💤 Staying over: '+staying.map(b=>lnk(b)).join(', ')+'</div>';
-  const quo=quotedOn(ds);
-  if(quo.length)h+='<div style="font-size:9px;color:var(--gr3);font-style:italic;margin-top:6px;border-top:1px dashed var(--gr4);padding-top:6px;">📝 Quoted (not committed) · '+quo.length+' — chase or commit: '+quo.map(b=>lnk(b)).join(', ')+'</div>';
-  h+='</div>';
-  return h;
-}
 // Resource grid: 4 "places" (rows) × N days (columns) for boarding/day-care, plus rows for other services.
 function _calGridHtml(start,nDays){
   const today=todayStr();
@@ -1997,13 +1981,15 @@ function _slotPresent(b,ds,slotStart){
   return slotStart<to&&slotEnd>from;
 }
 function _slotDogs(ds,slotStart){return bookings.filter(b=>CAL_ACTIVE.includes(b.status)&&_slotPresent(b,ds,slotStart));}
-// Hour view: places = COLUMNS (#1–#4), hours = ROWS. "Other services" and "Overbooked" appear as extra columns only
-// when that day has such data. Each cell = the dog occupying that place at that hour (blue=board, orange=daycare).
+// Hour view: places = COLUMNS (#1–#4), hours = ROWS. Each booking renders as ONE merged cell spanning the hours it
+// occupies (name shown once). Overbooked dogs (lanes beyond #4) each get their own ⚠ column showing the dog's name.
 function _calSlotsHtml(){
   const ds=_calAnchor;const d=new Date(ds+'T12:00:00');
   const title=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
-  const H0=6,H1=22;// hourly rows 06:00–21:00
+  const H0=6,H1=22;const nRows=H1-H0;// hourly rows 06:00–21:00
   const overlaps=(from,to,h)=>from<(h+1)*60&&to>h*60;
+  // First/last visible hour-row a [from,to] range covers → [firstRowIdx,lastRowIdx] (0-based) or null
+  const rowSpan=(from,to)=>{let f=-1,l=-1;for(let h=H0;h<H1;h++){if(overlaps(from,to,h)){if(f<0)f=h-H0;l=h-H0;}}return f<0?null:[f,l];};
   // Overnight (boarding/dog-sit) + day-care → assign each to a place lane; extra lanes beyond CAL_CAP = overbooked
   const items=[];
   bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;const k=_svcKind(b);if(k==='visit')return;const nsd=normDate(b.sd),ned=normDate(b.ed||b.sd);if(!nsd||!(nsd<=ds&&ds<=(ned||nsd)))return;
@@ -2016,35 +2002,39 @@ function _calSlotsHtml(){
   // Other services (walk / drop-in / taxi / training) on this day
   const visits=[];
   bookings.forEach(b=>{const committed=CAL_ACTIVE.includes(b.status),quoted=b.status==='Quoted';if(!committed&&!quoted)return;if(_svcKind(b)!=='visit')return;if(normDate(b.sd)!==ds)return;const stM=_minOf(b.st);let etM=_minOf(b.et);if(isNaN(stM))return;if(isNaN(etM)||etM<=stM)etM=stM+60;visits.push({b,quoted,from:stM,to:etM});});
-  const hasOther=visits.length>0,hasOver=lanes.length>CAL_CAP;
-  // build columns: 4 places, then (if data) Overbooked, then Other
-  const cols=[];for(let p=0;p<CAL_CAP;p++)cols.push({type:'place',lane:p,lbl:'#'+(p+1)});
-  if(hasOver)cols.push({type:'over',lbl:'⚠ Over'});
+  const hasOther=visits.length>0;
+  // Columns: places #1–#4, one ⚠ column per overbooked lane (shows the dog's name), then Other if any.
+  const nLanes=Math.max(CAL_CAP,lanes.length);
+  const cols=[];for(let p=0;p<nLanes;p++)cols.push({type:'place',lane:p,over:p>=CAL_CAP,lbl:p>=CAL_CAP?'⚠':'#'+(p+1)});
   if(hasOther)cols.push({type:'other',lbl:'Other'});
   const nCol=cols.length;
-  let g='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><div class="cw-grid" style="grid-template-columns:40px repeat('+nCol+',minmax(48px,1fr));min-width:'+(40+nCol*52)+'px;">';
-  g+='<div class="cw-cell cw-corner"></div>';
-  cols.forEach(c=>g+='<div class="cw-cell cw-dayhd"'+(c.type==='over'?' style="color:var(--rd);"':'')+'>'+c.lbl+'</div>');
-  for(let h=H0;h<H1;h++){
-    g+='<div class="cw-cell cw-lanelbl" style="font-size:9px;">'+String(h).padStart(2,'0')+':00</div>';
-    cols.forEach(c=>{
-      if(c.type==='place'){
-        const it=(lanes[c.lane]||[]).find(x=>overlaps(x.from,x.to,h));
-        if(it){const b=it.b;const solid=it.k==='day'?'var(--or)':'var(--sk)';
-          g+='<div class="cw-cell" style="cursor:pointer;font-size:8px;font-weight:700;'+(it.quoted?'border:1px dashed var(--gr3);color:var(--gr2);':'background:'+solid+';color:#fff;')+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+(b.dog||'')+'">'+(b.dog||'')+(it.quoted?' (Q)':'')+'</div>';}
-        else g+='<div class="cw-cell cw-bgcell"></div>';
-      }else if(c.type==='over'){
-        const cnt=lanes.slice(CAL_CAP).reduce((s,lane)=>s+(lane.some(x=>overlaps(x.from,x.to,h))?1:0),0);
-        g+='<div class="cw-cell" style="font-size:10px;font-weight:800;'+(cnt?'background:var(--rdl);color:var(--rd);':'color:var(--gr3);')+'">'+(cnt||'')+'</div>';
-      }else{
-        const vs=visits.filter(x=>overlaps(x.from,x.to,h));
-        g+='<div class="cw-cell" style="font-size:7px;line-height:1.15;'+(vs.length?'background:var(--pul);color:var(--pu);cursor:pointer;':'')+'"'+(vs.length?' onclick="openDogByCid(\''+(vs[0].b.customerId||'')+'\')"':'')+'>'+vs.map(x=>(x.b.dog||'')+(x.quoted?' (Q)':'')).join(', ')+'</div>';
-      }
-    });
+  let g='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><div class="cw-grid" style="grid-template-columns:40px repeat('+nCol+',minmax(30px,1fr));min-width:'+(40+nCol*34)+'px;">';
+  // header row
+  g+='<div class="cw-cell cw-corner" style="grid-row:1;grid-column:1;"></div>';
+  cols.forEach((c,ci)=>g+='<div class="cw-cell cw-dayhd" style="grid-row:1;grid-column:'+(ci+2)+';'+(c.over?'color:var(--rd);':'')+'">'+c.lbl+'</div>');
+  // hour labels + empty background cells for every row/column
+  for(let r=0;r<nRows;r++){
+    g+='<div class="cw-cell cw-lanelbl" style="font-size:9px;grid-row:'+(r+2)+';grid-column:1;">'+String(H0+r).padStart(2,'0')+':00</div>';
+    cols.forEach((c,ci)=>g+='<div class="cw-cell cw-bgcell" style="grid-row:'+(r+2)+';grid-column:'+(ci+2)+';"></div>');
   }
+  // merged booking cells (name once, spanning its hours) — placed on top of the background cells
+  const barSty='font-weight:700;justify-content:center;align-items:center;line-height:1;';
+  const vnm='writing-mode:vertical-rl;transform:rotate(180deg);max-height:100%;';// dog name reads bottom→top so columns can stay narrow
+  cols.forEach((c,ci)=>{
+    if(c.type==='place'){(lanes[c.lane]||[]).forEach(it=>{const sp=rowSpan(it.from,it.to);if(!sp)return;const b=it.b;
+      let fill;
+      if(it.quoted)fill='background:var(--gr5);color:var(--gr2);border-left:3px solid var(--gr3);font-style:italic;';
+      else if(c.over)fill='background:var(--rdl);color:var(--rd);border-left:3px solid var(--rd);';
+      else if(it.k==='day')fill='background:var(--orxl);color:var(--cn);border-left:3px solid var(--or);';
+      else fill='background:var(--bll);color:var(--bl);border-left:3px solid var(--sk);';
+      const per=_fmtT(b.st||(it.k==='day'?'07:00':'09:00'))+'-'+_fmtT(b.et||'18:00');
+      g+='<div class="cw-bar" style="grid-column:'+(ci+2)+';grid-row:'+(sp[0]+2)+' / '+(sp[1]+3)+';font-size:9px;'+barSty+fill+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+(b.dog||'')+(c.over?' (OVERBOOKED)':'')+' · '+per+'"><span class="cw-nm" style="'+vnm+'">'+(b.dog||'')+(it.quoted?' (Q)':'')+'</span></div>';});
+    }else{visits.forEach(v=>{const sp=rowSpan(v.from,v.to);if(!sp)return;
+      g+='<div class="cw-bar" style="grid-column:'+(ci+2)+';grid-row:'+(sp[0]+2)+' / '+(sp[1]+3)+';font-size:8px;'+barSty+'background:var(--pul);color:var(--pu);border-left:3px solid var(--pu);" onclick="openDogByCid(\''+(v.b.customerId||'')+'\')" title="'+(v.b.dog||'')+'"><span class="cw-nm" style="'+vnm+'">'+(v.b.dog||'')+(v.quoted?' (Q)':'')+'</span></div>';});}
+  });
   g+='</div></div>';
   const pre=bookings.filter(b=>CAL_ACTIVE.includes(b.status)&&_svcKind(b)==='stay'&&_slotPresent(b,ds,5*60)).length;
-  return _calGridHdr(title,'Places = columns · hours = rows · blue=board · orange=daycare · ‹ › = other days')+
+  return _calGridHdr(title,'Places = columns · hours = rows · blue=board · orange=daycare · ⚠=overbooked · ‹ › = other days')+
     '<div style="font-size:9px;color:var(--gr2);margin-bottom:6px;background:var(--gr5);padding:5px 8px;border-radius:var(--r);">🌙 Overnight (before 06:00): <b>'+pre+'</b> boarder'+(pre!==1?'s':'')+' on-site</div>'+g;
 }
 
@@ -2176,7 +2166,7 @@ function renderAnalysis(){
   bookings.filter(b=>b.sd&&normDate(b.sd)>today&&active.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!nextBk[k]||nsd<nextBk[k])nextBk[k]=nsd;});
   const top10=Object.values(ltvMap).sort((a,b)=>b.total-a.total).slice(0,10);
   const maxLtv=top10[0]?.total||1;
-  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;const nxt=nextBk[c.cid||c.dog];return'<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:3px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="display:flex;gap:10px;font-size:8px;color:var(--gr3);"><span>'+c.count+' booking'+(c.count!==1?'s':'')+'</span>'+(c.lastDate?'<span>last: '+c.lastDate+'</span>':'')+(nxt?'<span style="color:var(--gn);font-weight:700;">next: '+nxt+'</span>':(c.lastDate&&c.count>1?'<span>no upcoming</span>':''))+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
+  document.getElementById('anLTV').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+(top10.length?top10.map((c,i)=>{const pct=c.total/maxLtv*100;const nxt=nextBk[c.cid||c.dog];return'<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+(i+1)+'. '+c.dog+(c.cid&&c.cid!==c.dog?' <span style="font-weight:400;color:var(--gr3);font-size:9px;">'+c.cid+'</span>':'')+'</span><span style="color:var(--or);">'+fmtGBP(c.total)+'</span></div><div style="height:5px;background:var(--gr4);border-radius:3px;margin-bottom:3px;"><div style="height:5px;background:var(--or);border-radius:3px;width:'+pct+'%;"></div></div><div style="display:flex;gap:10px;font-size:8px;color:var(--gr3);"><span>'+c.count+' booking'+(c.count!==1?'s':'')+'</span>'+(c.lastDate?'<span>last: '+c.lastDate+'</span>':'')+(nxt?'<span style="color:var(--gn);font-weight:700;">next: '+nxt+'</span>':'')+'</div></div>';}).join(''):'<div style="color:var(--gr3);font-size:11px;">No paid bookings found</div>')+'</div>';
 }
 
 // ==================== TRAINING ====================

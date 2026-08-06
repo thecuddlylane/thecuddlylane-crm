@@ -487,7 +487,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v62b1</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v66b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -501,7 +501,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="screen active" id="sc-board">
   <div style="margin:10px 13px 0;background:var(--rdl);border:1px solid #FCA5A5;border-radius:var(--r);padding:9px 11px;font-size:10px;color:var(--rd);display:none;" id="credWarn">No credentials — tap Settings to connect Google Sheets.</div>
   <div class="brd-hdr"><div><div class="brd-t">Today's Board</div><div class="brd-d" id="boardDate"></div></div></div>
-  <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name or ID..." oninput="renderBoard()"></div>
+  <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name, breed or ID..." oninput="renderBoard()"></div>
   <div class="bsec">
     <div class="bsec-l on">Active today</div>
     <div class="dcards" id="todayCards"><div class="empty"><p>Tap Refresh to load</p></div></div>
@@ -993,12 +993,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="screen" id="sc-profile">
   <div class="p-hero">
     <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;">
-      <div class="phw" id="profPhotoWrap" onclick="promptGdriveUrl('profile')">
+      <div class="phw" id="profPhotoWrap" onclick="promptGdriveUrl('profile')" title="Tap to paste a Google Drive photo link">
         <span id="profEmoji" style="font-size:33px;">🐶</span>
         <div class="phe">📷</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
-        <button onclick="promptGdriveUrl('profile')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">🔗 Drive URL</button>
         <button onclick="copyPhotoUrl()" id="copyPhotoUrlBtn" style="display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">📋 Copy URL</button>
       </div>
     </div>
@@ -1071,11 +1070,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
   <div class="pg">
     <div class="pg-t" id="regTitle">Register New Dog</div>
     <div style="display:flex;flex-direction:column;align-items:center;padding:12px 0;">
-      <div id="regPhotoCircle" onclick="promptGdriveUrl('register')" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-        <span style="font-size:9px;color:var(--gr3);">Tap circle to add photo</span>
-        <button class="sbtn2" onclick="promptGdriveUrl('register')" style="font-size:11px;padding:4px 10px;">🔗 Drive URL</button>
-      </div>
+      <div id="regPhotoCircle" onclick="promptGdriveUrl('register')" title="Tap to paste a Google Drive photo link" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
     </div>
     <input type="hidden" id="reg_eid"><input type="hidden" id="reg_ridx">
     <div class="fsec">Dog Details</div>
@@ -1109,6 +1104,13 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <input type="range" id="reg_jog" min="1" max="5" value="3" oninput="updJogBar()" style="flex:1;">
         <div class="nb-bar" id="reg_jog_bar" style="width:72px;"><div class="nb-seg" id="jgs0"></div><div class="nb-seg" id="jgs1"></div><div class="nb-seg" id="jgs2"></div><div class="nb-seg" id="jgs3"></div><div class="nb-seg" id="jgs4"></div></div>
         <span class="nval" id="reg_jogval">3</span>
+      </div>
+    </div>
+    <div class="f"><label>Barking level (1–5)</label>
+      <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
+        <input type="range" id="reg_barking" min="1" max="5" value="1" oninput="updBarkBar()" style="flex:1;">
+        <div class="nb-bar" id="reg_bark_bar" style="width:72px;"><div class="nb-seg" id="bks0"></div><div class="nb-seg" id="bks1"></div><div class="nb-seg" id="bks2"></div><div class="nb-seg" id="bks3"></div><div class="nb-seg" id="bks4"></div></div>
+        <span class="nval" id="reg_barkval">1</span>
       </div>
     </div>
     <div class="f"><label>Friendly with dogs? (breeds to avoid)</label><input class="fi" id="reg_dogfriends" placeholder="e.g. Good with small breeds — avoid Huskies"></div>
@@ -1160,7 +1162,14 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <input type="hidden" id="reg_svc">
     </div>
     <div class="f"><label>Status</label><select class="fs" id="reg_status"><option>Active</option><option>Inactive</option></select></div>
-    <div class="f"><label>Remarks</label><textarea class="fta" id="reg_remarks"></textarea></div>
+    <div class="fsec">Staff Remarks</div>
+    <div class="f"><label>At home</label><textarea class="fta" id="reg_rm_home" style="min-height:44px;"></textarea></div>
+    <div class="f"><label>Outdoor</label><textarea class="fta" id="reg_rm_out" style="min-height:44px;"></textarea></div>
+    <div class="f"><label>Indoor</label><textarea class="fta" id="reg_rm_in" style="min-height:44px;"></textarea></div>
+    <div class="f"><label>Sleeping pattern</label><textarea class="fta" id="reg_rm_sleep" style="min-height:44px;"></textarea></div>
+    <div class="f"><label>Food</label><textarea class="fta" id="reg_rm_food" style="min-height:44px;"></textarea></div>
+    <div class="f"><label>With other dogs</label><textarea class="fta" id="reg_rm_dogs" style="min-height:44px;"></textarea></div>
+    <div class="f"><label>General remarks</label><textarea class="fta" id="reg_remarks"></textarea></div>
     <div class="srow"><button class="sbtn2" id="regBtn" onclick="registerDog()">Register Dog</button><span class="smsg" id="regStatus"></span></div>
     <div style="height:18px;"></div>
   </div>
