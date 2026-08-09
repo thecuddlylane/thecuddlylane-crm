@@ -492,7 +492,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v67b1</div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v70b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -953,7 +953,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
           <button onclick="clearActFilters()" style="font-size:9px;background:none;border:none;color:var(--or);cursor:pointer;font-family:var(--fb);text-decoration:underline;">Clear all</button>
         </div>
       </div>
-      <div class="af-grp"><span class="af-lbl">Location</span>
+      <div class="af-grp" style="margin-top:2px;">
         <button class="af-chip" data-facet="loc" data-val="Home" onclick="toggleActChip(this)">🏠 Home</button>
         <button class="af-chip" data-facet="loc" data-val="Garden" onclick="toggleActChip(this)">🌿 Garden</button>
         <button class="af-chip" data-facet="loc" data-val="Indoor" onclick="toggleActChip(this)">🏢 Indoor</button>
@@ -1004,20 +1004,17 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- PROFILE -->
 <div class="screen" id="sc-profile">
   <div class="p-hero">
-    <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;">
-      <div class="phw" id="profPhotoWrap" onclick="promptGdriveUrl('profile')" title="Tap to paste a Google Drive photo link">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="phw" id="profPhotoWrap" onclick="promptGdriveUrl('profile')" title="Tap to view / update the Google Drive photo link" style="flex-shrink:0;">
         <span id="profEmoji" style="font-size:33px;">🐶</span>
         <div class="phe">📷</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:5px;">
-        <button onclick="copyPhotoUrl()" id="copyPhotoUrlBtn" style="display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--fb);">📋 Copy URL</button>
+      <div style="flex:1;min-width:0;">
+        <div class="pnm" id="profName"></div>
+        <div class="pmt" id="profMeta"></div>
+        <div class="pid" id="profId"></div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-      <div class="pnm" id="profName"></div>
-    </div>
-    <div class="pmt" id="profMeta"></div>
-    <div class="pid" id="profId"></div>
   </div>
   <div class="ptabs">
     <button class="ptab active" data-tab="logs" onclick="swPTab('logs',this)">Logs</button>
@@ -1126,6 +1123,13 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
         <input type="range" id="reg_barking" min="1" max="5" value="1" oninput="updBarkBar()" style="flex:1;">
         <div class="nb-bar" id="reg_bark_bar" style="width:72px;"><div class="nb-seg" id="bks0"></div><div class="nb-seg" id="bks1"></div><div class="nb-seg" id="bks2"></div><div class="nb-seg" id="bks3"></div><div class="nb-seg" id="bks4"></div></div>
         <span class="nval" id="reg_barkval">1</span>
+      </div>
+    </div>
+    <div class="f"><label>Sociability (1 = Introvert … 5 = Extrovert)</label>
+      <div style="display:flex;align-items:center;gap:9px;margin-top:3px;">
+        <input type="range" id="reg_socia" min="1" max="5" value="3" oninput="updSociaBar()" style="flex:1;">
+        <div class="nb-bar" id="reg_socia_bar" style="width:72px;"><div class="nb-seg" id="scs0"></div><div class="nb-seg" id="scs1"></div><div class="nb-seg" id="scs2"></div><div class="nb-seg" id="scs3"></div><div class="nb-seg" id="scs4"></div></div>
+        <span class="nval" id="reg_sociaval">3</span>
       </div>
     </div>
     <div class="f"><label>Friendly with dogs? (breeds to avoid)</label><input class="fi" id="reg_dogfriends" placeholder="e.g. Good with small breeds — avoid Huskies"></div>
@@ -1287,6 +1291,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div class="f"><label>Separation anxiety (1–5) · <b id="sn_anxval">1</b></label><input type="range" id="sn_anxiety" min="1" max="5" value="1" oninput="document.getElementById('sn_anxval').textContent=this.value" style="width:100%;"></div>
       <div class="f"><label>Jogging suitability (1–5) · <b id="sn_jogval">3</b></label><input type="range" id="sn_jog" min="1" max="5" value="3" oninput="document.getElementById('sn_jogval').textContent=this.value" style="width:100%;"></div>
       <div class="f"><label>Barking level (1–5) · <b id="sn_barkval">1</b></label><input type="range" id="sn_barking" min="1" max="5" value="1" oninput="document.getElementById('sn_barkval').textContent=this.value" style="width:100%;"></div>
+      <div class="f"><label>Sociability · <b id="sn_sociaval">3</b> <span style="font-weight:400;color:var(--gr3);font-size:9px;">(1 Introvert – 5 Extrovert)</span></label><input type="range" id="sn_socia" min="1" max="5" value="3" oninput="document.getElementById('sn_sociaval').textContent=this.value" style="width:100%;"></div>
       <div class="f"><label>At home</label><textarea class="fta" id="sn_rm_home" style="min-height:42px;"></textarea></div>
       <div class="f"><label>Outdoor</label><textarea class="fta" id="sn_rm_out" style="min-height:42px;"></textarea></div>
       <div class="f"><label>Indoor</label><textarea class="fta" id="sn_rm_in" style="min-height:42px;"></textarea></div>
