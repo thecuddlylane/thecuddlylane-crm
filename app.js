@@ -307,6 +307,9 @@ function renderPendingPanel(){
   Object.values(bkMap).forEach(({bk,tasks})=>{if(!tasks.length)return;const e=dogEntry(bk.customerId||bk.dog,bk.dog);((bk.ed||bk.sd)<today?e.past:e.up).push({bk,tasks});});
   missingLogs.forEach(({dog,dates})=>{dogEntry(dog.cid,dog.name).missing=dates;});
   const dogList=Object.values(dogs);
+  // Outstanding counter → rendered into the sticky #todoCounter (shown in both empty and non-empty states).
+  const cpill=(lbl,n,col)=>'<span style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:99px;background:'+col+'1a;color:'+col+';border:1px solid '+col+';">'+lbl+' '+n+'</span>';
+  const cc=document.getElementById('todoCounter');if(cc)cc.innerHTML='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;font-weight:800;">'+totalOut+' outstanding</span>'+cpill('🆕 New',buckets.New,'#F97316')+cpill('🔴 Live',buckets.Live,'#16A34A')+cpill('✅ Completed',buckets.Completed,'#78716C')+'</div>';
   if(!dogList.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
   // Upcoming: soonest first · Past: most recent first · Dogs ordered by soonest upcoming (dogs with only past come after).
   dogList.forEach(d=>{d.up.sort((a,c)=>(a.bk.sd||'').localeCompare(c.bk.sd||''));d.past.sort((a,c)=>((c.bk.ed||c.bk.sd)||'').localeCompare((a.bk.ed||a.bk.sd)||''));});
@@ -317,8 +320,7 @@ function renderPendingPanel(){
   const bkStatusEmoji=bk=>{const ed=(bk.ed||bk.sd);return ed<today?'✅':(bk.sd>today?'🆕':'🔴');};
   const bkRow=x=>'<div style="border-top:1px solid var(--gr4);"><div onclick="openBkModal(\''+x.bk.id+'\',false,'+x.bk.ri+',2)" style="cursor:pointer;padding:6px 10px 4px;"><span style="font-size:10px;font-weight:700;color:var(--bk);">'+bkStatusEmoji(x.bk)+' '+x.bk.svc+' · '+dates(x)+' <span style="font-size:11px;">✏️</span></span></div>'+x.tasks.map(t=>taskRow(x.bk,t)).join('')+'</div>';
   const subhd=t=>'<div style="font-size:8px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;padding:5px 10px 2px;background:var(--gr5);">'+t+'</div>';
-  const cpill=(lbl,n,col)=>'<span style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:99px;background:'+col+'1a;color:'+col+';border:1px solid '+col+';">'+lbl+' '+n+'</span>';
-  let html='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:11px;"><span style="font-size:12px;font-weight:800;">'+totalOut+' outstanding</span>'+cpill('🆕 New',buckets.New,'#F97316')+cpill('🔴 Live',buckets.Live,'#16A34A')+cpill('✅ Completed',buckets.Completed,'#78716C')+'</div>';
+  let html='';
   dogList.forEach(d=>{
     const d0=allDogs.find(x=>x.cid===d.cid);
     const photo=d0?resolvePhotoUrl(d0):'';
@@ -707,7 +709,7 @@ function buildProfInfo(dog){
     '<div class="psec" style="--sc:var(--rd);"><div class="psec-h"><span class="psec-ic">🩺</span>Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="psec" style="--sc:var(--hn);"><div class="psec-h"><span class="psec-ic">🦴</span>Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="psec" style="--sc:var(--gr2);"><div class="psec-h"><span class="psec-ic">📝</span>Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
-    '<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks</div>'+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+(dog.barking?'<div class="irow"><span class="ikey">Barking level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.barking,parseInt(dog.barking)>=4?'var(--rd)':'var(--hn)')+'</span></div>':'')+(dog.socia?'<div class="irow"><span class="ikey">Sociability</span><span class="ival" style="display:flex;align-items:center;gap:4px;flex:1;">'+nbar(dog.socia,'var(--pu)')+'<span style="font-size:8px;color:var(--gr3);">Intro→Extro</span></span></div>':'')+ir('At home',dog.rmHome)+ir('Outdoor',dog.rmOut)+ir('Indoor',dog.rmIn)+ir('Sleeping pattern',dog.rmSleep)+ir('Food',dog.rmFood)+ir('With other dogs',dog.rmDogs)+ir('General',dog.remarks)+'</div>'+
+    '<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks</div>'+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+(dog.barking?'<div class="irow"><span class="ikey">Barking level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.barking,parseInt(dog.barking)>=4?'var(--rd)':'var(--hn)')+'</span></div>':'')+(dog.socia?'<div class="irow"><span class="ikey">Sociability with dogs</span><span class="ival" style="display:flex;align-items:center;gap:4px;flex:1;">'+nbar(dog.socia,'var(--pu)')+'</span></div>':'')+ir('At home',dog.rmHome)+ir('Outdoor',dog.rmOut)+ir('Indoor',dog.rmIn)+ir('Sleeping pattern',dog.rmSleep)+ir('Food',dog.rmFood)+ir('With other dogs',dog.rmDogs)+ir('General',dog.remarks)+'</div>'+
     '<div class="psec" style="--sc:var(--bl);"><div class="psec-h"><span class="psec-ic">📞</span>Owners &amp; Contacts</div>'+ir('Owner 1',dog.owner)+(dog.phone?'<div class="irow"><span class="ikey">Phone 1</span><span class="ival">'+waLink(dog.phone)+'</span></div>':'')+ir('Owner 2',dog.owner2)+(dog.phone2?'<div class="irow"><span class="ikey">Phone 2</span><span class="ival">'+waLink(dog.phone2)+'</span></div>':'')+ir('Owner 3',dog.owner3)+(dog.phone3?'<div class="irow"><span class="ikey">Phone 3</span><span class="ival">'+waLink(dog.phone3)+'</span></div>':'')+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency',dog.emergency)+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
     '<div class="psec" style="--sc:var(--gr3);"><div class="psec-h"><span class="psec-ic">🆔</span>Identifiers</div>'+ir('Customer ID',dog.cid)+ir('Microchip',dog.chip)+'</div>';
 }
@@ -1544,7 +1546,9 @@ function switchBkTab(n){
 function wfAutoLogs(bk){
   if(!bk||!bk.sd)return null;
   if(bk.wf&&bk.wf.dailyLogs)return true;
-  const today=todayStr();const endD=bk.ed&&bk.ed<today?bk.ed:(()=>{const y=new Date(today+'T12:00:00Z');y.setUTCDate(y.getUTCDate()-1);return y.toISOString().slice(0,10);})();
+  const today=todayStr();const ed=bk.ed||bk.sd;
+  if(today<ed)return false;// only auto-complete from the last day of service onward — not mid-service when only past days are logged
+  const endD=ed<today?ed:(()=>{const y=new Date(today+'T12:00:00Z');y.setUTCDate(y.getUTCDate()-1);return y.toISOString().slice(0,10);})();
   if(bk.sd>endD)return true;
   let d=new Date(bk.sd+'T12:00:00Z');const end=new Date(endD+'T12:00:00Z');
   while(d<=end){const ds=d.toISOString().slice(0,10);if(!dailyLogSet.has(bk.customerId+'_'+ds))return false;d.setUTCDate(d.getUTCDate()+1);}
@@ -1553,6 +1557,7 @@ function wfAutoLogs(bk){
 function wfAutoCompat(bk){
   if(!bk||!bk.dog)return null;
   if(bk.wf&&bk.wf.compat)return true;
+  {const today=todayStr();const ed=bk.ed||bk.sd;if(today<ed)return false;}// only auto-complete from the last day of service onward
   const bkCid=bk.customerId||'';const bkDog=(bk.dog||'').toLowerCase();
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
   const qStart=new Date(bk.sd+'T00:00');const qEnd=new Date((bk.ed||bk.sd)+'T23:59');
@@ -2564,7 +2569,9 @@ function registerSW(){if('serviceWorker' in navigator){navigator.serviceWorker.r
 loadConfig();checkCreds();loadQSettings();initPin();
 msgTpls=JSON.parse(localStorage.getItem('tcl_msg_tpls')||'[]');
 loadActivities();
-document.getElementById('boardDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('boardDate').textContent='· '+new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+// Promote the footer version (tcl-vXX) into the header so staff can see which build they're on.
+(function(){const fm=(document.getElementById('verFooter')?.textContent||'').match(/tcl-v[\w.]+/);const av=document.getElementById('appVer');if(fm&&av)av.textContent=fm[0].replace('tcl-','');})();
 document.getElementById('backBtn').style.display='none';
 document.getElementById('reg_eid').value='';document.getElementById('reg_ridx').value='';
 document.getElementById('st_date').value=todayStr();
