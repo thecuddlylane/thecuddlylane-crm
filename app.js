@@ -86,7 +86,8 @@ const WF_STEPS=[
   {k:'dailyLogs',l:'Daily logs completed',g:'during'},
   {k:'compat',l:'Compatibility / overlap logged',g:'during'},
   {k:'reviewReq',l:'Review request sent',g:'after'},
-  {k:'review',l:'Review logged (or marked N/A)',g:'after'}
+  {k:'review',l:'Review logged (or marked N/A)',g:'after'},
+  {k:'staffNotes',l:'Update staff notes',g:'after'}
 ];
 const WF_GRP={before:'📋 Before arrival',during:'🏠 During service',after:'⭐ After service'};
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_addDogs=[],_mainDog='';
@@ -163,7 +164,7 @@ async function doCreateSheet(){
   const t=await getToken().catch(e=>{s.textContent='Error: '+e.message;return null;});if(!t)return;
   const sheets=[
     {n:TABS.DOGS,h:['CustomerID','DogName','Breed','GenderStatus','Birthday','BirthdayType','Weight','ChipID','Rescue','Nervous','SepAnxiety','Jogging','DogFriends','FoodType','FoodMeasure','DietNotes','Allergies','Medical','MedSchedule','Fears','Untouchable','Vaccination','Flea','Behaviour','Motivation','WalkSchedule','CarSeat','SleepLocation','EscapeAttempts','ToiletTrained','AloneHours','TrainingCommands','PrevSitters','UpdateFrequency','Relationships','AdditionalNotes','Owner1','Phone1','Owner2','Phone2','Owner3','Phone3','Address','Postcode','Emergency','Vet','Insurance','MeetGreetDate','Referral','ReferralNotes','Service','Status','Remarks','VaccinationURL','PhotoURL','Barking','RemarkAtHome','RemarkOutdoor','RemarkIndoor','RemarkSleeping','RemarkFood','RemarkWithDogs','Sociability','InsuranceURL','EmergencyName','EmergencyPhone','EmergencyRelationship']},
-    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_PackingList','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','WF_DailyLogs','WF_Compat','WF_DocsReq','WF_ConsentSent','BookingRef','PrepaymentRef','FinalPaymentRef','WF_DatabaseUpdated']},
+    {n:TABS.BK,h:['CustomerID','DogName','ID','ServiceType','StartDate','StartTime','EndDate','EndTime','DropoffLocation','PickupLocation','Revenue','Tips','Prepayment','FinalPayment','UnitCost','DiscountNotes','RoverCommissionPct','RoverCommissionGBP','Channel','Payment','Status','Private','Month','Rating','Feedback','Rem1','Rem2','Rem3','Rem4','Rem5','WF_WhatsApp','WF_PackingList','WF_DocsReceived','WF_ConsentSigned','WF_DropoffReminder','WF_PickupReminder','WF_FinalPayReminder','WF_ReviewRequest','WF_Review','WF_DailyLogs','WF_Compat','WF_DocsReq','WF_ConsentSent','BookingRef','PrepaymentRef','FinalPaymentRef','WF_DatabaseUpdated','WF_StaffNotes']},
     {n:TABS.DAILY,h:['CustomerID','DogName','Date','Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','Garden','WalkPM','BeforeSleep','Game','Bowl','Room','Garment','Notes','Private']},
     {n:TABS.HEALTH,h:['CustomerID','DogName','Date','Owner','Issue','Category','Location','Importance','Description','RootCause','','NextStep','Private']},
     {n:TABS.FIGHT,h:['CustomerID','DogName','Date','Time','Owner','OtherDogs','Issue','Importance','Injuries','Treatment','Prevention','Private']},
@@ -226,6 +227,7 @@ function bkWfPendingItems(bk){
       if(!wfStepValue(bk,'reviewReq'))items.push({key:'reviewReq',label:'Send review request'});
       else if(!wfStepValue(bk,'review'))items.push({key:'review',label:'Log review (or mark N/A)'});
     }
+    if(!wfStepValue(bk,'staffNotes'))items.push({key:'staffNotes',label:'Update staff notes'});
     return items;
   }
   // Setup steps appear as soon as the booking is committed (any status except Quoted/Cancelled).
@@ -281,14 +283,25 @@ function computePendingActions(){
     qbks.sort((a,c)=>(a.sd||'').localeCompare(c.sd||''));
     vaccReminders.push({dog:d,missing:vaccMissing,vacc:d.vacc,bk:qbks[0]});
   });
+  // Emergency-contact reminders (high priority): same trigger as vaccination, but for a dog with no usable emergency contact on record.
+  const emergReminders=[];
+  allDogs.forEach(d=>{
+    const legacy=(d.emergency||'').trim().toLowerCase();
+    const legacyOk=legacy&&!['tbc','na','n/a','-','yes','no'].includes(legacy);
+    if((d.emergPhone||'').trim()||(d.emergName||'').trim()||legacyOk)return;// some contact on record
+    const qbks=bookings.filter(b=>!b.priv&&bkMatchesDog(b,d)&&PAID_UP.includes(b.status)&&b.sd&&(b.sd>=today||(b.sd<=today&&(b.ed||b.sd)>=today)));
+    if(!qbks.length)return;
+    qbks.sort((a,c)=>(a.sd||'').localeCompare(c.sd||''));
+    emergReminders.push({dog:d,bk:qbks[0]});
+  });
   const tm=localStorage.getItem('tcl_train_month')||'';const[tmMonth,tmHas]=tm.split(':');
   const noTrainingThisMonth=tmMonth===today.slice(0,7)&&tmHas==='0';
-  return{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders};
+  return{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders};
 }
 function updatePendingBadge(){
   const b=document.getElementById('pendingBadge');if(!b)return;
-  const{missingLogs,wfTasks,noTrainingThisMonth,vaccReminders}=computePendingActions();
-  const n=missingLogs.length+wfTasks.length+(vaccReminders?vaccReminders.length:0)+(noTrainingThisMonth?1:0);
+  const{missingLogs,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders}=computePendingActions();
+  const n=missingLogs.length+wfTasks.length+(vaccReminders?vaccReminders.length:0)+(emergReminders?emergReminders.length:0)+(noTrainingThisMonth?1:0);
   if(n){b.textContent=n;b.style.display='block';}else b.style.display='none';
 }
 function togglePendingPanel(){
@@ -308,7 +321,7 @@ async function quickToggleWf(bkId,bkRi,key){
 }
 function renderPendingPanel(){
   const el=document.getElementById('pending_results');if(!el)return;
-  const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders}=computePendingActions();
+  const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders}=computePendingActions();
   const today=todayStr();
   // Collect per-booking tasks, then group by dog.
   const bkMap={};const ensure=bk=>{const k=(bk.ri||bk.id);if(!bkMap[k])bkMap[k]={bk,tasks:[]};return bkMap[k];};
@@ -318,11 +331,13 @@ function renderPendingPanel(){
   Object.values(bkMap).forEach(({bk,tasks})=>{const ed=(bk.ed||bk.sd);const bkt=ed<today?'Completed':(bk.sd>today?'New':'Live');buckets[bkt]+=tasks.length;});
   missingLogs.forEach(({dog})=>{const live=bookings.some(b=>bkMatchesDog(b,dog)&&normDate(b.sd)<=today&&today<=normDate(b.ed||b.sd));buckets[live?'Live':'Completed']+=1;});
   (vaccReminders||[]).forEach(({bk})=>{const live=bk&&bk.sd<=today&&today<=(bk.ed||bk.sd);buckets[live?'Live':'New']+=1;});
+  (emergReminders||[]).forEach(({bk})=>{const live=bk&&bk.sd<=today&&today<=(bk.ed||bk.sd);buckets[live?'Live':'New']+=1;});
   const totalOut=buckets.New+buckets.Live+buckets.Completed;
-  const dogs={};const dogEntry=(cid,name)=>{if(!dogs[cid])dogs[cid]={name,cid,up:[],past:[],missing:null,vacc:null};return dogs[cid];};
+  const dogs={};const dogEntry=(cid,name)=>{if(!dogs[cid])dogs[cid]={name,cid,up:[],past:[],missing:null,vacc:null,emerg:null};return dogs[cid];};
   Object.values(bkMap).forEach(({bk,tasks})=>{if(!tasks.length)return;const e=dogEntry(bk.customerId||bk.dog,bk.dog);((bk.ed||bk.sd)<today?e.past:e.up).push({bk,tasks});});
   missingLogs.forEach(({dog,dates})=>{dogEntry(dog.cid,dog.name).missing=dates;});
   (vaccReminders||[]).forEach(v=>{dogEntry(v.dog.cid,v.dog.name).vacc=v;});
+  (emergReminders||[]).forEach(v=>{dogEntry(v.dog.cid,v.dog.name).emerg=v;});
   const dogList=Object.values(dogs);
   // Outstanding counter → rendered into the sticky #todoCounter (shown in both empty and non-empty states).
   const cpill=(lbl,n,col)=>'<span style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:99px;background:'+col+'1a;color:'+col+';border:1px solid '+col+';">'+lbl+' '+n+'</span>';
@@ -330,7 +345,9 @@ function renderPendingPanel(){
   if(!dogList.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
   // Upcoming: soonest first · Past: most recent first · Dogs ordered by soonest upcoming (dogs with only past come after).
   dogList.forEach(d=>{d.up.sort((a,c)=>(a.bk.sd||'').localeCompare(c.bk.sd||''));d.past.sort((a,c)=>((c.bk.ed||c.bk.sd)||'').localeCompare((a.bk.ed||a.bk.sd)||''));});
-  dogList.sort((a,c)=>{if(!!a.vacc!==!!c.vacc)return a.vacc?-1:1;return((a.up[0]?a.up[0].bk.sd:'9999')).localeCompare(c.up[0]?c.up[0].bk.sd:'9999');});
+  // Priority: Live (in-service) → New (upcoming) → Completed (ended only). Vaccination/emergency banners no longer jump a dog to the top.
+  const _dogBucket=d=>{if(d.up.some(x=>x.bk.sd<=today))return 0;if(d.up.length)return 1;return 2;};
+  dogList.sort((a,c)=>{const ba=_dogBucket(a),bc=_dogBucket(c);if(ba!==bc)return ba-bc;return((a.up[0]?a.up[0].bk.sd:'9999')).localeCompare(c.up[0]?c.up[0].bk.sd:'9999');});
   const dates=x=>fmtDate(x.bk.sd)+(x.bk.ed&&x.bk.ed!==x.bk.sd?' → '+fmtDate(x.bk.ed):'');
   const taskRow=(bk,t)=>t.key?'<div onclick="event.stopPropagation();quickToggleWf(\''+bk.id+'\','+bk.ri+',\''+t.key+'\')" style="display:flex;align-items:center;gap:8px;padding:6px 10px 6px 14px;cursor:pointer;font-size:10px;color:var(--gr);border-top:1px solid var(--gr5);"><span style="width:17px;height:17px;border-radius:5px;border:1.5px solid var(--gr3);flex-shrink:0;background:var(--wh);"></span><span style="flex:1;">'+t.label+'</span></div>':'<div style="padding:6px 10px 6px 14px;font-size:10px;color:var(--gr2);border-top:1px solid var(--gr5);">• '+t.label+'</div>';
   // Per-booking status emoji: 🆕 upcoming (New) · 🔴 in service (Live) · ✅ ended (Completed).
@@ -348,6 +365,7 @@ function renderPendingPanel(){
       '<div style="min-width:0;overflow:hidden;"><span style="font-size:12px;font-weight:800;color:var(--bl);">'+d.name+'</span>'+(meta?' <span style="font-size:9px;color:var(--gr3);font-weight:400;white-space:nowrap;">'+meta+'</span>':'')+'</div></div>';
     // High-priority vaccination reminder (expired/missing + an upcoming/in-service paid booking).
     if(d.vacc){const vb=d.vacc;const tgt=vb.bk?(vb.bk.svc+' '+fmtDate(vb.bk.sd)):'the next visit';html+='<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;padding:8px 10px;border-top:2px solid var(--rd);background:var(--rdl);"><div style="font-size:10px;font-weight:800;color:var(--rd);">💉 Vaccination '+(vb.missing?'record missing':'EXPIRED'+(vb.vacc?' ('+fmtDate(vb.vacc)+')':''))+'</div><div style="font-size:9px;color:var(--rd);margin-top:1px;">Ask the owner to update records before '+tgt+'.</div></div>';}
+    if(d.emerg){const eb=d.emerg;const tgt=eb.bk?(eb.bk.svc+' '+fmtDate(eb.bk.sd)):'the next visit';html+='<div onclick="openDogByCid(\''+d.cid+'\')" style="cursor:pointer;padding:8px 10px;border-top:2px solid var(--rd);background:var(--rdl);"><div style="font-size:10px;font-weight:800;color:var(--rd);">📞 Emergency contact not recorded</div><div style="font-size:9px;color:var(--rd);margin-top:1px;">Ask the owner for an emergency contact before '+tgt+'.</div></div>';}
     // All this dog's bookings in one list (soonest upcoming first, then most recent past) — each row carries its own status emoji.
     [...d.up,...d.past].forEach(x=>html+=bkRow(x));
     if(d.missing)html+='<div style="padding:6px 10px 7px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--or);margin-bottom:4px;">⚠️ Missing daily logs ('+d.missing.length+') — tap a date to add</div><div style="display:flex;flex-wrap:wrap;gap:4px;">'+d.missing.map(dt=>'<button onclick="event.stopPropagation();todoAddLog(\''+d.cid+'\',\''+dt+'\')" style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:99px;border:1px solid var(--or);background:var(--orxl);color:var(--cn);cursor:pointer;font-family:var(--fb);">+ '+fmtDate(dt)+'</button>').join('')+'</div></div>';
@@ -385,34 +403,34 @@ function filterAvDog(){
 // --- gender / neuter parsed from the combined GenderStatus string ("Spayed female", "Neutered male", "Male") ---
 function _gsGender(s){s=(s||'').toLowerCase();return /female|bitch/.test(s)?'female':/\bmale|\bdog\b/.test(s)?'male':'';}
 function _gsNeuter(s){s=(s||'').toLowerCase();return /spay/.test(s)?'spayed':/neuter|castrat/.test(s)?'neutered':/intact|entire|\bfull\b|un-?neuter|un-?spay/.test(s)?'intact':'';}
-// Queried dog's compatibility history: past 'Not Suitable' partners (→ conflict tiers) + latest prior-meeting result per partner.
+// Compatibility result → colour/emoji/severity. Vocabulary: Friends/Good/Ignore/Not Good/Fight/Did not meet (+ legacy Suitable/Partial/Not Suitable).
+function _compatMeta(result){const s=(result||'').toLowerCase().trim();
+  if(s==='fight'||s==='not suitable')return{col:'var(--rd)',emoji:'🔴',bad:true,rank:0};
+  if(s==='not good')return{col:'#EAB308',emoji:'🟡',bad:true,rank:1};
+  if(s==='partial')return{col:'#EAB308',emoji:'🟡',bad:false,rank:2};
+  if(s==='ignore')return{col:'var(--gr2)',emoji:'⚪',bad:false,rank:3};
+  if(s==='friends'||s==='good'||s==='suitable')return{col:'var(--gn)',emoji:'🟢',bad:false,rank:4};
+  return{col:'var(--gr3)',emoji:'⚪',bad:false,rank:5};}
+// Queried dog's compatibility history: latest prior-meeting result per partner (met[]) + partners it rated Not Good/Fight (conflicts[], for the reference panel). "Did not meet" counts as not-met.
 function _availRiskInfo(dogName){
-  const info={names:{},breeds:new Set(),gn:new Set(),met:{}};
-  if(!dogName)return info;const dn=dogName.toLowerCase();
+  const info={met:{},conflicts:[]};
+  if(!dogName)return info;const dn=dogName.toLowerCase();const seen=new Set();
   trialLogs.forEach(t=>{
     const parties=[(t.dog||'')].concat((t.mixedWith||'').split(/[,;]+/)).map(s=>s.trim().toLowerCase()).filter(Boolean);
     if(!parties.includes(dn))return;
-    const notgood=(t.suitable||'').toLowerCase().includes('not');
+    const result=(t.suitable||'').trim();const didNotMeet=result.toLowerCase()==='did not meet';
     parties.filter(p=>p!==dn).forEach(o=>{
-      if(!info.met[o]||(t.date||'')>=(info.met[o].date||''))info.met[o]={date:t.date||'',suitable:t.suitable||''};
-      if(notgood){info.names[o]=true;const p=allDogs.find(d=>(d.name||'').toLowerCase()===o);
-        if(p){if(p.breed)info.breeds.add(p.breed.toLowerCase());const g=_gsGender(p.gender),n=_gsNeuter(p.gender);if(g||n)info.gn.add(g+'|'+n);}}
+      if(!didNotMeet&&(!info.met[o]||(t.date||'')>=(info.met[o].date||'')))info.met[o]={date:t.date||'',result};
+      if(_compatMeta(result).bad&&!seen.has(o)){seen.add(o);const p=allDogs.find(d=>(d.name||'').toLowerCase()===o);const gs=p?(p.genderStatus||p.gender||''):'';
+        info.conflicts.push({name:p?p.name:o,breed:(p&&p.breed)||'',age:p?ageYears(p.birthday):null,gender:_gsGender(gs),neuter:_gsNeuter(gs),weight:(p&&p.weight)||'',result});}
     });
   });
   return info;
 }
-// Risk tier for an overlapping dog vs the queried dog's history. super > high > low > none.
-function _riskTier(prof,dogNm,info){
-  const nm=(dogNm||'').toLowerCase();
-  if(info.names[nm])return{tier:'super',emoji:'🔴',label:'Known conflict — did NOT get along before'};
-  if(prof){
-    if(prof.breed&&info.breeds.has(prof.breed.toLowerCase()))return{tier:'high',emoji:'🔴',label:'Same breed ('+prof.breed+') as a past conflict'};
-    const g=_gsGender(prof.gender),n=_gsNeuter(prof.gender);
-    if((g||n)&&info.gn.has(g+'|'+n))return{tier:'low',emoji:'🟡',label:'Same '+[n,g].filter(Boolean).join(' ')+' as a past conflict'};
-  }
-  return{tier:'none',emoji:'🟢',label:''};
-}
-function _tierCol(t){return t==='super'||t==='high'?'var(--rd)':t==='low'?'#B45309':'var(--gn)';}
+// Compatibility flag for one overlapped dog vs the queried dog: met-before (coloured by result) or not-met (grey).
+function _availFlag(dogNm,info){const m=info.met[(dogNm||'').toLowerCase()];if(m){const meta=_compatMeta(m.result);return{met:true,col:meta.col,emoji:meta.emoji,result:m.result,date:m.date,rank:meta.rank};}return{met:false,col:'var(--gr3)',emoji:'⚪',result:'',date:'',rank:9};}
+// Actual overlapping window (max start … min end, with times) between a booking and the searched range.
+function _overlapWindow(b,sd,st,ed,et){const qS=new Date(sd+'T'+(st||'00:00')),qE=new Date(ed+'T'+(et||'23:59'));const bS=new Date(b.sd+'T'+(b.st||'00:00')),bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));return{s:bS>qS?bS:qS,e:bE<qE?bE:qE};}
 // Inclusive count of days a booking is present within [sd,ed].
 function _rangeDays(b,sd,ed){const s=normDate(b.sd),e=normDate(b.ed||b.sd);if(!s)return 0;const a=s<sd?sd:s,z=e>ed?ed:e;if(a>z)return 0;let c=0,d=new Date(a+'T12:00:00');const end=new Date(z+'T12:00:00');while(d<=end){c++;d.setDate(d.getDate()+1);}return c;}
 // Compact month grid(s) covering the searched range; in-range days ringed (purple) + occupant names risk-coloured.
@@ -427,8 +445,8 @@ function _availMonthBlock(y,m,sd,ed,info){
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const inMo=d.getMonth()===m;const inR=ds>=sd&&ds<=ed;
     const occs=inR?occupantsOn(ds):[];const occ=occs.length;
     const bg=!inMo?'transparent':(inR?_capBg(occ):'var(--gr5)');
-    const names=occs.map(b=>{const p=allDogs.find(x=>bkMatchesDog(b,x));const rt=_riskTier(p,b.dog,info);
-      return'<span style="display:block;font-size:8px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+_tierCol(rt.tier)+';font-weight:'+(rt.tier!=='none'?'800':'500')+';">'+(rt.tier!=='none'?rt.emoji:'')+(b.dog||'')+'</span>';}).join('');
+    const names=occs.map(b=>{const fl=_availFlag(b.dog,info);
+      return'<span style="display:block;font-size:8px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+fl.col+';font-weight:'+(fl.met?'800':'500')+';">'+(fl.met?fl.emoji:'')+(b.dog||'')+'</span>';}).join('');
     cells+='<div style="min-height:34px;border:1px solid var(--gr4);border-radius:4px;padding:2px;background:'+bg+';'+(inR?'box-shadow:inset 0 0 0 2px var(--pu);':'')+(inMo?'':'opacity:.3;')+(ds===today?'outline:1px dashed var(--bl);':'')+'">'
       +'<div style="font-size:8px;font-weight:700;display:flex;justify-content:space-between;color:'+(inMo?'var(--bk)':'var(--gr3)')+';"><span>'+d.getDate()+'</span>'+(inR&&occ?'<span style="color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+names+'</div>';}
   const hd=['M','T','W','T','F','S','S'].map(x=>'<div style="font-size:7px;font-weight:700;color:var(--gr2);text-align:center;">'+x+'</div>').join('');
@@ -451,31 +469,33 @@ function runAvailCheck(){
   const info=_availRiskInfo(dogName);
   const grid=_availPeriodGrid(sd,ed,info);// month view of the searched range (4a)
   const mw=document.getElementById('av_msgWrap');if(mw)mw.style.display='block';// reveal overlap-message builder (4c/4d)
+  _fillOverlapMsgUI(sd,ed);// populate existing-owner picker + prefill new-dog name (7d/7f)
   if(!overlaps.length){el.innerHTML=grid+'<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;margin-top:8px;">✅ No active bookings during this period</div>';return;}
-  // Enrich + sort by risk severity (super→high→low→none) then start date (4b).
-  const order={super:0,high:1,low:2,none:3};
-  const enriched=overlaps.map(b=>{const prof=allDogs.find(d=>bkMatchesDog(b,d));return{b,prof,rt:_riskTier(prof,b.dog,info),met:info.met[(b.dog||'').toLowerCase()],days:_rangeDays(b,sd,ed)};});
-  enriched.sort((a,c)=>(order[a.rt.tier]-order[c.rt.tier])||((a.b.sd||'').localeCompare(c.b.sd||'')));
-  const rows=enriched.map(({b,prof,rt,met,days})=>{
-    const dateStr=b.sd+(b.ed&&b.ed!==b.sd?' – '+b.ed:'');
-    const timeStr=(b.st||'')+(b.et&&b.et!==b.st?' – '+b.et:'');
+  // Enrich + sort: met-before worst first (Fight→…→Friends), then not-met, then start date (7b).
+  const enriched=overlaps.map(b=>{const prof=allDogs.find(d=>bkMatchesDog(b,d));return{b,prof,fl:_availFlag(b.dog,info),days:_rangeDays(b,sd,ed)};});
+  enriched.sort((a,c)=>(a.fl.rank-c.fl.rank)||((a.b.sd||'').localeCompare(c.b.sd||'')));
+  const wd=D=>fmtDate(_dstr(D))+' '+String(D.getHours()).padStart(2,'0')+':'+String(D.getMinutes()).padStart(2,'0');
+  const rows=enriched.map(({b,prof,fl,days})=>{
+    const win=_overlapWindow(b,sd,st,ed,et);const winStr=wd(win.s)+' → '+wd(win.e);
     const clickAttr=prof?' onclick="openDogByCid(\''+prof.cid+'\')" style="cursor:pointer;"':'';
-    const metCol=(s=>s.includes('not')?'var(--rd)':s.includes('partial')?'#B45309':'var(--gn)')((met&&met.suitable||'').toLowerCase());
-    const metNote=met?'<div style="font-size:9px;color:var(--gr2);">🐾 Met before'+(met.date?' ('+met.date+')':'')+': <b style="color:'+metCol+';">'+(met.suitable||'-')+'</b></div>':'';
+    const attrs=[prof&&prof.breed,[_gsNeuter(prof&&(prof.genderStatus||prof.gender)||''),_gsGender(prof&&(prof.genderStatus||prof.gender)||'')].filter(Boolean).join(' '),(prof&&prof.weight?prof.weight+'kg':'')].filter(Boolean).join('&nbsp;·&nbsp;');
+    const metNote=fl.met?'<div style="font-size:9px;">🐾 Met before'+(fl.date?' ('+fl.date+')':'')+': <b style="color:'+fl.col+';">'+fl.result+'</b></div>':'<div style="font-size:9px;color:var(--gr2);">🐾 Not met before</div>';
+    const dot='<span style="width:12px;height:12px;border-radius:50%;background:'+fl.col+';flex-shrink:0;margin-top:3px;display:inline-block;'+(fl.met&&_compatMeta(fl.result).bad?'box-shadow:0 0 0 2px var(--rdl);':'')+'"></span>';
     return'<div'+clickAttr+' style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--gr4);">'
-      +'<span style="font-size:14px;flex-shrink:0;line-height:1.4;white-space:nowrap;">'+rt.emoji+(rt.tier==='super'?'🔴':'')+'</span>'
+      +dot
       +'<div style="flex:1;min-width:0;">'
       +'<div style="font-size:11px;font-weight:700;color:var(--bk);'+(prof?'text-decoration:underline;':'')+'">'+(b.dog||'')+' <span style="font-size:9px;font-weight:700;color:var(--pu);">· '+days+' day'+(days!==1?'s':'')+' overlap</span></div>'
-      +'<div style="font-size:9px;color:var(--gr2);">'+(b.svc||'')+'&nbsp;·&nbsp;'+dateStr+(timeStr?'&nbsp;·&nbsp;'+timeStr:'')+(prof&&prof.breed?'&nbsp;·&nbsp;'+prof.breed:'')+'</div>'
-      +(rt.label?'<div style="font-size:9px;font-weight:700;color:'+_tierCol(rt.tier)+';">'+rt.label+'</div>':'')
+      +(attrs?'<div style="font-size:9px;color:var(--gr2);">'+attrs+'</div>':'')
+      +'<div style="font-size:9px;color:var(--gr2);">'+(b.svc||'')+'&nbsp;·&nbsp;overlaps '+winStr+'</div>'
       +metNote
       +'</div></div>';
   }).join('');
-  const cnt={super:0,high:0,low:0};enriched.forEach(e=>{if(cnt[e.rt.tier]!==undefined)cnt[e.rt.tier]++;});
-  const riskBits=[cnt.super&&cnt.super+' known',cnt.high&&cnt.high+' breed',cnt.low&&cnt.low+' similar'].filter(Boolean).join(', ');
-  const riskPill=(dogName&&riskBits)?' · <span style="color:var(--rd);font-weight:800;">'+riskBits+' risk</span>':'';
-  const legend=dogName?'<div style="font-size:8px;color:var(--gr2);margin:4px 0;">🔴🔴 known conflict · 🔴 same breed · 🟡 same sex+neuter as a past conflict · 🟢 no flag · purple ring = searched days</div>':'<div style="font-size:8px;color:var(--gr2);margin:4px 0;">Pick a dog above to see compatibility risk flags · purple ring = searched days</div>';
-  el.innerHTML=grid+legend+'<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:4px;">'+overlaps.length+' booking'+(overlaps.length>1?'s':'')+' during this period'+riskPill+'</div>'+rows;
+  const nBad=enriched.filter(e=>e.fl.met&&_compatMeta(e.fl.result).bad).length;
+  const riskPill=(dogName&&nBad)?' · <span style="color:var(--rd);font-weight:800;">'+nBad+' flagged</span>':'';
+  // Reference panel: the searched dog's past Not Good / Fight partners + their attributes (7b).
+  const refPanel=(dogName&&info.conflicts.length)?'<div style="background:var(--rdl);border:1px solid var(--rd);border-radius:8px;padding:8px 10px;margin-top:8px;"><div style="font-size:9px;font-weight:800;color:var(--rd);margin-bottom:2px;">⚠️ '+dogName+' previously did NOT get on with (reference — watch for similar dogs):</div>'+info.conflicts.map(c=>'<div style="font-size:9px;color:var(--rd);">• '+c.name+' — '+[c.breed,(c.age!=null?c.age+'y':''),[c.neuter,c.gender].filter(Boolean).join(' '),(c.weight?c.weight+'kg':'')].filter(Boolean).join(' · ')+' <b>('+c.result+')</b></div>').join('')+'</div>':'';
+  const legend=dogName?'<div style="font-size:8px;color:var(--gr2);margin:4px 0;">Met before → 🟢 Friends/Good · ⚪ Ignore · 🟡 Not Good · 🔴 Fight · otherwise "not met before" · purple ring = searched days</div>':'<div style="font-size:8px;color:var(--gr2);margin:4px 0;">Pick a dog above to see met-before compatibility · purple ring = searched days</div>';
+  el.innerHTML=grid+legend+refPanel+'<div style="font-size:9px;font-weight:700;color:var(--gr2);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:4px;">'+overlaps.length+' booking'+(overlaps.length>1?'s':'')+' during this period'+riskPill+'</div>'+rows;
 }
 // --- Overlap approval message builder (4c/4d) ---
 function _photoViewLink(d){if(!d||!d.photoUrl)return'';return /^https?:/.test(d.photoUrl)?d.photoUrl:gdriveDirect(d.photoUrl);}
@@ -497,6 +517,13 @@ function _overlapDogs(sd,ed){
   overlaps.forEach(b=>{const p=allDogs.find(d=>bkMatchesDog(b,d));const key=(p&&p.cid)||b.dog;if(!key||seen.has(key))return;seen.add(key);out.push(p||{name:b.dog||''});});
   return out;
 }
+// Overlapped-dog one-liner by ATTRIBUTES (no name): breed · gender · spayed/neutered/full · weight (7h).
+function _dogAttrLine(d){if(!d)return'';const gs=d.genderStatus||d.gender||'';const g=_gsGender(gs);let n=_gsNeuter(gs);if(n==='intact')n='full';const gn=[n,g].filter(Boolean).join(' ');return[d.breed,gn,(d.weight?d.weight+'kg':'')].filter(Boolean).join(', ');}
+// Populate the overlap-message UI (existing-owner picker + prefill new-dog name) after a check runs.
+function _fillOverlapMsgUI(sd,ed){
+  const dm=document.getElementById('av_msg_dog');if(dm&&!dm.value)dm.value=document.getElementById('av_dog').value||'';
+  const sel=document.getElementById('av_msg_exist');if(sel){const od=_overlapDogs(sd,ed);sel.innerHTML=od.length?od.map((d,i)=>'<option value="'+i+'">'+(d.name||'(dog)')+(d.owner?' — '+d.owner:'')+'</option>').join(''):'<option value="">(no overlapping owners)</option>';}
+}
 function buildOverlapMsg(kind){
   const sd=document.getElementById('av_sd').value,ed=document.getElementById('av_ed').value;
   const dogName=document.getElementById('av_dog').value;
@@ -505,33 +532,26 @@ function buildOverlapMsg(kind){
   const monthName=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'long',year:'numeric'});
   const overDogs=_overlapDogs(sd,ed);
   const nd=allDogs.find(d=>d.name===dogName)||null;
-  const tpl=_overlapTpl(kind);
-  const photoLine=d=>{const lk=_photoViewLink(d);return lk?('📷 '+(d.name||'photo')+': '+lk):'';};
   let msg='';
-  if(tpl&&tpl.content){
-    if(kind==='new'){
-      // ONE message to the new customer, describing the overlapped dog(s). Singular fields = first overlapped dog; new dog's name fills {{dogs_name}}.
-      const subj=overDogs[0]||null;
-      const vars=Object.assign({month:monthName,dates,dogs_name:dogName||''},_dogFactVars(subj));
-      msg=_fillTplVars(tpl.content,vars);
-      const links=overDogs.map(photoLine).filter(Boolean);
-      if(links.length&&!/https?:\/\//.test(tpl.content))msg+='\n\n'+links.join('\n');
-      if(overDogs.length>1)msg+='\n\nAlso staying during this period:\n'+overDogs.slice(1).map(d=>'• '+(d.name||'')+' — '+fmtDogDescPhoto(d)).join('\n');
-      if(overDogs.length===0)msg='(No other dogs are booked during '+dates+' — you may not need this message.)\n\n'+msg;
-    }else{
-      // ONE message PER existing overlapped customer: their dog fills {{dogs_name}}/{{dog_owner}}; the NEW dog's facts fill breed/gender/age/He_or_she.
-      const newFacts=Object.assign({month:monthName,dates},_dogFactVars(nd));
-      const nl=nd?photoLine(nd):'';
-      if(!overDogs.length){out.value='No overlapping bookings found for '+dates+'.';return;}
-      msg=overDogs.map(d=>{const vars=Object.assign({},newFacts,{dogs_name:d.name||'',dog_owner:d.owner||''});let m=_fillTplVars(tpl.content,vars);if(nl&&!/https?:\/\//.test(tpl.content))m+='\n\n'+nl;return m;}).join('\n\n────────────────\n\n');
-    }
+  if(kind==='new'){
+    // Availability reply = the NEW-customer message (7e). Owner/dog from inputs (7d). Overlapped dogs by attributes, not names (7h).
+    const owner=(gv('av_msg_owner')||'').trim()||(nd&&nd.owner)||'there';
+    const dogsNm=(gv('av_msg_dog')||'').trim()||dogName||'your dog(s)';
+    let m=getTpls().avail||TP_AVAIL;
+    const availability=overDogs.length?'We have some other dogs staying during part of this period — see below for details.':"Good news, we're available for these dates! ✅";
+    const overlapBlock=overDogs.length?('Dogs already booked during this period:\n'+overDogs.map(d=>'• '+_dogAttrLine(d)).join('\n')+'\n\n'):'';
+    m=m.replace(/\{\{ownerName\}\}/g,owner).replace(/\{\{dates\}\}/g,dates).replace(/\{\{dogs\}\}/g,dogsNm).replace(/\{\{availability\}\}/g,availability).replace(/\{\{overlapBlock\}\}/g,overlapBlock).replace(/\{\{[^}]*\}\}/g,'');
+    msg=m.replace(/\n{3,}/g,'\n\n').trim();
   }else{
-    // Fallback when no authored "Overlapped" template is loaded.
-    if(kind==='new'){
-      msg=overDogs.length?('Hi {{dog_owner}},\n\nDuring your dates ('+dates+') these dogs are also booked in with us:\n'+overDogs.map(d=>'• '+(d.name||'')+' — '+fmtDogDescPhoto(d)).join('\n')+'\n\nIs '+(dogName||'your dog')+' comfortable sharing the space? 🐾'):'Good news — no other dogs are booked during '+dates+'! ✅';
-    }else{
-      msg='Hi {{dog_owner}},\n\nWe have a new guest hoping to stay during '+dates+', overlapping your booking:\n'+(nd?('• '+nd.name+' — '+fmtDogDescPhoto(nd)):'• (select the new dog above)')+'\n\nWould you be happy for them to share the space with {{dogs_name}}? 🐾';
-    }
+    // EXISTING customer — one owner at a time (7f). The NEW dog fills breed/gender/age/He_or_she; the picked owner+dog fill dog_owner/dogs_name.
+    if(!overDogs.length){out.value='No overlapping bookings found for '+dates+'.';return;}
+    const sel=document.getElementById('av_msg_exist');let idx=sel?parseInt(sel.value):0;if(isNaN(idx))idx=0;
+    const d=overDogs[idx]||overDogs[0];
+    const tpl=_overlapTpl('existing');
+    const vars=Object.assign({month:monthName,dates},_dogFactVars(nd),{dogs_name:d.name||'',dog_owner:d.owner||''});
+    if(tpl&&tpl.content){msg=_fillTplVars(tpl.content,vars);}
+    else{msg='Hi '+(d.owner||'there')+',\n\nWe have a new guest ('+(_dogAttrLine(nd)||'a friendly dog')+') hoping to stay during '+dates+', overlapping '+(d.name||'your dog')+"'s booking. Would you be happy for them to share the space? 🐾";}
+    const lk=nd?_photoViewLink(nd):'';if(lk&&!/https?:\/\//.test(msg))msg+='\n\n📷 '+(nd.name||'photo')+': '+lk;
   }
   out.value=msg;
 }
@@ -607,8 +627,8 @@ async function refreshBoard(){
   const btn=document.getElementById('refreshBtn');btn.style.opacity='.5';btn.style.pointerEvents='none';
   document.getElementById('todayCards').innerHTML='<div class="empty"><p>Loading...</p></div>';
   try{
-    const dogRows=await readSheet(TABS.DOGS,'A1:BG');const dh=mkHdr(dogRows[0]||[]);dogsHdrRow=dogRows[0]||[];allDogs=dogRows.slice(1).map((r,i)=>mapDog(r,i,dh)).filter(d=>d.name.trim());
-    const bkRows=await readSheet(TABS.BK,'A1:AZ').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bkHdrRow=bkRows[0]||[];bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
+    const dogRows=await readSheet(TABS.DOGS,'A1:CZ');const dh=mkHdr(dogRows[0]||[]);dogsHdrRow=dogRows[0]||[];allDogs=dogRows.slice(1).map((r,i)=>mapDog(r,i,dh)).filter(d=>d.name.trim());// wide range so appended cols (Sociability/Insurance/split-Emergency at BM–BQ, +future) are read — mapping is by header name
+    const bkRows=await readSheet(TABS.BK,'A1:BZ').catch(()=>[]);const bh=mkHdr(bkRows[0]||[]);bkHdrRow=bkRows[0]||[];bookings=bkRows.slice(1).map((r,i)=>mapBk(r,i,bh));
     const cr=await readSheet(TABS.COSTS,'A1:D').catch(()=>[]);costsHdrRow=cr[0]||[];const ch=mkHdr(cr[0]||[]);costs=cr.slice(1).map((r,i)=>({date:r[ch['Date']??-1]||'',cat:r[ch['Category']??-1]||'',amount:parseFloat(r[ch['Amount']??-1])||0,notes:r[ch['Notes']??-1]||'',ri:i+2})).filter(c=>c.date||c.notes||c.amount);// drop blank/cleared rows so a deleted cost doesn't reappear as an empty row after sync (map before filter keeps ri = real sheet row)
     const al=await readSheet(TABS.ACTLOG,'A1:G').catch(()=>[]);actlogHdrRow=al[0]||[];const alh=mkHdr(al[0]||[]);actLogs=al.slice(1).map(r=>({date:r[alh['Date']??-1]||'',activity:r[alh['Activity']??-1]||'',dogs:r[alh['DogName']??-1]||'',staff:r[alh['Staff']??-1]||'',dur:r[alh['Duration']??-1]||'',notes:r[alh['Notes']??-1]||''}));
     const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialHdrRow=tl[0]||[];trialLogs=tl.slice(1).map((r,i)=>{const rv=n=>tlh[n]!==undefined?r[tlh[n]]||'':'';return{cid:rv('CustomerID'),dog:rv('DogName'),date:rv('Date'),mixedWith:rv('MixedWith'),obs:rv('Observations'),suitable:rv('Suitable'),ri:i+2};});
@@ -685,11 +705,11 @@ function mapBk(r,i,h){
       consentSigned:rv('WF_ConsentSigned'),dropoff:rv('WF_DropoffReminder'),
       pickup:rv('WF_PickupReminder'),finalpay:rv('WF_FinalPayReminder'),
       reviewReq:rv('WF_ReviewRequest'),review:rv('WF_Review'),
-      dailyLogs:rv('WF_DailyLogs'),compat:rv('WF_Compat'),dbUpdated:rv('WF_DatabaseUpdated')},
+      dailyLogs:rv('WF_DailyLogs'),compat:rv('WF_Compat'),dbUpdated:rv('WF_DatabaseUpdated'),staffNotes:rv('WF_StaffNotes')},
     bookingRef:rv('BookingRef'),prepayRef:rv('PrepaymentRef'),finalPayRef:rv('FinalPaymentRef'),
     ri:i+2};
 }
-function bkFieldMap(bk){const rem=bk.rem||['','','','','']; const wf=bk.wf||{};return{CustomerID:bk.customerId,DogName:bk.dog,ID:bk.id,ServiceType:bk.svc,StartDate:bk.sd,StartTime:bk.st,EndDate:bk.ed,EndTime:bk.et,DropoffLocation:bk.dropLoc,PickupLocation:bk.pickLoc,Revenue:bk.rev,Tips:bk.tips,Prepayment:bk.prepay,FinalPayment:bk.finalPay,UnitCost:bk.unit,DiscountNotes:bk.discNotes,RoverCommissionPct:bk.roverPct,RoverCommissionGBP:bk.roverAmt,Channel:bk.ch,Payment:bk.pay,Status:bk.status,Private:bk.priv?'Private':'',Month:bk.month,Rating:bk.rating,Feedback:bk.feedback,Rem1:rem[0]||'',Rem2:rem[1]||'',Rem3:rem[2]||'',Rem4:rem[3]||'',Rem5:rem[4]||'',WF_WhatsApp:wf.whatsapp||'',WF_PackingList:wf.packingList||'',WF_DocsReq:wf.docsReq||'',WF_ConsentSent:wf.consentSent||'',WF_DocsReceived:wf.docsReceived||'',WF_ConsentSigned:wf.consentSigned||'',WF_DropoffReminder:wf.dropoff||'',WF_PickupReminder:wf.pickup||'',WF_FinalPayReminder:wf.finalpay||'',WF_ReviewRequest:wf.reviewReq||'',WF_Review:wf.review||'',WF_DailyLogs:wf.dailyLogs||'',WF_Compat:wf.compat||'',WF_DatabaseUpdated:wf.dbUpdated||'',BookingRef:bk.bookingRef||'',PrepaymentRef:bk.prepayRef||'',FinalPaymentRef:bk.finalPayRef||''};}
+function bkFieldMap(bk){const rem=bk.rem||['','','','','']; const wf=bk.wf||{};return{CustomerID:bk.customerId,DogName:bk.dog,ID:bk.id,ServiceType:bk.svc,StartDate:bk.sd,StartTime:bk.st,EndDate:bk.ed,EndTime:bk.et,DropoffLocation:bk.dropLoc,PickupLocation:bk.pickLoc,Revenue:bk.rev,Tips:bk.tips,Prepayment:bk.prepay,FinalPayment:bk.finalPay,UnitCost:bk.unit,DiscountNotes:bk.discNotes,RoverCommissionPct:bk.roverPct,RoverCommissionGBP:bk.roverAmt,Channel:bk.ch,Payment:bk.pay,Status:bk.status,Private:bk.priv?'Private':'',Month:bk.month,Rating:bk.rating,Feedback:bk.feedback,Rem1:rem[0]||'',Rem2:rem[1]||'',Rem3:rem[2]||'',Rem4:rem[3]||'',Rem5:rem[4]||'',WF_WhatsApp:wf.whatsapp||'',WF_PackingList:wf.packingList||'',WF_DocsReq:wf.docsReq||'',WF_ConsentSent:wf.consentSent||'',WF_DocsReceived:wf.docsReceived||'',WF_ConsentSigned:wf.consentSigned||'',WF_DropoffReminder:wf.dropoff||'',WF_PickupReminder:wf.pickup||'',WF_FinalPayReminder:wf.finalpay||'',WF_ReviewRequest:wf.reviewReq||'',WF_Review:wf.review||'',WF_DailyLogs:wf.dailyLogs||'',WF_Compat:wf.compat||'',WF_DatabaseUpdated:wf.dbUpdated||'',WF_StaffNotes:wf.staffNotes||'',BookingRef:bk.bookingRef||'',PrepaymentRef:bk.prepayRef||'',FinalPaymentRef:bk.finalPayRef||''};}
 function bkRowVals(bk){return rowFromMap(bkHdrRow,bkFieldMap(bk),TABS.BK.h);}
 function renderBoard(){
   const q=(document.getElementById('dogSearch')?.value||'').toLowerCase();const today=todayStr();

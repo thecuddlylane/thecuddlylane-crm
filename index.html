@@ -492,7 +492,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v76b1</div>
+  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v78b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -550,15 +550,19 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       </div>
       <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;" onclick="runAvailCheck()">Check Availability</button>
       <div id="av_results"></div>
-      <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;margin-top:8px;background:var(--pu);" onclick="copyAvailReply()">📋 Copy Availability Reply</button>
       <div id="av_msgWrap" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--gr4);">
-        <div style="font-size:10px;font-weight:800;color:var(--pu);margin-bottom:5px;">✉️ Overlap approval messages</div>
-        <div style="font-size:8px;color:var(--gr2);margin-bottom:6px;">Uses your "Overlapped" templates (Templates page) and auto-fills breed · gender · spay/neuter · age · month + a clickable photo link. Existing-customer = one message per overlapped owner. Edit before copying.</div>
-        <div style="display:flex;gap:6px;">
-          <button class="sbtn2" style="flex:1;font-size:10px;padding:7px;" onclick="buildOverlapMsg('new')">➡️ To NEW customer<br><span style="font-size:8px;font-weight:400;color:var(--gr2);">lists overlapped dogs</span></button>
-          <button class="sbtn2" style="flex:1;font-size:10px;padding:7px;" onclick="buildOverlapMsg('existing')">⬅️ To EXISTING customers<br><span style="font-size:8px;font-weight:400;color:var(--gr2);">describes the new dog</span></button>
+        <div style="font-size:10px;font-weight:800;color:var(--pu);margin-bottom:4px;">✉️ Overlap approval messages</div>
+        <div style="font-size:8px;color:var(--gr2);margin-bottom:6px;">Overlapped dogs are described by breed · gender · spay/neuter · weight (no names). <a href="#" onclick="showScreen('sc-templates');return false;" style="color:var(--pu);font-weight:700;">✏️ Edit templates</a></div>
+        <div class="fr">
+          <div class="f"><label>New customer's owner name</label><input class="fi" id="av_msg_owner" style="font-size:11px;" placeholder="e.g. Sarah"></div>
+          <div class="f"><label>New dog's name</label><input class="fi" id="av_msg_dog" style="font-size:11px;"></div>
         </div>
-        <textarea id="av_msgOut" class="fta" style="width:100%;min-height:150px;font-size:11px;margin-top:6px;" placeholder="Tap a button above to generate the message…"></textarea>
+        <button class="sbtn2" style="width:100%;font-size:10px;padding:7px;margin-top:7px;" onclick="buildOverlapMsg('new')">➡️ To NEW customer — availability reply (lists overlapped dogs by breed/gender/spay-neuter/weight)</button>
+        <div style="display:flex;gap:6px;margin-top:7px;align-items:flex-end;">
+          <div class="f" style="flex:1;margin:0;"><label>Existing overlapped owner (send one by one)</label><select class="fs" id="av_msg_exist" style="font-size:11px;"></select></div>
+          <button class="sbtn2" style="flex:0 0 auto;font-size:10px;padding:7px 10px;" onclick="buildOverlapMsg('existing')">⬅️ To EXISTING</button>
+        </div>
+        <textarea id="av_msgOut" class="fta" style="width:100%;min-height:150px;font-size:11px;margin-top:6px;" placeholder="Fill details then tap a button…"></textarea>
         <button id="av_msgCopyBtn" class="sbtn2" style="width:100%;font-size:11px;padding:8px;background:var(--pu);" onclick="copyOverlapMsg()">📋 Copy message</button>
       </div>
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gr4);">
