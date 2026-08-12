@@ -492,7 +492,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v74b1</div>
+  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v76b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -551,6 +551,27 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;" onclick="runAvailCheck()">Check Availability</button>
       <div id="av_results"></div>
       <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;margin-top:8px;background:var(--pu);" onclick="copyAvailReply()">📋 Copy Availability Reply</button>
+      <div id="av_msgWrap" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--gr4);">
+        <div style="font-size:10px;font-weight:800;color:var(--pu);margin-bottom:5px;">✉️ Overlap approval messages</div>
+        <div style="font-size:8px;color:var(--gr2);margin-bottom:6px;">Uses your "Overlapped" templates (Templates page) and auto-fills breed · gender · spay/neuter · age · month + a clickable photo link. Existing-customer = one message per overlapped owner. Edit before copying.</div>
+        <div style="display:flex;gap:6px;">
+          <button class="sbtn2" style="flex:1;font-size:10px;padding:7px;" onclick="buildOverlapMsg('new')">➡️ To NEW customer<br><span style="font-size:8px;font-weight:400;color:var(--gr2);">lists overlapped dogs</span></button>
+          <button class="sbtn2" style="flex:1;font-size:10px;padding:7px;" onclick="buildOverlapMsg('existing')">⬅️ To EXISTING customers<br><span style="font-size:8px;font-weight:400;color:var(--gr2);">describes the new dog</span></button>
+        </div>
+        <textarea id="av_msgOut" class="fta" style="width:100%;min-height:150px;font-size:11px;margin-top:6px;" placeholder="Tap a button above to generate the message…"></textarea>
+        <button id="av_msgCopyBtn" class="sbtn2" style="width:100%;font-size:11px;padding:8px;background:var(--pu);" onclick="copyOverlapMsg()">📋 Copy message</button>
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gr4);">
+        <button class="sbtn2" style="width:100%;font-size:11px;padding:8px;" onclick="toggleQuickBk()">➕ Quick-add booking (minimal profile)</button>
+        <div id="av_qbkWrap" style="display:none;margin-top:8px;">
+          <div style="font-size:8px;color:var(--gr2);margin-bottom:6px;">Uses the From/To dates above. Creates a lightweight dog + booking so you can hold the slot before the full profile / meet &amp; greet.</div>
+          <div class="fr"><div class="f"><label>Dog name</label><input class="fi" id="qbk_dog" style="font-size:11px;"></div><div class="f"><label>Customer name</label><input class="fi" id="qbk_owner" style="font-size:11px;"></div></div>
+          <div class="fr" style="margin-top:6px;"><div class="f"><label>Gender</label><select class="fs" id="qbk_gender" style="font-size:11px;"><option value="">—</option><option>Female</option><option>Male</option></select></div><div class="f"><label>Spayed/neutered</label><select class="fs" id="qbk_neut" style="font-size:11px;"><option value="Intact">Intact / not done</option><option>Spayed</option><option>Neutered</option></select></div></div>
+          <div class="fr" style="margin-top:6px;"><div class="f"><label>Service</label><select class="fs" id="qbk_svc" style="font-size:11px;"><option>Boarding</option><option>DayCare</option><option>Walking</option><option>Drop-in</option><option>Dog Sit</option><option>Pet Taxi</option><option>Training</option></select></div><div class="f"><label>Status</label><select class="fs" id="qbk_status" style="font-size:11px;"><option>Booked</option><option>Quoted</option><option>Prepaid</option></select></div></div>
+          <button id="qbk_save" class="sbtn2" style="width:100%;font-size:11px;padding:8px;margin-top:8px;background:var(--gn);" onclick="quickAddBooking()">💾 Add booking</button>
+          <div id="qbk_msg" style="font-size:9px;margin-top:6px;font-weight:600;"></div>
+        </div>
+      </div>
     </div>
     <div style="height:14px;"></div>
   </div>
@@ -871,7 +892,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="fsec">Occupancy Rate by Places <span style="font-size:9px;font-weight:400;color:var(--gr3);">(max 4 dogs/day · Boarding + Day Care)</span></div>
     <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anOccPlaces" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
-    <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(All time · Top 10)</span></div>
+    <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Top 10 · <span id="ltvYearLbl">All time</span>)</span><select class="fs" id="ltvYear" onchange="renderAnalysis()" style="font-size:10px;padding:3px 18px 3px 7px;border-radius:6px;width:auto;display:inline-block;margin-left:6px;"><option value="all">All Time</option><option>2028</option><option>2027</option><option>2026</option><option>2025</option><option>2024</option></select></div>
     <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anLTV" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div style="height:18px;"></div>
