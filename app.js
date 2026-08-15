@@ -93,9 +93,30 @@ const WF_GRP={before:'📋 Before arrival',during:'🏠 During service',after:'�
 let _restoreTplKey=null,_delBkId=null,_delBkRi=null,_selDogs=[],_addDogs=[],_mainDog='';
 // Quote dogs are stored as CustomerIDs (cids) to avoid same-name mix-ups. _addDogs = cids charged the additional-dog rate.
 function _nm(cid){const d=allDogs.find(x=>x.cid===cid);return d?d.name:(cid||'Dog');}
+function _dogByCid(cid){return cid?allDogs.find(d=>d.cid===cid)||null:null;}
+// Parse a party token that may embed a CID: "TCL-XX0001 Name" / "Name - TCL-XX0001" / "Name" / "TCL-XX0001".
+function _parseParty(tok){const s=(tok||'').trim();const m=s.match(/TCL-[A-Za-z0-9]+/i);const cid=m?m[0].toUpperCase():'';const name=s.replace(/TCL-[A-Za-z0-9]+/i,'').replace(/[-–—]/g,' ').replace(/\s+/g,' ').trim();return{cid,name};}
+// Resolve a party token to a dog object — by CID first, else by name (case-insensitive). Always prefer CID (dupe names).
+function _resolveParty(tok){const p=_parseParty(tok);if(p.cid){const d=_dogByCid(p.cid);if(d)return d;}if(p.name){const n=p.name.toLowerCase();const d=allDogs.find(x=>(x.name||'').toLowerCase()===n);if(d)return d;}return null;}
+// For a Trial/Fight record, the OTHER dog relative to curDog (record owner or a mixed-with token) with its attributes (item 16).
+function _otherPartyLine(ownerCid,ownerName,mixedWith){
+  const meCid=curDog?curDog.cid:'';const meNm=(curDog?curDog.name:'').toLowerCase();
+  const owner={cid:ownerCid||'',name:ownerName||'',dog:_dogByCid(ownerCid)||allDogs.find(x=>(x.name||'').toLowerCase()===(ownerName||'').toLowerCase())};
+  const toks=(mixedWith||'').split(/[,;]+/).map(s=>s.trim()).filter(Boolean).map(t=>{const d=_resolveParty(t);const p=_parseParty(t);return{cid:d?d.cid:(p.cid||''),name:d?d.name:(p.name||t),dog:d};});
+  const others=[owner].concat(toks).filter(p=>!((p.cid&&p.cid===meCid)||(p.name&&p.name.toLowerCase()===meNm)));
+  const o=others[0];if(!o)return ownerName||'?';
+  const d=o.dog;const gs=d?(d.genderStatus||d.gender||''):'';const age=d?ageYears(d.birthday):null;
+  const attrs=d?[d.breed,(age!=null?age+'y':''),[_gsNeuter(gs),_gsGender(gs)].filter(Boolean).join(' '),(d.weight?d.weight+'kg':'')].filter(Boolean).join(' · '):'';
+  return (d?d.name:(o.name||o.cid))+(attrs?' ('+attrs+')':'');
+}
 function _isAddDog(cid){return _addDogs.includes(cid);}
 function _orderedSel(){return [..._selDogs.filter(c=>!_addDogs.includes(c)),..._selDogs.filter(c=>_addDogs.includes(c))];}
 let _bkSaving=false;
+let _todoFilter='';// To-Do New/Live/Completed pill filter (17)
+function setTodoFilter(b){_todoFilter=(_todoFilter===b)?'':b;renderPendingPanel();}
+// Date-range linkage (10): picking the start date constrains + defaults the end date and auto-opens its picker, so a range is one flow.
+function _linkStart(sid,eid){const s=document.getElementById(sid),e=document.getElementById(eid);if(!s||!e||s._rangeLinked)return;s._rangeLinked=true;
+  s.addEventListener('change',()=>{if(!s.value)return;e.min=s.value;if(!e.value||e.value<s.value)e.value=s.value;try{e.focus();if(e.showPicker)e.showPicker();}catch(_){}});}
 let _regEmoji='',_emojiCtx='profile',_regPhotoUrl='';
 let _cr={total:0,prepayAmt:0,finalAmt:0,lines:[],nights:0,rpn:0,addLine:'',discLine:'',holDates:[],selDogs:[],mainDog:''};
 
@@ -173,7 +194,7 @@ async function doCreateSheet(){
     {n:TABS.COSTS,h:['Date','Category','Amount','Notes']},
     {n:TABS.TARGETS,h:['Month','RevTarget','CostTarget']},
     {n:TABS.TRAIN,h:['Date','Staff','Category','Objective','Provider','Learnt','CPDPoints','CertLink','MaterialsLink']},
-    {n:TABS.CONSENT,h:['CustomerID','DogName','Date','PhotoConsent','OffLeash','Mixing','WalkOutside','GroupWalk','FeedTogether','Crate','SameRoom','MedCost','VetConsent','TCSigned']},
+    {n:TABS.CONSENT,h:['CustomerID','DogName','Date','PhotoConsent','OffLeash','Mixing','WalkOutside','GroupWalk','FeedTogether','Crate','SameRoom','MedCost','VetConsent','TCSigned','TCVersion','TCSignedDate']},
     {n:TABS.TPLS,h:['Name','Category','Content','LastUpdated','Key']},
     {n:TABS.ACTS,h:['Title','Category','IndoorOutdoor','EnergyLevel','Weather','Location','MapsURL','DurationMins','DistanceMins','Cost','Notes']},
     {n:TABS.ACTLOG,h:['CustomerID','DogName','Date','Activity','Staff','Duration','Notes']},
@@ -209,7 +230,7 @@ function showScreen(id,push=true){
   document.getElementById('backBtn').style.display=isRoot?'none':'flex';document.getElementById('hdrTitle').style.display=isRoot?'block':'none';
   const subs={'sc-bookings':'Booking Records','sc-costs':'Cost Records','sc-pl':'P&L Dashboard','sc-calendar':'Availability Calendar','sc-training':'Staff Training','sc-templates':'Message Templates','sc-activities':'Activities','sc-analysis':'Analysis','sc-profile':curDog?curDog.name:'Dog Profile','sc-register':document.getElementById('reg_eid')?.value?'Edit Profile':'Register New Dog'};
   document.getElementById('hdrSub').textContent=subs[id]||'Staff Portal';
-  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();}if(id==='sc-todo')renderPendingPanel();if(id==='sc-checkdates')initAvail();if(id==='sc-rates'){loadQSettings();renderHolYrBtns();}
+  if(id==='sc-bookings')renderBk();if(id==='sc-pl')updatePL();if(id==='sc-costs'){initCostFilters();renderCostTable();};if(id==='sc-calendar')renderCalendar();if(id==='sc-templates')syncTplsFromSheet();if(id==='sc-activities')renderActs();if(id==='sc-analysis')renderAnalysis();if(id==='sc-quote'){buildQDogMS();buildMainDogBtns();_linkStart('ml_sd','ml_ed');}if(id==='sc-todo')renderPendingPanel();if(id==='sc-checkdates')initAvail();if(id==='sc-rates'){loadQSettings();renderHolYrBtns();}
 }
 function goBack(){_stk.pop();showScreen(_stk[_stk.length-1]||'sc-board',false);}
 
@@ -328,20 +349,24 @@ function renderPendingPanel(){
   wfTasks.forEach(({bk,key,label})=>ensure(bk).tasks.push({key,label}));
   // Bucket outstanding tasks by the booking's timing: New = upcoming (sd>today), Live = in service, Completed = ended (ed<today).
   const buckets={New:0,Live:0,Completed:0};
-  Object.values(bkMap).forEach(({bk,tasks})=>{const ed=(bk.ed||bk.sd);const bkt=ed<today?'Completed':(bk.sd>today?'New':'Live');buckets[bkt]+=tasks.length;});
-  missingLogs.forEach(({dog})=>{const live=bookings.some(b=>bkMatchesDog(b,dog)&&normDate(b.sd)<=today&&today<=normDate(b.ed||b.sd));buckets[live?'Live':'Completed']+=1;});
-  (vaccReminders||[]).forEach(({bk})=>{const live=bk&&bk.sd<=today&&today<=(bk.ed||bk.sd);buckets[live?'Live':'New']+=1;});
-  (emergReminders||[]).forEach(({bk})=>{const live=bk&&bk.sd<=today&&today<=(bk.ed||bk.sd);buckets[live?'Live':'New']+=1;});
+  const _bkt=bk=>{const ed=(bk.ed||bk.sd);return ed<today?'Completed':(bk.sd>today?'New':'Live');};
+  const _mlBkt=dog=>bookings.some(b=>bkMatchesDog(b,dog)&&normDate(b.sd)<=today&&today<=normDate(b.ed||b.sd))?'Live':'Completed';
+  const _remBkt=bk=>(bk&&bk.sd<=today&&today<=(bk.ed||bk.sd))?'Live':'New';
+  Object.values(bkMap).forEach(({bk,tasks})=>{buckets[_bkt(bk)]+=tasks.length;});
+  missingLogs.forEach(({dog})=>{buckets[_mlBkt(dog)]+=1;});
+  (vaccReminders||[]).forEach(({bk})=>{buckets[_remBkt(bk)]+=1;});
+  (emergReminders||[]).forEach(({bk})=>{buckets[_remBkt(bk)]+=1;});
   const totalOut=buckets.New+buckets.Live+buckets.Completed;
+  const _pass=b=>!_todoFilter||b===_todoFilter;// New/Live/Completed pill filter (17)
   const dogs={};const dogEntry=(cid,name)=>{if(!dogs[cid])dogs[cid]={name,cid,up:[],past:[],missing:null,vacc:null,emerg:null};return dogs[cid];};
-  Object.values(bkMap).forEach(({bk,tasks})=>{if(!tasks.length)return;const e=dogEntry(bk.customerId||bk.dog,bk.dog);((bk.ed||bk.sd)<today?e.past:e.up).push({bk,tasks});});
-  missingLogs.forEach(({dog,dates})=>{dogEntry(dog.cid,dog.name).missing=dates;});
-  (vaccReminders||[]).forEach(v=>{dogEntry(v.dog.cid,v.dog.name).vacc=v;});
-  (emergReminders||[]).forEach(v=>{dogEntry(v.dog.cid,v.dog.name).emerg=v;});
+  Object.values(bkMap).forEach(({bk,tasks})=>{if(!tasks.length)return;if(!_pass(_bkt(bk)))return;const e=dogEntry(bk.customerId||bk.dog,bk.dog);((bk.ed||bk.sd)<today?e.past:e.up).push({bk,tasks});});
+  missingLogs.forEach(({dog,dates})=>{if(!_pass(_mlBkt(dog)))return;dogEntry(dog.cid,dog.name).missing=dates;});
+  (vaccReminders||[]).forEach(v=>{if(!_pass(_remBkt(v.bk)))return;dogEntry(v.dog.cid,v.dog.name).vacc=v;});
+  (emergReminders||[]).forEach(v=>{if(!_pass(_remBkt(v.bk)))return;dogEntry(v.dog.cid,v.dog.name).emerg=v;});
   const dogList=Object.values(dogs);
   // Outstanding counter → rendered into the sticky #todoCounter (shown in both empty and non-empty states).
-  const cpill=(lbl,n,col)=>'<span style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:99px;background:'+col+'1a;color:'+col+';border:1px solid '+col+';">'+lbl+' '+n+'</span>';
-  const cc=document.getElementById('todoCounter');if(cc)cc.innerHTML='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;font-weight:800;">'+totalOut+' outstanding</span>'+cpill('🆕 New',buckets.New,'#F97316')+cpill('🔴 Live',buckets.Live,'#16A34A')+cpill('✅ Completed',buckets.Completed,'#78716C')+'</div>';
+  const cpill=(lbl,n,col,key)=>'<span onclick="setTodoFilter(\''+key+'\')" title="Tap to filter" style="cursor:pointer;font-size:9px;font-weight:700;padding:3px 9px;border-radius:99px;background:'+(_todoFilter===key?col:col+'1a')+';color:'+(_todoFilter===key?'#fff':col)+';border:1px solid '+col+';">'+lbl+' '+n+'</span>';
+  const cc=document.getElementById('todoCounter');if(cc)cc.innerHTML='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;font-weight:800;">'+totalOut+' outstanding</span>'+cpill('🆕 New',buckets.New,'#F97316','New')+cpill('🔴 Live',buckets.Live,'#16A34A','Live')+cpill('✅ Completed',buckets.Completed,'#78716C','Completed')+(_todoFilter?'<span onclick="setTodoFilter(\'\')" style="cursor:pointer;font-size:9px;color:var(--bl);text-decoration:underline;">show all</span>':'')+'</div>';
   if(!dogList.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
   // Upcoming: soonest first · Past: most recent first · Dogs ordered by soonest upcoming (dogs with only past come after).
   dogList.forEach(d=>{d.up.sort((a,c)=>(a.bk.sd||'').localeCompare(c.bk.sd||''));d.past.sort((a,c)=>((c.bk.ed||c.bk.sd)||'').localeCompare((a.bk.ed||a.bk.sd)||''));});
@@ -377,9 +402,31 @@ function renderPendingPanel(){
 // Populate the Check Dates screen (av_dog dropdown + default dates). Called on sc-checkdates show.
 function initAvail(){
   const dse=document.getElementById('av_dog_search');if(dse)dse.value='';
-  const sel=document.getElementById('av_dog');if(sel){sel.innerHTML='<option value="">— No dog (skip compatibility check) —</option>';[...allDogs].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).forEach(d=>sel.add(new Option(d.name+' - '+d.cid,d.name)));}
+  const av=document.getElementById('av_dog');if(av)av.value='';
+  const res=document.getElementById('av_dog_results');if(res)res.style.display='none';
   const td=todayStr();const sd=document.getElementById('av_sd'),ed=document.getElementById('av_ed');if(sd&&!sd.value)sd.value=td;if(ed&&!ed.value)ed.value=td;
+  _linkStart('av_sd','av_ed');// date-range linkage (10)
 }
+// Live typeahead for the Check-dates dog picker (11). av_dog (hidden) holds the chosen CID.
+function filterAvDog(){
+  const q=(document.getElementById('av_dog_search')?.value||'').trim().toLowerCase();
+  const res=document.getElementById('av_dog_results');if(!res)return;
+  const matches=[...allDogs].filter(d=>!q||(d.name||'').toLowerCase().includes(q)||(d.cid||'').toLowerCase().includes(q)).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).slice(0,30);
+  const exact=matches.some(d=>(d.name||'').toLowerCase()===q);
+  res.innerHTML=matches.map(d=>'<div onmousedown="pickAvDog(\''+d.cid+'\')" style="padding:6px 9px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--gr5);">'+(d.name||'')+' <span style="color:var(--gr3);font-size:9px;">'+d.cid+(d.breed?' · '+d.breed:'')+'</span></div>').join('')
+    +((q&&!exact)?'<div onmousedown="quickAddDogFromSearch()" style="padding:6px 9px;font-size:11px;color:var(--gn);font-weight:700;cursor:pointer;border-bottom:1px solid var(--gr5);">➕ Create new dog “'+document.getElementById('av_dog_search').value.trim()+'” (minimal profile)</div>':'')
+    +'<div onmousedown="pickAvDog(\'\')" style="padding:6px 9px;font-size:10px;color:var(--gr2);cursor:pointer;">— No dog (skip compatibility) —</div>';
+  res.style.display='block';
+}
+// (13) Create a minimal dog profile (name only) right from the Check-dates search, then select it — no booking required. Complete the full profile later.
+async function quickAddDogFromSearch(){
+  const name=(document.getElementById('av_dog_search').value||'').trim();if(!name)return;
+  const cid=genId(name);
+  const drow=rowFromMap(dogsHdrRow,{CustomerID:cid,DogName:name,Name:name,Status:'Enquiry'},TABS.DOGS.h);
+  try{await appendRow(TABS.DOGS,drow);const dog=mapDog(drow,allDogs.length,mkHdr(dogsHdrRow));allDogs.push(dog);pickAvDog(cid);if(typeof toast==='function')toast('Minimal profile added for '+name+' ('+cid+') — complete it later','ok');}
+  catch(e){alert('Error: '+e.message);}
+}
+function pickAvDog(cid){const d=_dogByCid(cid);document.getElementById('av_dog').value=cid||'';document.getElementById('av_dog_search').value=d?d.name:'';const res=document.getElementById('av_dog_results');if(res)res.style.display='none';}
 function toggleAvailPanel(){
   const p=document.getElementById('availPanel');if(!p)return;const showing=p.style.display!=='none'&&p.style.display!=='';
   p.style.display=showing?'none':'block';
@@ -387,18 +434,11 @@ function toggleAvailPanel(){
     const dse=document.getElementById('av_dog_search');if(dse)dse.value='';
     const sel=document.getElementById('av_dog');
     sel.innerHTML='<option value="">— No dog (skip compatibility check) —</option>';
-    [...allDogs].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).forEach(d=>sel.add(new Option(d.name+' – '+d.cid,d.name)));
+    [...allDogs].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).forEach(d=>sel.add(new Option(d.name+' – '+d.cid,d.cid)));
     const td=todayStr();
     if(!document.getElementById('av_sd').value)document.getElementById('av_sd').value=td;
     if(!document.getElementById('av_ed').value)document.getElementById('av_ed').value=td;
   }
-}
-function filterAvDog(){
-  const q=(document.getElementById('av_dog_search')?.value||'').toLowerCase();
-  const sel=document.getElementById('av_dog');if(!sel)return;const prev=sel.value;
-  sel.innerHTML='<option value="">— No dog (skip compatibility check) —</option>';
-  [...allDogs].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).forEach(d=>sel.add(new Option(d.name+' – '+d.cid,d.name)));
-  if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
 }
 // --- gender / neuter parsed from the combined GenderStatus string ("Spayed female", "Neutered male", "Male") ---
 function _gsGender(s){s=(s||'').toLowerCase();return /female|bitch/.test(s)?'female':/\bmale|\bdog\b/.test(s)?'male':'';}
@@ -412,23 +452,28 @@ function _compatMeta(result){const s=(result||'').toLowerCase().trim();
   if(s==='friends'||s==='good'||s==='suitable')return{col:'var(--gn)',emoji:'🟢',bad:false,rank:4};
   return{col:'var(--gr3)',emoji:'⚪',bad:false,rank:5};}
 // Queried dog's compatibility history: latest prior-meeting result per partner (met[]) + partners it rated Not Good/Fight (conflicts[], for the reference panel). "Did not meet" counts as not-met.
-function _availRiskInfo(dogName){
+// A booking's dog CID (prefer CustomerID, else resolve by name for legacy rows).
+function _bkCid(b){if(b.customerId)return b.customerId;const d=allDogs.find(x=>bkMatchesDog(b,x));return d?d.cid:'';}
+// Compat history for the searched dog (by CID). Parties are resolved to canonical CIDs via _resolveParty so "CID Name" / "Name - CID" tokens all match (fixes #12/#15).
+function _availRiskInfo(searchCid){
   const info={met:{},conflicts:[]};
-  if(!dogName)return info;const dn=dogName.toLowerCase();const seen=new Set();
+  if(!searchCid)return info;const seen=new Set();
   trialLogs.forEach(t=>{
-    const parties=[(t.dog||'')].concat((t.mixedWith||'').split(/[,;]+/)).map(s=>s.trim().toLowerCase()).filter(Boolean);
-    if(!parties.includes(dn))return;
+    const owner=_dogByCid(t.cid)||allDogs.find(d=>(d.name||'').toLowerCase()===(t.dog||'').toLowerCase());
+    const parties=[{key:owner?owner.cid:((t.cid||t.dog||'').toLowerCase()),dog:owner}];
+    (t.mixedWith||'').split(/[,;]+/).map(s=>s.trim()).filter(Boolean).forEach(tok=>{const d=_resolveParty(tok);const p=_parseParty(tok);parties.push({key:d?d.cid:((p.cid||p.name||tok).toLowerCase()),dog:d});});
+    if(!parties.some(p=>p.key===searchCid))return;
     const result=(t.suitable||'').trim();const didNotMeet=result.toLowerCase()==='did not meet';
-    parties.filter(p=>p!==dn).forEach(o=>{
-      if(!didNotMeet&&(!info.met[o]||(t.date||'')>=(info.met[o].date||'')))info.met[o]={date:t.date||'',result};
-      if(_compatMeta(result).bad&&!seen.has(o)){seen.add(o);const p=allDogs.find(d=>(d.name||'').toLowerCase()===o);const gs=p?(p.genderStatus||p.gender||''):'';
-        info.conflicts.push({name:p?p.name:o,breed:(p&&p.breed)||'',age:p?ageYears(p.birthday):null,gender:_gsGender(gs),neuter:_gsNeuter(gs),weight:(p&&p.weight)||'',result});}
+    parties.filter(p=>p.key!==searchCid).forEach(o=>{
+      if(!didNotMeet){let m=info.met[o.key];if(!m){m={result:'',latest:'',firstDate:'',lastDate:'',count:0};info.met[o.key]=m;}const dt=t.date||'';m.count++;if(dt){if(!m.firstDate||dt<m.firstDate)m.firstDate=dt;if(dt>m.lastDate)m.lastDate=dt;if(dt>=m.latest){m.latest=dt;m.result=result;}}else if(!m.result)m.result=result;}
+      if(_compatMeta(result).bad&&!seen.has(o.key)){seen.add(o.key);const p=o.dog;const gs=p?(p.genderStatus||p.gender||''):'';
+        info.conflicts.push({cid:o.key,name:p?p.name:o.key,breed:(p&&p.breed)||'',age:p?ageYears(p.birthday):null,gender:_gsGender(gs),neuter:_gsNeuter(gs),weight:(p&&p.weight)||'',result});}
     });
   });
   return info;
 }
 // Compatibility flag for one overlapped dog vs the queried dog: met-before (coloured by result) or not-met (grey).
-function _availFlag(dogNm,info){const m=info.met[(dogNm||'').toLowerCase()];if(m){const meta=_compatMeta(m.result);return{met:true,col:meta.col,emoji:meta.emoji,result:m.result,date:m.date,rank:meta.rank};}return{met:false,col:'var(--gr3)',emoji:'⚪',result:'',date:'',rank:9};}
+function _availFlag(cid,info){const m=cid&&info.met[cid];if(m){const meta=_compatMeta(m.result);return{met:true,col:meta.col,emoji:meta.emoji,result:m.result,first:m.firstDate,last:m.lastDate,count:m.count,rank:meta.rank};}return{met:false,col:'var(--gr3)',emoji:'⚪',result:'',first:'',last:'',count:0,rank:9};}
 // Actual overlapping window (max start … min end, with times) between a booking and the searched range.
 function _overlapWindow(b,sd,st,ed,et){const qS=new Date(sd+'T'+(st||'00:00')),qE=new Date(ed+'T'+(et||'23:59'));const bS=new Date(b.sd+'T'+(b.st||'00:00')),bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));return{s:bS>qS?bS:qS,e:bE<qE?bE:qE};}
 // Inclusive count of days a booking is present within [sd,ed].
@@ -445,7 +490,7 @@ function _availMonthBlock(y,m,sd,ed,info){
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=_dstr(d);const inMo=d.getMonth()===m;const inR=ds>=sd&&ds<=ed;
     const occs=inR?occupantsOn(ds):[];const occ=occs.length;
     const bg=!inMo?'transparent':(inR?_capBg(occ):'var(--gr5)');
-    const names=occs.map(b=>{const fl=_availFlag(b.dog,info);
+    const names=occs.map(b=>{const fl=_availFlag(_bkCid(b),info);
       return'<span style="display:block;font-size:8px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+fl.col+';font-weight:'+(fl.met?'800':'500')+';">'+(fl.met?fl.emoji:'')+(b.dog||'')+'</span>';}).join('');
     cells+='<div style="min-height:34px;border:1px solid var(--gr4);border-radius:4px;padding:2px;background:'+bg+';'+(inR?'box-shadow:inset 0 0 0 2px var(--pu);':'')+(inMo?'':'opacity:.3;')+(ds===today?'outline:1px dashed var(--bl);':'')+'">'
       +'<div style="font-size:8px;font-weight:700;display:flex;justify-content:space-between;color:'+(inMo?'var(--bk)':'var(--gr3)')+';"><span>'+d.getDate()+'</span>'+(inR&&occ?'<span style="color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+names+'</div>';}
@@ -455,7 +500,7 @@ function _availMonthBlock(y,m,sd,ed,info){
 function runAvailCheck(){
   const sd=document.getElementById('av_sd').value;const st=document.getElementById('av_st').value||'00:00';
   const ed=document.getElementById('av_ed').value;const et=document.getElementById('av_et').value||'23:59';
-  const dogName=document.getElementById('av_dog').value;
+  const dogCid=document.getElementById('av_dog').value;const searchDog=_dogByCid(dogCid);const dogName=searchDog?searchDog.name:'';
   const el=document.getElementById('av_results');
   if(!sd||!ed){el.innerHTML='<div style="font-size:10px;color:var(--rd);margin-top:6px;">Please enter start and end dates.</div>';return;}
   const qStart=new Date(sd+'T'+st);const qEnd=new Date(ed+'T'+et);
@@ -463,28 +508,35 @@ function runAvailCheck(){
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
   const overlaps=bookings.filter(b=>{
     if(!active.includes(b.status)||!b.sd)return false;
+    if(dogCid&&_bkCid(b)===dogCid)return false;// exclude the searched dog's own bookings
     const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
     return bS<qEnd&&bE>qStart;
   });
-  const info=_availRiskInfo(dogName);
+  const info=_availRiskInfo(dogCid);
   const grid=_availPeriodGrid(sd,ed,info);// month view of the searched range (4a)
   const mw=document.getElementById('av_msgWrap');if(mw)mw.style.display='block';// reveal overlap-message builder (4c/4d)
   _fillOverlapMsgUI(sd,ed);// populate existing-owner picker + prefill new-dog name (7d/7f)
   if(!overlaps.length){el.innerHTML=grid+'<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;margin-top:8px;">✅ No active bookings during this period</div>';return;}
   // Enrich + sort: met-before worst first (Fight→…→Friends), then not-met, then start date (7b).
-  const enriched=overlaps.map(b=>{const prof=allDogs.find(d=>bkMatchesDog(b,d));return{b,prof,fl:_availFlag(b.dog,info),days:_rangeDays(b,sd,ed)};});
+  const enriched=overlaps.map(b=>{const prof=allDogs.find(d=>bkMatchesDog(b,d));return{b,prof,fl:_availFlag(_bkCid(b),info),days:_rangeDays(b,sd,ed)};});
   enriched.sort((a,c)=>(a.fl.rank-c.fl.rank)||((a.b.sd||'').localeCompare(c.b.sd||'')));
   const wd=D=>fmtDate(_dstr(D))+' '+String(D.getHours()).padStart(2,'0')+':'+String(D.getMinutes()).padStart(2,'0');
   const rows=enriched.map(({b,prof,fl,days})=>{
     const win=_overlapWindow(b,sd,st,ed,et);const winStr=wd(win.s)+' → '+wd(win.e);
-    const clickAttr=prof?' onclick="openDogByCid(\''+prof.cid+'\')" style="cursor:pointer;"':'';
-    const attrs=[prof&&prof.breed,[_gsNeuter(prof&&(prof.genderStatus||prof.gender)||''),_gsGender(prof&&(prof.genderStatus||prof.gender)||'')].filter(Boolean).join(' '),(prof&&prof.weight?prof.weight+'kg':'')].filter(Boolean).join('&nbsp;·&nbsp;');
-    const metNote=fl.met?'<div style="font-size:9px;">🐾 Met before'+(fl.date?' ('+fl.date+')':'')+': <b style="color:'+fl.col+';">'+fl.result+'</b></div>':'<div style="font-size:9px;color:var(--gr2);">🐾 Not met before</div>';
-    const dot='<span style="width:12px;height:12px;border-radius:50%;background:'+fl.col+';flex-shrink:0;margin-top:3px;display:inline-block;'+(fl.met&&_compatMeta(fl.result).bad?'box-shadow:0 0 0 2px var(--rdl);':'')+'"></span>';
-    return'<div'+clickAttr+' style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--gr4);">'
-      +dot
+    const clickAttr=prof?' onclick="openDogByCid(\''+prof.cid+'\')"':'';// note: no style here — the row's single style attr sets cursor (a 2nd style attr would be ignored)
+    const _pa=prof?ageYears(prof.birthday):null;const attrs=[prof&&prof.breed,(_pa!=null?_pa+'y':''),[_gsNeuter(prof&&(prof.genderStatus||prof.gender)||''),_gsGender(prof&&(prof.genderStatus||prof.gender)||'')].filter(Boolean).join(' '),(prof&&prof.weight?prof.weight+'kg':'')].filter(Boolean).join('&nbsp;·&nbsp;');
+    const _per=fl.first?((fl.last&&fl.last!==fl.first)?fmtDate(fl.first)+' – '+fmtDate(fl.last):fmtDate(fl.first)):'';
+    const _chip='display:inline-block;margin-top:3px;padding:2px 9px;border-radius:99px;font-size:9px;font-weight:800;color:#fff;';
+    const metNote=fl.met
+      ?'<div style="'+_chip+'background:'+fl.col+';">🐾 Met before'+(_per?' · '+_per:'')+(fl.count>1?' · '+fl.count+'×':'')+' — '+fl.result+'</div>'
+      :'<div style="'+_chip+'background:var(--gr3);">🐾 Not met before</div>';
+    const flagDot='<span title="'+(fl.met?('met before: '+fl.result):'not met before')+'" style="width:11px;height:11px;border-radius:50%;background:'+fl.col+';display:inline-block;flex-shrink:0;'+(fl.met&&_compatMeta(fl.result).bad?'box-shadow:0 0 0 2px var(--rdl);':'')+'"></span>';
+    const photo=prof?resolvePhotoUrl(prof):'';
+    const av=photo?'<img src="'+photo+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--gr4);" onerror="this.style.display=\'none\'">':'<span style="width:34px;height:34px;border-radius:50%;background:var(--orl);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">🐶</span>';
+    return'<div'+clickAttr+' style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gr4);'+(prof?'cursor:pointer;':'')+'">'
+      +av
       +'<div style="flex:1;min-width:0;">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--bk);'+(prof?'text-decoration:underline;':'')+'">'+(b.dog||'')+' <span style="font-size:9px;font-weight:700;color:var(--pu);">· '+days+' day'+(days!==1?'s':'')+' overlap</span></div>'
+      +'<div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--bk);'+(prof?'text-decoration:underline;':'')+'">'+flagDot+'<span>'+(b.dog||'')+'</span><span style="font-size:9px;font-weight:700;color:var(--pu);white-space:nowrap;">· '+days+' day'+(days!==1?'s':'')+' overlap</span></div>'
       +(attrs?'<div style="font-size:9px;color:var(--gr2);">'+attrs+'</div>':'')
       +'<div style="font-size:9px;color:var(--gr2);">'+(b.svc||'')+'&nbsp;·&nbsp;overlaps '+winStr+'</div>'
       +metNote
@@ -512,26 +564,26 @@ function _overlapDogs(sd,ed){
   const st=document.getElementById('av_st').value||'00:00',et=document.getElementById('av_et').value||'23:59';
   const qStart=new Date(sd+'T'+st),qEnd=new Date(ed+'T'+et);
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
-  const overlaps=bookings.filter(b=>{if(!active.includes(b.status)||!b.sd)return false;const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));return bS<qEnd&&bE>qStart;});
+  const dogCid=document.getElementById('av_dog').value;// exclude the searched dog itself
+  const overlaps=bookings.filter(b=>{if(!active.includes(b.status)||!b.sd)return false;if(dogCid&&_bkCid(b)===dogCid)return false;const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));return bS<qEnd&&bE>qStart;});
   const seen=new Set(),out=[];
   overlaps.forEach(b=>{const p=allDogs.find(d=>bkMatchesDog(b,d));const key=(p&&p.cid)||b.dog;if(!key||seen.has(key))return;seen.add(key);out.push(p||{name:b.dog||''});});
   return out;
 }
 // Overlapped-dog one-liner by ATTRIBUTES (no name): breed · gender · spayed/neutered/full · weight (7h).
-function _dogAttrLine(d){if(!d)return'';const gs=d.genderStatus||d.gender||'';const g=_gsGender(gs);let n=_gsNeuter(gs);if(n==='intact')n='full';const gn=[n,g].filter(Boolean).join(' ');return[d.breed,gn,(d.weight?d.weight+'kg':'')].filter(Boolean).join(', ');}
+function _dogAttrLine(d){if(!d)return'';const gs=d.genderStatus||d.gender||'';const g=_gsGender(gs);let n=_gsNeuter(gs);if(n==='intact')n='full';const gn=[n,g].filter(Boolean).join(' ');const a=ageYears(d.birthday);return[d.breed,(a!=null?a+'y':''),gn,(d.weight?d.weight+'kg':'')].filter(Boolean).join(', ');}
 // Populate the overlap-message UI (existing-owner picker + prefill new-dog name) after a check runs.
 function _fillOverlapMsgUI(sd,ed){
-  const dm=document.getElementById('av_msg_dog');if(dm&&!dm.value)dm.value=document.getElementById('av_dog').value||'';
+  const _sd=_dogByCid(document.getElementById('av_dog').value);const dm=document.getElementById('av_msg_dog');if(dm&&!dm.value)dm.value=_sd?_sd.name:'';
   const sel=document.getElementById('av_msg_exist');if(sel){const od=_overlapDogs(sd,ed);sel.innerHTML=od.length?od.map((d,i)=>'<option value="'+i+'">'+(d.name||'(dog)')+(d.owner?' — '+d.owner:'')+'</option>').join(''):'<option value="">(no overlapping owners)</option>';}
 }
 function buildOverlapMsg(kind){
   const sd=document.getElementById('av_sd').value,ed=document.getElementById('av_ed').value;
-  const dogName=document.getElementById('av_dog').value;
   const out=document.getElementById('av_msgOut');if(!sd||!ed){out.value='Run the availability check first (enter dates).';return;}
   const dates=fmtDate(sd)+(ed&&ed!==sd?' – '+fmtDate(ed):'');
   const monthName=new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'long',year:'numeric'});
   const overDogs=_overlapDogs(sd,ed);
-  const nd=allDogs.find(d=>d.name===dogName)||null;
+  const nd=_dogByCid(document.getElementById('av_dog').value)||null;const dogName=nd?nd.name:'';
   let msg='';
   if(kind==='new'){
     // Availability reply = the NEW-customer message (7e). Owner/dog from inputs (7d). Overlapped dogs by attributes, not names (7h).
@@ -550,14 +602,14 @@ function buildOverlapMsg(kind){
     const tpl=_overlapTpl('existing');
     const vars=Object.assign({month:monthName,dates},_dogFactVars(nd),{dogs_name:d.name||'',dog_owner:d.owner||''});
     if(tpl&&tpl.content){msg=_fillTplVars(tpl.content,vars);}
-    else{msg='Hi '+(d.owner||'there')+',\n\nWe have a new guest ('+(_dogAttrLine(nd)||'a friendly dog')+') hoping to stay during '+dates+', overlapping '+(d.name||'your dog')+"'s booking. Would you be happy for them to share the space? 🐾";}
+    else{const FALLBACK_EXIST='Hi {{dog_owner}},\n\nHope you and {{dogs_name}} are both keeping well! 🧡\n\nWe’ve had a request from another owner to board their {{dogs_breed}} with us, which overlaps with {{dogs_name}}’s booking in {{month}}. {{He_or_she}} is friendly with other dogs.\n\nWould you be comfortable with {{He_or_she}} staying alongside {{dogs_name}} during that time?\n\nBest regards,\nKatie & Osbert 🐾';msg=_fillTplVars(FALLBACK_EXIST,vars);}
     const lk=nd?_photoViewLink(nd):'';if(lk&&!/https?:\/\//.test(msg))msg+='\n\n📷 '+(nd.name||'photo')+': '+lk;
   }
   out.value=msg;
 }
 function copyOverlapMsg(){const v=document.getElementById('av_msgOut').value;if(!v){return;}copyText(v);const b=document.getElementById('av_msgCopyBtn');if(b){const o=b.textContent;b.textContent='Copied ✓';b.style.background='var(--gn)';setTimeout(()=>{b.textContent=o;b.style.background='var(--pu)';},1800);}}
 // --- Quick-add a booking with a minimal dog profile from the search page (4e) ---
-function toggleQuickBk(){const w=document.getElementById('av_qbkWrap');if(!w)return;w.style.display=w.style.display==='none'?'block':'none';if(w.style.display==='block'){const dn=document.getElementById('av_dog').value;if(dn&&!document.getElementById('qbk_dog').value)document.getElementById('qbk_dog').value=dn;}}
+function toggleQuickBk(){const w=document.getElementById('av_qbkWrap');if(!w)return;w.style.display=w.style.display==='none'?'block':'none';if(w.style.display==='block'){const d0=_dogByCid(document.getElementById('av_dog').value);if(d0&&!document.getElementById('qbk_dog').value)document.getElementById('qbk_dog').value=d0.name;}}
 async function quickAddBooking(){
   const msg=document.getElementById('qbk_msg');
   const name=(document.getElementById('qbk_dog').value||'').trim();
@@ -590,6 +642,22 @@ async function quickAddBooking(){
     runAvailCheck();if(typeof updatePendingBadge==='function')updatePendingBadge();
   }catch(e){setMsg('Error: '+e.message,'var(--rd)');}
   finally{btn.disabled=false;}
+}
+// Jump to the Quote page prefilled from the Check-dates search (dog, service, dates, times) — works for existing dogs (or ones just created via the typeahead).
+function quoteFromSearch(){
+  const cid=document.getElementById('av_dog').value;
+  if(!cid){alert('Pick a dog first — type its name above (or create a minimal profile).');return;}
+  const svcMap={Boarding:'boarding',DayCare:'daycare',Walking:'walk','Drop-in':'dropin','Dog Sit':'dogsit','Pet Taxi':'taxi',Training:'training'};
+  const av=document.getElementById('av_svc')?.value||'Boarding';
+  _selDogs=[cid];_addDogs=[];_mainDog=cid;
+  showScreen('sc-quote');
+  const set=(id,v)=>{const e=document.getElementById(id);if(e&&v!=null)e.value=v;};
+  set('ml_svc',svcMap[av]||'boarding');if(typeof onMLSvc==='function')onMLSvc();
+  set('ml_sd',document.getElementById('av_sd').value);set('ml_ed',document.getElementById('av_ed').value);
+  set('ml_st',document.getElementById('av_st').value||'09:00');set('ml_et',document.getElementById('av_et').value||'18:00');
+  const d=_dogByCid(cid);const ownerEl=document.getElementById('q_owner');if(ownerEl&&d)ownerEl.value=d.owner||'';
+  buildQDogMS();buildMainDogBtns&&buildMainDogBtns();
+  if(typeof addSvcLine==='function')addSvcLine();// auto-add the prefilled service line so the quote is ready
 }
 function copyAvailReply(){
   const sd=document.getElementById('av_sd').value;const ed=document.getElementById('av_ed').value;
@@ -747,8 +815,8 @@ function renderCards(entries,c,cls){
   });
 }
 function dogOptLabel(d){return d.name+(d.breed?' · '+d.breed:'')+' · '+d.cid;}
-function refreshDogDropdowns(){const sel=document.getElementById('bm_dog');if(sel){const cur=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(cur)sel.value=cur;}buildQDogMS();}
-function filterBmDog(){const q=(document.getElementById('bm_dog_search')?.value||'').toLowerCase();const sel=document.getElementById('bm_dog');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));if(prev)sel.value=prev;}
+function refreshDogDropdowns(){const sel=document.getElementById('bm_dog');if(sel){const cur=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.cid)));if(cur)sel.value=cur;}buildQDogMS();}
+function filterBmDog(){const q=(document.getElementById('bm_dog_search')?.value||'').toLowerCase();const sel=document.getElementById('bm_dog');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">Select dog</option>';allDogs.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cid.toLowerCase().includes(q)).forEach(d=>sel.add(new Option(dogOptLabel(d),d.cid)));if(prev)sel.value=prev;}
 
 function waLink(ph){if(!ph)return'';const n=ph.replace(/[^0-9]/g,'');return'<a href="https://wa.me/'+n+'" target="_blank" style="color:var(--gn);font-weight:600;text-decoration:none;">'+ph+' 💬</a>';}
 // ==================== PROFILE ====================
@@ -794,7 +862,7 @@ function buildTodayLog(){
   // Default all unset tiles to 'To-do' when there is an active booking
   const _TILE_KEYS=['breakfast','medAm','dinner','medPm','snack','walkAm','garden','walkPm','game','beforeSleep','bowl','room','garment'];
   const _anySet=_TILE_KEYS.some(k=>sv[k]);
-  if(!_anySet){_TILE_KEYS.forEach(k=>{sv[k]='todo';});localStorage.setItem('log_'+curDog.cid+'_'+todayStr(),JSON.stringify(sv));}
+  if(!_anySet){const noMed=v=>{const s=(v||'').toLowerCase().trim();return !s||s==='no'||s==='none'||s==='n/a'||s==='na'||s==='-';};const _noMeds=noMed(curDog.med)&&noMed(curDog.medSchedule);_TILE_KEYS.forEach(k=>{sv[k]=(_noMeds&&(k==='medAm'||k==='medPm'))?'na':'todo';});localStorage.setItem('log_'+curDog.cid+'_'+todayStr(),JSON.stringify(sv));}// (14) current-date only: med tiles default to N/A when the dog needs no medication
   document.getElementById('logNotes').value=sv.notes||'';document.getElementById('logPrivate').checked=!!sv.priv;
   function tile(k,ico,lbl){const s=sv[k]||'';const sc=s?'done-'+s:'';const si=s==='yes'?' ✓':s==='refused'?' ✗':s==='todo'?' ○':s==='na'?' —':'';return'<div class="tile'+(sc?' '+sc:'')+'" id="tl_'+k+'" data-lbl="'+lbl+'" onclick="togTile(\''+k+'\')"><span class="t-ico">'+ico+'</span><span class="t-lbl">'+lbl+si+'</span></div>';}
   function inc(k,lbl,body){return '<div class="inc-tog" onclick="togInc(\''+k+'\')"><span>'+lbl+'</span><span style="font-size:10px;color:var(--gr3);">'+(sv['inc_'+k]?'&#9652;':'&#9660;')+'</span></div><div class="inc-fld'+(sv['inc_'+k]?' open':'')+'" id="inc_'+k+'">'+body+'</div>';}
@@ -919,9 +987,9 @@ async function filtHist(type,btn){
         summary=(done.length?done.join(' · '):'Nothing logged')+(meta?' · '+meta:'')+(notes?' — '+notes:'');
       }
       else if(tab===TABS.HEALTH)summary=(g('Issue')||'-')+' '+(g('Category')||'');
-      else if(tab===TABS.FIGHT)summary='Fight: '+(g('Issue')||'-');
+      else if(tab===TABS.FIGHT)summary='Fight: '+(g('Issue')||'-')+((g('OtherDogs')||'').trim()?' · with '+_otherPartyLine(g('CustomerID'),g('DogName'),g('OtherDogs')):'');
       else if(tab===TABS.TRANSPORT){const trn=g('Transporter');const jtype=g('JourneyType');const time=g('Time');const from=g('From');const to=g('To');const route=(from||to)?(from||'?')+' → '+(to||'?'):'';summary=[trn,jtype,time,route].filter(Boolean).join(' · ');}
-      else if(tab===TABS.TRIAL)summary='Mixed: '+(g('MixedWith')||'-')+' - '+(g('Suitable')||'-');
+      else if(tab===TABS.TRIAL)summary='Mixed with: '+_otherPartyLine(g('CustomerID'),g('DogName'),g('MixedWith'))+' — '+(g('Suitable')||'-');
       else if(tab===TABS.ACTLOG)summary=(g('ActivityTitle')||'-')+(g('DurationMins')?' - '+g('DurationMins')+' mins':'')+(g('Staff')?' - '+g('Staff'):'');
       const item=document.createElement('div');item.className='hi';
       item.innerHTML='<div class="hi-h"><span class="hi-d">'+(row[2]||'-')+'</span><span class="htype '+(cls[tab]||'htd')+'">'+(lbl[tab]||tab)+'</span>'+(iP?'<span class="ptag">Private</span>':'')+'</div><div class="hsum">'+summary+'</div><div class="hi-acts"><button class="ebtn">Edit</button></div>';
@@ -1047,25 +1115,39 @@ function swPTab(name,btn){
 // CONSENT
 const CF=[{k:'photo',l:'Photo & video for marketing'},{k:'offleash',l:'Off-lead consent'},{k:'mixing',l:'Mixing with other households'},{k:'walkout',l:'Walking outside home/garden'},{k:'groupwalk',l:'Group walk (max 6 dogs)'},{k:'feedtog',l:'Fed alongside other households'},{k:'crate',l:'Crate consent'},{k:'sameroom',l:'Same room as family dog'},{k:'medcost',l:'Owner covers all vet costs'},{k:'vetconsent',l:'Vet consent incl. euthanasia'},{k:'tcsigned',l:'Signed T&Cs (THE CUDDLY LANE)'}];
 function _renderConsentUI(dog){
-  document.getElementById('consentBody').innerHTML=CF.map(f=>{
+  const tcSignedNow=((dog.tcsigned||'').toLowerCase().includes('yes')||(dog.tcsigned||'').toLowerCase().includes('signed'));
+  const rows=CF.map(f=>{
     const v=(dog[f.k]||'').toLowerCase();const iy=v.includes('yes')||v.includes('signed');const inn=v.includes('no');
     const yoc="setConsent('"+f.k+"','Yes',this)";const noc="setConsent('"+f.k+"','No',this)";
-    return'<div class="cfld"><label>'+f.l+'</label><div class="ctog"><button class="ctb'+(iy?' yes':'')+'" onclick="'+yoc+'">Yes</button><button class="ctb'+(inn?' no':'')+'" onclick="'+noc+'">No</button></div></div>';
+    let extra='';
+    if(f.k==='tcsigned'){const sd=dog._tcSignedDate||'',sv=dog._tcVersion||'';extra=(sd||sv)?'<div style="font-size:9px;color:var(--gr2);margin-top:2px;">Last signed: '+(sd?fmtDate(sd):'—')+(sv?' · T&C version '+sv:'')+'</div>':'';}
+    return'<div class="cfld"><label>'+f.l+'</label><div class="ctog"><button class="ctb'+(iy?' yes':'')+'" onclick="'+yoc+'">Yes</button><button class="ctb'+(inn?' no':'')+'" onclick="'+noc+'">No</button></div>'+extra+'</div>';
   }).join('');
+  const curVer=getTCVersion();
+  const tcAdmin='<div style="margin-top:10px;padding:8px 10px;background:var(--gr5);border-radius:8px;"><div style="font-size:9px;font-weight:700;color:var(--gr2);margin-bottom:4px;">📄 Current T&amp;C version <span style="font-weight:400;">(bump when you change the T&amp;Cs — a fresh "Yes" stamps this version + today\'s date)</span></div><div style="display:flex;gap:6px;"><input class="fi" id="tc_version_input" value="'+curVer.replace(/"/g,'&quot;')+'" placeholder="e.g. 2026-08 or v3" style="font-size:11px;flex:1;"><button class="sbtn2" style="font-size:10px;padding:6px 10px;" onclick="setTCVersion()">Set as current</button></div>'+(tcSignedNow?'<div style="font-size:9px;color:var(--gn);margin-top:4px;">This dog\'s "Signed T&amp;Cs" will save as version <b>'+(curVer||'(blank)')+'</b> on '+fmtDate(todayStr())+' unless already signed on this version.</div>':'')+'</div>';
+  document.getElementById('consentBody').innerHTML=rows+tcAdmin;
 }
 function buildConsent(dog){
   _renderConsentUI(dog);
   // Async: fetch latest consent record from sheet and refresh UI
-  readSheet(TABS.CONSENT,'A2:N').then(rows=>{
-    const dogRows=rows.filter(r=>r[0]===dog.cid||r[1]===dog.name).sort((a,b)=>(b[2]||'').localeCompare(a[2]||''));
+  readSheet(TABS.CONSENT,'A2:P').then(rows=>{
+    const dogRows=rows.filter(r=>r[0]===dog.cid).sort((a,b)=>(b[2]||'').localeCompare(a[2]||''));// match by CID (dupe-name safe)
     if(!dogRows.length)return;
     const latest=dogRows[0];
     CF.forEach((f,i)=>{curDog[f.k]=latest[i+3]||'';});
+    curDog._tcVersion=latest[14]||'';curDog._tcSignedDate=latest[15]||'';// TCVersion=O, TCSignedDate=P (18)
     _renderConsentUI(curDog);
   }).catch(()=>{});
 }
 function setConsent(k,v,btn){if(!curDog)return;const already=(curDog[k]||'')=== v;curDog[k]=already?'':v;btn.closest('.cfld').querySelectorAll('.ctb').forEach(b=>b.className='ctb');if(!already)btn.classList.add(v==='Yes'?'yes':'no');}
-async function saveConsent(){const st=document.getElementById('consentStatus');if(!curDog)return;const vals=[curDog.cid,curDog.name,todayStr(),...CF.map(f=>curDog[f.k]||'')];try{await appendRow(TABS.CONSENT,vals);st.textContent='Consent saved!';st.className='smsg ok';setTimeout(()=>st.className='smsg',3000);}catch(e){st.textContent=e.message;st.className='smsg err';}}
+async function saveConsent(){const st=document.getElementById('consentStatus');if(!curDog)return;
+  // (18) stamp T&C version + signed date when Signed T&Cs = Yes. Latest-only: keep the prior date if the same version was already signed, else stamp today.
+  const signedYes=((curDog.tcsigned||'').toLowerCase().includes('yes')||(curDog.tcsigned||'').toLowerCase().includes('signed'));
+  let tcVer='',tcDate='';
+  if(signedYes){const cur=getTCVersion();tcVer=cur;tcDate=((curDog._tcVersion||'')===cur&&curDog._tcSignedDate)?curDog._tcSignedDate:todayStr();curDog._tcVersion=tcVer;curDog._tcSignedDate=tcDate;}
+  else{curDog._tcVersion='';curDog._tcSignedDate='';}
+  const vals=[curDog.cid,curDog.name,todayStr(),...CF.map(f=>curDog[f.k]||''),tcVer,tcDate];
+  try{await appendRow(TABS.CONSENT,vals);st.textContent='Consent saved!';st.className='smsg ok';_renderConsentUI(curDog);setTimeout(()=>st.className='smsg',3000);}catch(e){st.textContent=e.message;st.className='smsg err';}}
 function buildServices(dog){
   const el=document.getElementById('servicesList');const recs=bookings.filter(r=>bkMatchesDog(r,dog)).sort((a,b)=>b.sd.localeCompare(a.sd));
   if(!recs.length){el.innerHTML='<div class="hload">No bookings yet</div>';return;}
@@ -1414,12 +1496,18 @@ function getRates(){return JSON.parse(localStorage.getItem('tcl_rates')||JSON.st
 // Auto-fill the read-only holiday-rate fields from their base rate × 1.15 (rounded). Called on load + base-rate edit.
 function recalcHolFields(){const set=(id,base)=>{const el=document.getElementById(id),b=document.getElementById(base);if(el&&b)el.value=holRate(parseFloat(b.value)||0);};set('r_board_hol','r_board_std');set('r_board_addh','r_board_add');set('r_day_hol','r_day_std');}
 function getHolRanges(){return JSON.parse(localStorage.getItem('tcl_hol_ranges')||JSON.stringify(DEFAULT_RANGES));}
+// Current T&C version (18) — stored in the Rates sheet (row 'tcl_tc_version') so all devices share it.
+function getTCVersion(){return localStorage.getItem('tcl_tc_version')||'';}
+async function setTCVersion(){const v=(document.getElementById('tc_version_input')?.value||'').trim();localStorage.setItem('tcl_tc_version',v);const st=document.getElementById('consentStatus');if(st){st.textContent='Current T&C version set to '+(v||'(blank)');st.className='smsg ok';setTimeout(()=>st.className='smsg',2500);}
+  try{const rows=await readSheet(TABS.RATES,'A2:C').catch(()=>[]);const idx=rows.findIndex(r=>r[0]==='tcl_tc_version');const row=['tcl_tc_version',v,new Date().toISOString()];if(idx>=0)await updateRow(TABS.RATES,idx+2,row);else await appendRow(TABS.RATES,row);}catch(e){}
+  if(curDog)_renderConsentUI(curDog);}
 // Rates + holiday ranges live in the Rates sheet (rows 'tcl_rates' / 'tcl_hol_ranges') so all devices share them.
 // Read on every sync into the localStorage cache; every save writes the sheet.
 async function syncSettingsFromSheet(){
   try{const rows=await readSheet(TABS.RATES,'A2:C');
     const rr=rows.find(r=>r[0]==='tcl_rates');if(rr&&rr[1])localStorage.setItem('tcl_rates',rr[1]);
     const hr=rows.find(r=>r[0]==='tcl_hol_ranges');if(hr&&hr[1])localStorage.setItem('tcl_hol_ranges',hr[1]);
+    const tv=rows.find(r=>r[0]==='tcl_tc_version');if(tv)localStorage.setItem('tcl_tc_version',tv[1]||'');
   }catch(e){}
 }
 async function saveHolRangesToSheet(ranges){
@@ -1619,7 +1707,7 @@ function quoteFromBk(){
   const actualPrepay=parseFloat(document.getElementById('bm_prepay')?.value)||0;
   const svcMap={Boarding:'boarding',DayCare:'daycare',Walking:'walk','Drop-in':'dropin','Dog Sit':'dogsit','Pet Taxi':'taxi',Training:'training'};
   const svcKey=svcMap[svc]||'boarding';
-  const _dd=allDogs.find(x=>x.name.toLowerCase()===(dog||'').toLowerCase());const cid0=_dd?_dd.cid:'';
+  const cid0=_dogByCid(dog)?dog:'';// bm_dog now holds the CID
   _svcLines=[{svc:svcKey,dogs:cid0?[cid0]:[],sd,ed,st2:bst||'09:00',et:et||'18:00',rate:0}];
   _selDogs=cid0?[cid0]:[];_addDogs=[];
   const dogData=_dd;
@@ -1646,12 +1734,13 @@ function openBkModal(editId=null,fromProf=false,editRi=null,tab=1){
   document.getElementById('bkMTitle').textContent=ed?'Modify Booking':'Add Booking';document.getElementById('bkBtn').textContent=ed?'Modify Booking':'Save Booking';
   document.getElementById('bkDelBtn').style.display=ed?'block':'none';
   const searchEl=document.getElementById('bm_dog_search');if(searchEl)searchEl.value='';
-  const sel=document.getElementById('bm_dog');sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.name)));
+  const sel=document.getElementById('bm_dog');sel.innerHTML='<option value="">Select dog</option>';allDogs.forEach(d=>sel.add(new Option(dogOptLabel(d),d.cid)));
+  _linkStart('bm_sd','bm_ed');// date-range linkage (10)
   if(ed){
     const ss=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v!=null?v:''};
-    sel.value=ed.dog;updateDogIdHint();ss('bm_svc',ed.svc);ss('bm_sd',ed.sd);ss('bm_st',ed.st);ss('bm_ed',ed.ed);ss('bm_et',ed.et);ss('bm_drop_loc',ed.dropLoc||'');ss('bm_pick_loc',ed.pickLoc||'');ss('bm_rev',ed.rev||0);ss('bm_tips',ed.tips||0);ss('bm_prepay',ed.prepay||0);ss('bm_final',ed.finalPay||0);ss('bm_unit',ed.unit||0);ss('bm_disc_notes',ed.discNotes||'');ss('bm_channel',ed.ch||'TCL');ss('bm_pay',ed.pay||'');ss('bm_status',ed.status||'Quoted');ss('bm_rpct',ed.roverPct||15);ss('bm_ramt',ed.roverAmt||0);ss('bm_rating',ed.rating||'');ss('bm_feedback',ed.feedback||'');ss('bm_ref',ed.bookingRef||'');ss('bm_prepay_ref',ed.prepayRef||'');ss('bm_final_ref',ed.finalPayRef||'');document.getElementById('bm_priv').checked=ed.priv||false;
+    sel.value=ed.customerId||(allDogs.find(d=>(d.name||'').toLowerCase()===(ed.dog||'').toLowerCase())?.cid||'');updateDogIdHint();ss('bm_svc',ed.svc);ss('bm_sd',ed.sd);ss('bm_st',ed.st);ss('bm_ed',ed.ed);ss('bm_et',ed.et);ss('bm_drop_loc',ed.dropLoc||'');ss('bm_pick_loc',ed.pickLoc||'');ss('bm_rev',ed.rev||0);ss('bm_tips',ed.tips||0);ss('bm_prepay',ed.prepay||0);ss('bm_final',ed.finalPay||0);ss('bm_unit',ed.unit||0);ss('bm_disc_notes',ed.discNotes||'');ss('bm_channel',ed.ch||'TCL');ss('bm_pay',ed.pay||'');ss('bm_status',ed.status||'Quoted');ss('bm_rpct',ed.roverPct||15);ss('bm_ramt',ed.roverAmt||0);ss('bm_rating',ed.rating||'');ss('bm_feedback',ed.feedback||'');ss('bm_ref',ed.bookingRef||'');ss('bm_prepay_ref',ed.prepayRef||'');ss('bm_final_ref',ed.finalPayRef||'');document.getElementById('bm_priv').checked=ed.priv||false;
   }else{
-    sel.value='';if(fromProf&&curDog)sel.value=curDog.name;updateDogIdHint();
+    sel.value='';if(fromProf&&curDog)sel.value=curDog.cid;updateDogIdHint();
     ['bm_rev','bm_tips','bm_prepay','bm_final','bm_unit','bm_disc_notes','bm_drop_loc','bm_pick_loc','bm_rating','bm_feedback','bm_ref','bm_prepay_ref','bm_final_ref'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('bm_rpct').value='15';document.getElementById('bm_sd').value=todayStr();document.getElementById('bm_ed').value=todayStr();document.getElementById('bm_channel').value='TCL';document.getElementById('bm_pay').value='';document.getElementById('bm_status').value='Quoted';document.getElementById('bm_priv').checked=false;
   }
@@ -1783,18 +1872,18 @@ function renderOverlapCheck(){
   const eid=document.getElementById('bm_eid')?.value;
   const qStart=new Date(sd+'T'+st);const qEnd=new Date(ed+'T'+et);
   const active=['Quoted','Booked','Prepaid','Fully Paid','Credit','Completed'];
-  const dogObj=allDogs.find(d=>d.name===dog);
+  const dogObj=_dogByCid(dog);// bm_dog now holds the CID
   const overlaps=bookings.filter(b=>{
     if(b.id===eid)return false;
     if(!active.includes(b.status)||!b.sd)return false;
     if(dogObj&&b.customerId&&b.customerId===dogObj.cid)return false;
-    if((!dogObj||!b.customerId)&&b.dog.toLowerCase()===dog.toLowerCase())return false;
+    if((!dogObj||!b.customerId)&&dogObj&&(b.dog||'').toLowerCase()===(dogObj.name||'').toLowerCase())return false;
     const bS=new Date(b.sd+'T'+(b.st||'00:00'));const bE=new Date((b.ed||b.sd)+'T'+(b.et||'23:59'));
     return bS<qEnd&&bE>qStart;
   });
   if(!overlaps.length){c.innerHTML='<div style="font-size:9px;color:var(--gn);">✅ No other dogs booked during this period.</div>';return;}
   const seen=new Set();const names=overlaps.filter(b=>{const k=b.customerId||b.dog.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
-  const dogEsc=(dog||'').replace(/'/g,"\\'");
+  const dogEsc=(dogObj?dogObj.cid:dog||'').replace(/'/g,"\\'");
   const logBtn=dogObj?'<button type="button" class="sbtn2" style="margin-top:6px;font-size:10px;padding:6px 10px;" onclick="curDog=allDogs.find(d=>d.cid===\''+dogObj.cid+'\');openAddHistEntry(\'trial\',\''+sd+'\')">📝 Log full Trial-Log entry</button>':'';
   const bk=dogObj?bkByRef(eid,parseInt(document.getElementById('bm_ridx')?.value)||null):null;
   const bkSd=bk?bk.sd:sd;const bkEd=bk?bk.ed||bk.sd:ed||sd;
@@ -1809,7 +1898,7 @@ function renderOverlapCheck(){
         const mwHas=cid=>!!cid&&(t.mixedWith||'').toLowerCase().split(/[,;]+/).some(p=>p.trim().split(/\s+/)[0]===cid);
         if(myCid&&otherCid)return (tCid===myCid&&mwHas(otherCid))||(tCid===otherCid&&mwHas(myCid));// pair, either direction
         const md=(b.dog||'').toLowerCase();const mixedParts=(t.mixedWith||'').toLowerCase().split(/[,;]+/).map(s=>s.trim());
-        return (t.dog||'').toLowerCase()===(dog||'').toLowerCase()&&mixedParts.some(m=>m===md||m.endsWith(' '+md));
+        return (t.dog||'').toLowerCase()===((dogObj?dogObj.name:'')||'').toLowerCase()&&mixedParts.some(m=>m===md||m.endsWith(' '+md));
       });
       const curResult=existingLog?.suitable||'';
       const opts=[{v:'Friends',e:'🥰'},{v:'Good',e:'😊'},{v:'Ignore',e:'😐'},{v:'Not Good',e:'😒'},{v:'Fight',e:'😡'},{v:'Did not meet',e:'🚶'}];
@@ -1824,9 +1913,10 @@ function renderOverlapCheck(){
         +'</div>';
     }).join('')+logBtn;
 }
-async function logCompatResult(dogName,mixedLabel,result,notes,logDate,bookingStart,bookingEnd){
-  const dogObj=allDogs.find(d=>d.name===dogName);if(!dogObj)return;
-  if(!confirm('Confirm: log '+dogName+' + '+mixedLabel+' as "'+result+'"?'))return;// no accidental writes
+async function logCompatResult(dogRef,mixedLabel,result,notes,logDate,bookingStart,bookingEnd){
+  const dogObj=_dogByCid(dogRef)||allDogs.find(d=>d.name===dogRef);if(!dogObj)return;// dogRef may be a CID or a name
+  const otherNm=(_resolveParty(mixedLabel)||{}).name||mixedLabel;
+  if(!confirm('Confirm: log '+dogObj.name+' + '+otherNm+' as "'+result+'"?'))return;// no accidental writes
   const today=logDate||todayStr();
   const suitMap={'Friends':'Friends','Good':'Good','Ignore':'Ignore','Not Good':'Not Good','Fight':'Fight','Did not meet':'Did not meet'};
   const suitable=suitMap[result]||result;
@@ -1860,7 +1950,7 @@ async function logCompatResult(dogName,mixedLabel,result,notes,logDate,bookingSt
   }
   updatePendingBadge();
 }
-function updateDogIdHint(){const n=document.getElementById('bm_dog').value;const d=allDogs.find(x=>x.name===n);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
+function updateDogIdHint(){const d=_dogByCid(document.getElementById('bm_dog').value);document.getElementById('bm_dog_id').textContent=d?d.cid:'';}
 function updateStatusFlow(){const v=document.getElementById('bm_status')?.value||'';const steps=['quoted','booked','prepaid','fullypaid'];const statMap={Quoted:0,Booked:1,Prepaid:2,'Fully Paid':3};const cur=statMap[v]??-1;const isCancelled=v==='Cancelled';const isCompleted=v==='Completed';steps.forEach((s,i)=>{const el=document.getElementById('bsf_'+s);if(!el)return;el.className='bk-flow-step';el.style.opacity='';if(isCancelled){el.style.opacity='0.3';return;}if(isCompleted){el.classList.add('fsdone');return;}if(cur<0)return;if(i<cur)el.classList.add('fsdone');else if(i===cur)el.classList.add('fsactive');});const cancelEl=document.getElementById('bsf_cancelled');const completeEl=document.getElementById('bsf_completed');if(cancelEl)cancelEl.style.display=isCancelled?'inline-block':'none';if(completeEl)completeEl.style.display=isCompleted?'inline-block':'none';
   const warnEl=document.getElementById('bm_status_warn');
   if(warnEl){
@@ -1886,14 +1976,13 @@ async function saveBk(){
   const priv=document.getElementById('bm_priv').checked;const id=eid||nextBkId(document.getElementById('bm_sd').value);const rems=eid?(bkByRef(eid,ri)?.rem||['','','','','']):['','','','',''];
   const sd=document.getElementById('bm_sd').value;const month=sd?new Date(sd+'T12:00:00').toLocaleString('en-GB',{month:'short',year:'numeric'}):'';
   const existingBk=eid?bkByRef(eid,ri):null;
-  const dogData=allDogs.find(d=>d.name===dog);let customerId=dogData?dogData.cid:'';
-  // On edit, if the dog wasn't changed, keep the booking's original CustomerID so two same-name dogs never get reassigned
-  if(existingBk&&existingBk.dog===dog&&existingBk.customerId)customerId=existingBk.customerId;
+  // bm_dog now carries the CID (dupe-name safe). Resolve the display name from it.
+  const customerId=dog;const dogData=_dogByCid(dog);const dogName=dogData?dogData.name:(existingBk?.dog||'');
   const existingWf=eid?(existingBk?.wf||{}):{};
-  const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dog,id,svc:document.getElementById('bm_svc').value,sd,st:document.getElementById('bm_st').value,ed:document.getElementById('bm_ed').value,et:document.getElementById('bm_et').value,dropLoc:gv('bm_drop_loc'),pickLoc:gv('bm_pick_loc'),rev,tips,prepay:pre,finalPay:fin,unit,discNotes:document.getElementById('bm_disc_notes').value,roverPct:rPct,roverAmt:rAmt,ch,pay:document.getElementById('bm_pay').value,status:document.getElementById('bm_status').value,priv,month,rating:gv('bm_rating'),feedback:gv('bm_feedback'),rem:rems,wf:existingWf,bookingRef:gv('bm_ref'),prepayRef:gv('bm_prepay_ref'),finalPayRef:gv('bm_final_ref')}),TABS.BK.h);
+  const vals=rowFromMap(bkHdrRow,bkFieldMap({customerId,dog:dogName,id,svc:document.getElementById('bm_svc').value,sd,st:document.getElementById('bm_st').value,ed:document.getElementById('bm_ed').value,et:document.getElementById('bm_et').value,dropLoc:gv('bm_drop_loc'),pickLoc:gv('bm_pick_loc'),rev,tips,prepay:pre,finalPay:fin,unit,discNotes:document.getElementById('bm_disc_notes').value,roverPct:rPct,roverAmt:rAmt,ch,pay:document.getElementById('bm_pay').value,status:document.getElementById('bm_status').value,priv,month,rating:gv('bm_rating'),feedback:gv('bm_feedback'),rem:rems,wf:existingWf,bookingRef:gv('bm_ref'),prepayRef:gv('bm_prepay_ref'),finalPayRef:gv('bm_final_ref')}),TABS.BK.h);
   try{
     if(eid){if(!ri)throw new Error('Could not find this booking row to update — tap Sync and retry. Nothing was saved (prevents a duplicate).');await updateRow(TABS.BK,ri,vals);}else await appendRow(TABS.BK,vals);
-    const mv=[...vals];mv[1]=dog;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>ri?r.ri===ri:r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
+    const mv=[...vals];mv[1]=dogName;const bkObj=mapBk(mv,eid?ri-2:bookings.length,mkHdr(bkHdrRow));if(eid){const idx=bookings.findIndex(r=>ri?r.ri===ri:r.id===eid);if(idx>=0)bookings[idx]=bkObj;}else bookings.push(bkObj);
     st.textContent='Saved!';st.className='smsg ok';setTimeout(()=>{document.getElementById('bkModal').classList.remove('open');renderBk();if(curDog)buildServices(curDog);updatePL();renderBoard();updatePendingBadge();},1400);
   }catch(e){st.textContent=e.message;st.className='smsg err';}finally{btn.disabled=false;btn.textContent=eid?'Modify Booking':'Save Booking';_bkSaving=false;}
 }
