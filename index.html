@@ -492,7 +492,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v79b1</div>
+  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v80b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -867,9 +867,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- ANALYSIS -->
 <div class="screen" id="sc-analysis">
   <div class="pg">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:7px;">
+    <div style="position:sticky;top:0;z-index:5;background:var(--hnxl);display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:7px;padding:9px 0;">
       <div><div class="pg-t">Analysis</div><div class="pg-s">Trends &amp; insights</div></div>
-      <select class="fs" id="anYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="renderAnalysis()"><option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
+      <select class="fs" id="anYear" style="font-size:11px;padding:5px 22px 5px 9px;border-radius:7px;width:auto;" onchange="renderAnalysis()"><option value="all">All Time</option><option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option></select>
     </div>
     <div class="fsec">Revenue by Service <span style="font-size:9px;font-weight:400;color:var(--gr3);">(stacked by month)</span></div>
     <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">💰 Cash in — Fully Paid + Prepaid deposits (+ Credit/Completed)</div>
@@ -901,7 +901,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="fsec">Occupancy Rate by Places <span style="font-size:9px;font-weight:400;color:var(--gr3);">(max 4 dogs/day · Boarding + Day Care)</span></div>
     <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anOccPlaces" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
-    <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Top 10 · <span id="ltvYearLbl">All time</span>)</span><select class="fs" id="ltvYear" onchange="renderAnalysis()" style="font-size:10px;padding:3px 18px 3px 7px;border-radius:6px;width:auto;display:inline-block;margin-left:6px;"><option value="all">All Time</option><option>2028</option><option>2027</option><option>2026</option><option>2025</option><option>2024</option></select></div>
+    <div class="fsec">Customer Lifetime Value <span style="font-size:9px;font-weight:400;color:var(--gr3);">(Top 10 · <span id="ltvYearLbl">All time</span>)</span></div>
     <div style="font-size:8px;color:var(--gr3);font-style:italic;margin:-3px 0 5px;">📅 Excludes quoted & cancelled</div>
     <div id="anLTV" style="margin-bottom:14px;"><div class="hload">Loading…</div></div>
     <div style="height:18px;"></div>
@@ -918,6 +918,8 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Course Provider</label><input class="fi" id="st_prov"></div>
     <div class="f"><label>What I learnt / improved</label><textarea class="fta" id="st_learnt"></textarea></div>
     <div class="fr"><div class="f"><label>CPD Points</label><input class="fi" id="st_cpd"></div><div class="f"><label>Certificate Link</label><input class="fi" id="st_link"></div></div>
+    <div class="f"><label>Materials Link</label><input class="fi" id="st_materials" placeholder="Link to training materials/notes"></div>
+    <div class="fr"><div class="f"><label>Next repeat date <span style="font-weight:400;color:var(--gr3);">(if this needs re-doing)</span></label><input class="fi" id="st_next" type="date"></div><div class="f"><label>Reminder</label><select class="fs" id="st_remind"><option value="">No reminder</option><option value="1 month">1 month before</option><option value="1 week">1 week before</option><option value="1 day">1 day before</option></select></div></div>
     <div class="srow"><input type="hidden" id="st_eid"><input type="hidden" id="st_ridx"><div id="stForm"></div><button class="sbtn2" onclick="submitTraining()">Save Record</button><button class="sbtn2 grey" style="font-size:11px;padding:6px 11px;" onclick="exportTraining()">Export CSV</button><span class="smsg" id="stStatus"></span></div>
     <div class="fsec" style="margin-top:14px;">Records <button class="hbtn" style="float:right;background:var(--gr);" onclick="loadTraining()">Load</button></div>
     <div id="stList" style="margin-top:7px;"><div class="hload">Tap Load to view</div></div>

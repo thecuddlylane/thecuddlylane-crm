@@ -98,6 +98,8 @@ function _dogByCid(cid){return cid?allDogs.find(d=>d.cid===cid)||null:null;}
 function _parseParty(tok){const s=(tok||'').trim();const m=s.match(/TCL-[A-Za-z0-9]+/i);const cid=m?m[0].toUpperCase():'';const name=s.replace(/TCL-[A-Za-z0-9]+/i,'').replace(/[-–—]/g,' ').replace(/\s+/g,' ').trim();return{cid,name};}
 // Resolve a party token to a dog object — by CID first, else by name (case-insensitive). Always prefer CID (dupe names).
 function _resolveParty(tok){const p=_parseParty(tok);if(p.cid){const d=_dogByCid(p.cid);if(d)return d;}if(p.name){const n=p.name.toLowerCase();const d=allDogs.find(x=>(x.name||'').toLowerCase()===n);if(d)return d;}return null;}
+// Does a sheet row refer to this dog? Match by CID (exact cell OR embedded token) or the dog's NAME as a whole cell / party token — NOT a loose substring (a short name like "Obi" must not match inside other text). Fixes wrong-dog history.
+function _rowRefersToDog(row,dog){const cid=dog.cid,nm=(dog.name||'').toLowerCase();return (row||[]).some(cell=>{const s=(cell==null?'':cell).toString();if(!s)return false;if(s===cid)return true;const sl=s.toLowerCase();if(sl===nm)return true;if(/TCL-[A-Za-z0-9]+/i.test(s)||/[,;]/.test(s)||/\s-\s/.test(s)){return s.split(/[,;]+/).some(tok=>{const p=_parseParty(tok);return (p.cid&&p.cid===cid)||(p.name&&p.name.toLowerCase()===nm);});}return false;});}
 // For a Trial/Fight record, the OTHER dog relative to curDog (record owner or a mixed-with token) with its attributes (item 16).
 function _otherPartyLine(ownerCid,ownerName,mixedWith){
   const meCid=curDog?curDog.cid:'';const meNm=(curDog?curDog.name:'').toLowerCase();
@@ -193,7 +195,7 @@ async function doCreateSheet(){
     {n:TABS.TRIAL,h:['CustomerID','DogName','Date','MixedWith','Observations','Suitable','Private']},
     {n:TABS.COSTS,h:['Date','Category','Amount','Notes']},
     {n:TABS.TARGETS,h:['Month','RevTarget','CostTarget']},
-    {n:TABS.TRAIN,h:['Date','Staff','Category','Objective','Provider','Learnt','CPDPoints','CertLink','MaterialsLink']},
+    {n:TABS.TRAIN,h:['Date','Staff','Category','Objective','Provider','Learnt','CPDPoints','CertLink','MaterialsLink','NextRepeat','ReminderLead']},
     {n:TABS.CONSENT,h:['CustomerID','DogName','Date','PhotoConsent','OffLeash','Mixing','WalkOutside','GroupWalk','FeedTogether','Crate','SameRoom','MedCost','VetConsent','TCSigned','TCVersion','TCSignedDate']},
     {n:TABS.TPLS,h:['Name','Category','Content','LastUpdated','Key']},
     {n:TABS.ACTS,h:['Title','Category','IndoorOutdoor','EnergyLevel','Weather','Location','MapsURL','DurationMins','DistanceMins','Cost','Notes']},
@@ -317,12 +319,15 @@ function computePendingActions(){
   });
   const tm=localStorage.getItem('tcl_train_month')||'';const[tmMonth,tmHas]=tm.split(':');
   const noTrainingThisMonth=tmMonth===today.slice(0,7)&&tmHas==='0';
-  return{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders};
+  // Training repeat reminders: a training record with a NextRepeat date whose reminder window has opened (today >= NextRepeat − lead).
+  const trainingReminders=[];const _leadDays={'1 month':30,'1 week':7,'1 day':1};
+  (trainRecords||[]).forEach(t=>{if(!t.next)return;const lead=_leadDays[t.remind]||0;let remindFrom=t.next;try{const d=new Date(t.next+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-lead);remindFrom=d.toISOString().slice(0,10);}catch(e){}if(today>=remindFrom)trainingReminders.push({rec:t,due:t.next});});
+  return{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders,trainingReminders};
 }
 function updatePendingBadge(){
   const b=document.getElementById('pendingBadge');if(!b)return;
-  const{missingLogs,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders}=computePendingActions();
-  const n=missingLogs.length+wfTasks.length+(vaccReminders?vaccReminders.length:0)+(emergReminders?emergReminders.length:0)+(noTrainingThisMonth?1:0);
+  const{missingLogs,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders,trainingReminders}=computePendingActions();
+  const n=missingLogs.length+wfTasks.length+(vaccReminders?vaccReminders.length:0)+(emergReminders?emergReminders.length:0)+(trainingReminders?trainingReminders.length:0)+(noTrainingThisMonth?1:0);
   if(n){b.textContent=n;b.style.display='block';}else b.style.display='none';
 }
 function togglePendingPanel(){
@@ -342,7 +347,8 @@ async function quickToggleWf(bkId,bkRi,key){
 }
 function renderPendingPanel(){
   const el=document.getElementById('pending_results');if(!el)return;
-  const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders}=computePendingActions();
+  const{missingLogs,pendingCompletion,wfTasks,noTrainingThisMonth,vaccReminders,emergReminders,trainingReminders}=computePendingActions();
+  const trainCount=(trainingReminders||[]).length;
   const today=todayStr();
   // Collect per-booking tasks, then group by dog.
   const bkMap={};const ensure=bk=>{const k=(bk.ri||bk.id);if(!bkMap[k])bkMap[k]={bk,tasks:[]};return bkMap[k];};
@@ -356,7 +362,7 @@ function renderPendingPanel(){
   missingLogs.forEach(({dog})=>{buckets[_mlBkt(dog)]+=1;});
   (vaccReminders||[]).forEach(({bk})=>{buckets[_remBkt(bk)]+=1;});
   (emergReminders||[]).forEach(({bk})=>{buckets[_remBkt(bk)]+=1;});
-  const totalOut=buckets.New+buckets.Live+buckets.Completed;
+  const totalOut=buckets.New+buckets.Live+buckets.Completed+trainCount;
   const _pass=b=>!_todoFilter||b===_todoFilter;// New/Live/Completed pill filter (17)
   const dogs={};const dogEntry=(cid,name)=>{if(!dogs[cid])dogs[cid]={name,cid,up:[],past:[],missing:null,vacc:null,emerg:null};return dogs[cid];};
   Object.values(bkMap).forEach(({bk,tasks})=>{if(!tasks.length)return;if(!_pass(_bkt(bk)))return;const e=dogEntry(bk.customerId||bk.dog,bk.dog);((bk.ed||bk.sd)<today?e.past:e.up).push({bk,tasks});});
@@ -366,8 +372,8 @@ function renderPendingPanel(){
   const dogList=Object.values(dogs);
   // Outstanding counter → rendered into the sticky #todoCounter (shown in both empty and non-empty states).
   const cpill=(lbl,n,col,key)=>'<span onclick="setTodoFilter(\''+key+'\')" title="Tap to filter" style="cursor:pointer;font-size:9px;font-weight:700;padding:3px 9px;border-radius:99px;background:'+(_todoFilter===key?col:col+'1a')+';color:'+(_todoFilter===key?'#fff':col)+';border:1px solid '+col+';">'+lbl+' '+n+'</span>';
-  const cc=document.getElementById('todoCounter');if(cc)cc.innerHTML='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;font-weight:800;">'+totalOut+' outstanding</span>'+cpill('🆕 New',buckets.New,'#F97316','New')+cpill('🔴 Live',buckets.Live,'#16A34A','Live')+cpill('✅ Completed',buckets.Completed,'#78716C','Completed')+(_todoFilter?'<span onclick="setTodoFilter(\'\')" style="cursor:pointer;font-size:9px;color:var(--bl);text-decoration:underline;">show all</span>':'')+'</div>';
-  if(!dogList.length&&!noTrainingThisMonth){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
+  const cc=document.getElementById('todoCounter');if(cc)cc.innerHTML='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span style="font-size:12px;font-weight:800;">'+totalOut+' outstanding</span>'+cpill('🆕 New',buckets.New,'#F97316','New')+cpill('🔴 Live',buckets.Live,'#16A34A','Live')+cpill('✅ Completed',buckets.Completed,'#78716C','Completed')+cpill('🎓 Training',trainCount,'#7C3AED','Training')+(_todoFilter?'<span onclick="setTodoFilter(\'\')" style="cursor:pointer;font-size:9px;color:var(--bl);text-decoration:underline;">show all</span>':'')+'</div>';
+  if(!dogList.length&&!noTrainingThisMonth&&!trainCount){el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--gn);padding:10px 12px;background:var(--gnl);border-radius:8px;">✅ Nothing pending — all caught up!</div>';return;}
   // Upcoming: soonest first · Past: most recent first · Dogs ordered by soonest upcoming (dogs with only past come after).
   dogList.forEach(d=>{d.up.sort((a,c)=>(a.bk.sd||'').localeCompare(c.bk.sd||''));d.past.sort((a,c)=>((c.bk.ed||c.bk.sd)||'').localeCompare((a.bk.ed||a.bk.sd)||''));});
   // Priority: Live (in-service) → New (upcoming) → Completed (ended only). Vaccination/emergency banners no longer jump a dog to the top.
@@ -396,7 +402,12 @@ function renderPendingPanel(){
     if(d.missing)html+='<div style="padding:6px 10px 7px;border-top:1px solid var(--gr4);"><div style="font-size:10px;font-weight:700;color:var(--or);margin-bottom:4px;">⚠️ Missing daily logs ('+d.missing.length+') — tap a date to add</div><div style="display:flex;flex-wrap:wrap;gap:4px;">'+d.missing.map(dt=>'<button onclick="event.stopPropagation();todoAddLog(\''+d.cid+'\',\''+dt+'\')" style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:99px;border:1px solid var(--or);background:var(--orxl);color:var(--cn);cursor:pointer;font-family:var(--fb);">+ '+fmtDate(dt)+'</button>').join('')+'</div></div>';
     html+='</div>';
   });
-  if(noTrainingThisMonth)html+='<div onclick="showScreen(\'sc-training\')" style="cursor:pointer;padding:8px 10px;border:1px solid var(--gr4);border-radius:8px;"><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">📚 No training logged this month</div><div style="font-size:9px;color:var(--gr2);">Log CPD/training for '+new Date().toLocaleString('en-GB',{month:'long',year:'numeric'})+'</div></div>';
+  // Training repeat reminders (shown under no filter or the Training filter).
+  if((!_todoFilter||_todoFilter==='Training')&&trainCount){
+    html+='<div style="font-size:8px;font-weight:800;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 4px;">🎓 Training repeats due</div>';
+    trainingReminders.forEach(({rec,due})=>{html+='<div onclick="showScreen(\'sc-training\')" style="cursor:pointer;margin-bottom:8px;padding:8px 10px;border:1px solid #7C3AED;border-radius:8px;background:rgba(124,58,237,.05);"><div style="font-size:11px;font-weight:800;color:#7C3AED;">🎓 Re-do: '+(rec.cat||'Training')+'</div>'+(rec.obj?'<div style="font-size:9px;color:var(--gr2);">'+rec.obj+'</div>':'')+'<div style="font-size:9px;color:#7C3AED;font-weight:700;margin-top:1px;">Due '+fmtDate(due)+(rec.remind?' · reminder '+rec.remind+' before':'')+(rec.staff?' · '+rec.staff:'')+'</div></div>';});
+  }
+  if(noTrainingThisMonth&&(!_todoFilter||_todoFilter==='Training'))html+='<div onclick="showScreen(\'sc-training\')" style="cursor:pointer;padding:8px 10px;border:1px solid var(--gr4);border-radius:8px;"><div style="font-size:11px;font-weight:700;color:var(--bk);text-decoration:underline;">📚 No training logged this month</div><div style="font-size:9px;color:var(--gr2);">Log CPD/training for '+new Date().toLocaleString('en-GB',{month:'long',year:'numeric'})+'</div></div>';
   el.innerHTML=html;
 }
 // Populate the Check Dates screen (av_dog dropdown + default dates). Called on sc-checkdates show.
@@ -444,6 +455,8 @@ function toggleAvailPanel(){
 function _gsGender(s){s=(s||'').toLowerCase();return /female|bitch/.test(s)?'female':/\bmale|\bdog\b/.test(s)?'male':'';}
 function _gsNeuter(s){s=(s||'').toLowerCase();return /spay/.test(s)?'spayed':/neuter|castrat/.test(s)?'neutered':/intact|entire|\bfull\b|un-?neuter|un-?spay/.test(s)?'intact':'';}
 // Compatibility result → colour/emoji/severity. Vocabulary: Friends/Good/Ignore/Not Good/Fight/Did not meet (+ legacy Suitable/Partial/Not Suitable).
+// Shared compatibility vocabulary — same options everywhere (booking overlap + History trial forms) so they never clobber each other (24).
+const COMPAT_OPTS=['Friends','Good','Ignore','Not Good','Fight','Did not meet'];
 function _compatMeta(result){const s=(result||'').toLowerCase().trim();
   if(s==='fight'||s==='not suitable')return{col:'var(--rd)',emoji:'🔴',bad:true,rank:0};
   if(s==='not good')return{col:'#EAB308',emoji:'🟡',bad:true,rank:1};
@@ -701,6 +714,7 @@ async function refreshBoard(){
     const al=await readSheet(TABS.ACTLOG,'A1:G').catch(()=>[]);actlogHdrRow=al[0]||[];const alh=mkHdr(al[0]||[]);actLogs=al.slice(1).map(r=>({date:r[alh['Date']??-1]||'',activity:r[alh['Activity']??-1]||'',dogs:r[alh['DogName']??-1]||'',staff:r[alh['Staff']??-1]||'',dur:r[alh['Duration']??-1]||'',notes:r[alh['Notes']??-1]||''}));
     const tl=await readSheet(TABS.TRIAL,'A1:G').catch(()=>[]);const tlh=mkHdr(tl[0]||[]);trialHdrRow=tl[0]||[];trialLogs=tl.slice(1).map((r,i)=>{const rv=n=>tlh[n]!==undefined?r[tlh[n]]||'':'';return{cid:rv('CustomerID'),dog:rv('DogName'),date:rv('Date'),mixedWith:rv('MixedWith'),obs:rv('Observations'),suitable:rv('Suitable'),ri:i+2};});
     const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dlh=mkHdr(dl[0]||[]);dailyHdrRow=dl[0]||[];dailyLogRows=dl.slice(1);dailyLogSet=new Set(dailyLogRows.map(r=>(dlh['CustomerID']!==undefined?r[dlh['CustomerID']]||'':'')+'_'+(dlh['Date']!==undefined?r[dlh['Date']]||'':'')));
+    const trn=await readSheet(TABS.TRAIN,'A2:K').catch(()=>[]);trainRecords=trn.map((r,i)=>({ri:i+2,date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',link:r[7]||'',materials:r[8]||'',next:r[9]||'',remind:r[10]||''}));// load training so To-Do repeat reminders work (Training feature)
     const [hlR,ftR,trR,acR]=await Promise.all([readSheet(TABS.HEALTH,'A1:Z1').catch(()=>[]),readSheet(TABS.FIGHT,'A1:Z1').catch(()=>[]),readSheet(TABS.TRANSPORT,'A1:Z1').catch(()=>[]),readSheet(TABS.ACTS,'A1:Z1').catch(()=>[])]);healthHdrRow=hlR[0]||[];fightHdrRow=ftR[0]||[];transportHdrRow=trR[0]||[];actsHdrRow=acR[0]||[];
     // Sync targets from sheet into localStorage
     syncTargetsFromSheet().catch(()=>{});
@@ -839,7 +853,7 @@ function openProfile(dog){
 
 function hasActiveBookingToday(dog){
   const today=todayStr();
-  return bookings.some(b=>(b.customerId&&b.customerId===dog.cid||b.dog.toLowerCase()===dog.name.toLowerCase())&&b.sd<=today&&b.ed>=today&&b.status!=='Canceled');
+  return bookings.some(b=>bkMatchesDog(b,dog)&&b.sd<=today&&b.ed>=today&&b.status!=='Canceled');// CID-first (dupe-name safe)
 }
 function buildTodayLog(){
   _logSelectedActs=[];
@@ -877,7 +891,7 @@ function buildTodayLog(){
     inc('health','Health','<div class="fr"><div class="f"><label>Category</label><select class="fs" id="ih_cat"><option>Injury</option><option>Illness</option><option>Allergic reaction</option><option>Digestive</option><option>Behavioural</option><option>Medication</option><option>Other</option></select></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'health\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'health\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'health\',\'High\',event)">High</button></div><input type="hidden" id="ih_imp"></div></div><div class="f"><label>Issue</label><input class="fi" id="ih_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ih_desc" style="min-height:48px;"></textarea></div><div class="f"><label>Root cause</label><input class="fi" id="ih_cause"></div><div class="f"><label>Next steps</label><input class="fi" id="ih_next"></div>')+
     inc('fight','Dog Fight','<div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="if_time"></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'fight\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'fight\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'fight\',\'High\',event)">High</button></div><input type="hidden" id="if_imp"></div></div><div class="f"><label>Other dogs</label><select class="fs" id="if_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>What happened</label><textarea class="fta" id="if_issue" style="min-height:48px;"></textarea></div><div class="f"><label>Injuries</label><input class="fi" id="if_inj"></div><div class="f"><label>Treatment</label><input class="fi" id="if_treat"></div><div class="f"><label>Prevention</label><input class="fi" id="if_prev"></div>')+
     inc('transport','Transport','<div class="fr"><div class="f"><label>Transporter</label><input class="fi" id="it_name"></div><div class="f"><label>Vehicle</label><input class="fi" id="it_vehicle"></div></div><div class="fr"><div class="f"><label>Plate</label><input class="fi" id="it_plate"></div><div class="f"><label>Journey</label><select class="fs" id="it_type"><option>Drop-off</option><option>Pick-up</option><option>Both</option></select></div></div><div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="it_time"></div><div class="f"><label>Notes</label><input class="fi" id="it_notes"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="it_from" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="it_to" placeholder="Drop-off location"></div></div>')+
-    inc('trial','Dog Trial','<div class="f"><label>Dogs mixed with</label><select class="fs" id="itr_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>Observations</label><textarea class="fta" id="itr_obs" style="min-height:55px;"></textarea></div><div class="f"><label>Suitable?</label><select class="fs" id="itr_suit"><option>Suitable</option><option>Partial</option><option>Not Suitable</option></select></div>')+
+    inc('trial','Dog Trial','<div class="f"><label>Dogs mixed with</label><select class="fs" id="itr_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>Observations</label><textarea class="fta" id="itr_obs" style="min-height:55px;"></textarea></div><div class="f"><label>How did they get on?</label><select class="fs" id="itr_suit">'+COMPAT_OPTS.map(o=>'<option>'+o+'</option>').join('')+'</select></div>')+
     '</div>';
 }
 function parseState(v){return v==='[Y]'?'yes':v==='[Refused]'?'refused':v==='[To-do]'?'todo':v==='[N/A]'?'na':'';}
@@ -956,7 +970,7 @@ async function filtHist(type,btn){
     else if(type==='activities')all=(await ft(TABS.ACTLOG)).items;
     else if(type==='transport')all=(await ft(TABS.TRANSPORT)).items;
     else if(type==='trial')all=(await ft(TABS.TRIAL)).items;
-    const nm=curDog.name.toLowerCase();const cid=curDog.cid;let flt=all.filter(({row})=>row.includes(cid)||(row.join(' ').toLowerCase().includes(nm)));
+    let flt=all.filter(({row})=>_rowRefersToDog(row,curDog));
     flt.sort((a,b)=>(b.row[2]||'').localeCompare(a.row[2]||''));
     // Deduplicate Daily logs — keep only latest entry per day
     const seenDaily=new Set();flt=flt.filter(({tab,row})=>{if(tab!==TABS.DAILY)return true;const key=row[2]||'';if(seenDaily.has(key))return false;seenDaily.add(key);return true;});
@@ -1007,7 +1021,7 @@ function buildEditFlds(tab,date,lr,ri,h={}){
   else if(tab===TABS.HEALTH){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Category</label><input class="fi" id="ef_cat" value="'+g('Category')+'"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue" value="'+g('Issue')+'"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc">'+g('Description')+'</textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next" value="'+g('NextStep')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','health')";}
   else if(tab===TABS.FIGHT){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_time" value="'+g('Time')+'"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue">'+g('Issue')+'</textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev" value="'+g('Prevention')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','fight')";}
   else if(tab===TABS.TRANSPORT){const jtypeVal=g('JourneyType');const jtypeOpts=['Drop-off','Pick-up','Both'].map(o=>'<option'+(o===jtypeVal?' selected':'')+'>'+o+'</option>').join('');flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Transporter</label><input class="fi" id="ef_trn" value="'+g('Transporter')+'"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv" value="'+g('Vehicle')+'"></div><div class="f"><label>Plate</label><input class="fi" id="ef_plate" value="'+g('Plate')+'"></div></div><div class="fr"><div class="f"><label>Journey type</label><select class="fs" id="ef_jtype">'+jtypeOpts+'</select></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_ttime" value="'+g('Time')+'"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from" value="'+g('From')+'" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="ef_to" value="'+g('To')+'" placeholder="Drop-off location"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','transport')";}
-  else if(tab===TABS.TRIAL){const suitVal=g('Suitable');const suitOpts=['Suitable','Partial','Not Suitable'].map(o=>'<option'+(o===suitVal?' selected':'')+'>'+o+'</option>').join('');flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+suitOpts+'</select></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g('Observations')+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
+  else if(tab===TABS.TRIAL){const suitVal=g('Suitable');const _opts=(suitVal&&!COMPAT_OPTS.includes(suitVal))?COMPAT_OPTS.concat([suitVal]):COMPAT_OPTS;const suitOpts=_opts.map(o=>'<option'+(o===suitVal?' selected':'')+'>'+o+'</option>').join('');flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>How did they get on?</label><select class="fs" id="ef_suit">'+suitOpts+'</select></div></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs">'+g('Observations')+'</textarea></div><label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ef_priv" '+(g('Private')==='Private'?'checked':'')+'>Private</label>';fn="doEdit('"+ri+"','"+tab+"','trial')";}
   else if(tab===TABS.ACTLOG){flds='<div class="fr"><div class="f"><label>Date</label><input class="fi" id="ef_date" value="'+date+'"></div><div class="f"><label>Duration (mins)</label><input class="fi" id="ef_dur" value="'+g('DurationMins')+'"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes" value="'+g('Notes')+'"></div>';fn="doEdit('"+ri+"','"+tab+"','actlog')";}
   return info+flds+'<div class="srow"><button class="sbtn2" onclick="'+fn+'">Save Changes</button><span class="smsg" id="editStatus"></span></div>';
 }
@@ -1089,7 +1103,7 @@ function openAddHistEntry(type,date){
   if(type==='health')flds=df+'<div class="fr"><div class="f"><label>Category</label><input class="fi" id="ef_cat"></div></div><div class="f"><label>Issue</label><input class="fi" id="ef_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ef_desc"></textarea></div><div class="f"><label>Next steps</label><input class="fi" id="ef_next"></div>'+prv;
   else if(type==='fight')flds='<div class="fr">'+df+'<div class="f"><label>Time</label><input class="fi" type="time" id="ef_time"></div></div><div class="f"><label>What happened</label><textarea class="fta" id="ef_issue"></textarea></div><div class="f"><label>Prevention</label><input class="fi" id="ef_prev"></div>'+prv;
   else if(type==='transport'){const jtypeOpts2=['Drop-off','Pick-up','Both'].map(o=>'<option>'+o+'</option>').join('');flds='<div class="fr">'+df+'<div class="f"><label>Transporter</label><input class="fi" id="ef_trn"></div></div><div class="fr"><div class="f"><label>Vehicle</label><input class="fi" id="ef_trv"></div><div class="f"><label>Plate</label><input class="fi" id="ef_plate"></div></div><div class="fr"><div class="f"><label>Journey type</label><select class="fs" id="ef_jtype">'+jtypeOpts2+'</select></div><div class="f"><label>Time</label><input class="fi" type="time" id="ef_ttime"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="ef_from"></div><div class="f"><label>To</label><input class="fi" id="ef_to"></div></div><div class="f"><label>Notes</label><input class="fi" id="ef_notes"></div>'+prv;}
-  else if(type==='trial'){const opts=['Suitable','Partial','Not Suitable'].map(o=>'<option>'+o+'</option>').join('');const dogOpts=allDogs.filter(d=>d.cid!==curDog.cid).map(d=>'<option value="'+d.name+'">').join('');flds='<div class="fr">'+df+'<div class="f"><label>Suitable?</label><select class="fs" id="ef_suit">'+opts+'</select></div></div><div class="f"><label>Mixed with (dog names)</label><input class="fi" id="ef_mixed" list="mixedDogList" placeholder="e.g. Bertie, Daisy (comma-separated)"><datalist id="mixedDogList">'+dogOpts+'</datalist></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs"></textarea></div>'+prv;}
+  else if(type==='trial'){const opts=COMPAT_OPTS.map(o=>'<option>'+o+'</option>').join('');const dogOpts=allDogs.filter(d=>d.cid!==curDog.cid).map(d=>'<option value="'+d.name+' - '+d.cid+'">').join('');flds='<div class="fr">'+df+'<div class="f"><label>How did they get on?</label><select class="fs" id="ef_suit">'+opts+'</select></div></div><div class="f"><label>Mixed with (dog)</label><input class="fi" id="ef_mixed" list="mixedDogList" placeholder="e.g. Bertie, Daisy (comma-separated)"><datalist id="mixedDogList">'+dogOpts+'</datalist></div><div class="f"><label>Observations</label><textarea class="fta" id="ef_obs"></textarea></div>'+prv;}
   else return;
   document.getElementById('editModalBody').innerHTML=warn+flds+ss;
   document.getElementById('editModal').classList.add('open');
@@ -1926,7 +1940,8 @@ async function logCompatResult(dogRef,mixedLabel,result,notes,logDate,bookingSta
   const otherCid=(mixedLabel||'').trim().split(/\s+/)[0]||'';
   const inPeriod=t=>(!bookingStart||t.date>=bookingStart)&&(!bookingEnd||t.date<=bookingEnd);
   const mwHas=(mw,cid)=>!!cid&&(mw||'').toLowerCase().split(/[,;]+/).some(p=>p.trim().split(/\s+/)[0]===cid.toLowerCase());
-  const existing=trialLogs.find(t=>inPeriod(t)&&((t.cid===dogObj.cid&&mwHas(t.mixedWith,otherCid))||(t.cid===otherCid&&mwHas(t.mixedWith,dogObj.cid))));
+  // Pick the LATEST matching record (same order as renderOverlapCheck's display match) so an update changes the record shown, not a different duplicate.
+  const existing=[...trialLogs].reverse().find(t=>inPeriod(t)&&((t.cid===dogObj.cid&&mwHas(t.mixedWith,otherCid))||(t.cid===otherCid&&mwHas(t.mixedWith,dogObj.cid))));
   const persist=cid=>{const bk=bookings.find(b=>b.customerId===cid&&b.sd<=today&&(b.ed||b.sd)>=today);if(bk&&!bk.wf?.compat)persistAutoWf(bk,'compat').catch(()=>{});};
   if(existing){
     const prevSuitable=existing.suitable,prevObs=existing.obs,prevDate=existing.date;
@@ -2316,20 +2331,25 @@ function _calSlotsHtml(){
 
 // ==================== ANALYSIS ====================
 function renderAnalysis(){
-  const yr=document.getElementById('anYear')?.value||'2026';
+  const yr=document.getElementById('anYear')?.value||'2026';const allTime=(yr==='all');// unified filter drives the whole page incl. LTV (23)
   const today=todayStr();
   // Revenue reports count Prepaid (deposit) + Fully Paid + Credit + Completed. actualRev() handles how much
   // of each counts (Prepaid → deposit only; the rest → full settlement).
   const paid=['Prepaid','Fully Paid','Credit','Completed'];
   const active=['Booked','Prepaid','Fully Paid','Credit','Completed']; // occupancy = physical presence
   const svcCols={Boarding:'#F97316',DayCare:'#EAB308',Walking:'#22C55E','Drop-in':'#8B5CF6','Dog Sit':'#06B6D4','Pet Taxi':'#EC4899',Training:'#6366F1',Other:'#A8A29E'};
+  const inYr=b=>allTime||bkMonthFractions(b).some(s=>s.y===yr);// All Time → every year
   // Cross-year/month split: a booking is in-year if any night falls in yr; revenue counts only its in-year portion.
-  const yBks=bookings.filter(b=>paid.includes(b.status)&&bkMonthFractions(b).some(s=>s.y===yr));// cash-in reports (Prepaid deposit + Fully Paid/Credit/Completed)
-  const fpBks=bookings.filter(b=>b.status==='Fully Paid'&&bkMonthFractions(b).some(s=>s.y===yr));// "Fully Paid only" reports
-  const fracInYr=b=>bkMonthFractions(b).filter(s=>s.y===yr);
+  const yBks=bookings.filter(b=>paid.includes(b.status)&&inYr(b));// cash-in reports (Prepaid deposit + Fully Paid/Credit/Completed)
+  const fpBks=bookings.filter(b=>b.status==='Fully Paid'&&inYr(b));// "Fully Paid only" reports
+  const fracInYr=b=>allTime?bkMonthFractions(b):bkMonthFractions(b).filter(s=>s.y===yr);
   const revY=b=>actualRev(b)*fracInYr(b).reduce((a,s)=>a+s.frac,0);
-  const yrN=parseInt(yr);
-  const isLeap=yrN%4===0&&(yrN%100!==0||yrN%400===0);const daysInYr=isLeap?366:365;
+  // Occupancy under All Time = sum across every year that has active bookings; capacity scales to match (23).
+  const _occYears=allTime?[...new Set(bookings.filter(b=>active.includes(b.status)&&b.sd).flatMap(b=>bkMonthFractions(b).map(s=>s.y)))].filter(y=>/^\d{4}$/.test(y)).sort():[yr];
+  const _occYrsN=(_occYears.length?_occYears:[String(new Date().getFullYear())]).map(y=>parseInt(y));
+  const yrN=_occYrsN[_occYrsN.length-1];// concrete year for single-year month math
+  const _dimMo=i=>_occYrsN.reduce((s,Y)=>s+new Date(Y,i+1,0).getDate(),0);// days in month i across all occ years
+  const daysInYr=_occYrsN.reduce((s,Y)=>s+((Y%4===0&&(Y%100!==0||Y%400===0))?366:365),0);
 
   // ── 1. Revenue by Service — stacked bar chart by month ──
   const moSvcRev={};MOS.forEach(m=>moSvcRev[m]={});
@@ -2387,7 +2407,7 @@ function renderAnalysis(){
   const dogBdays={};allDogs.forEach(d=>{if(d.birthday){const k=(d.cid||'')+'_'+(d.name||'').toLowerCase();dogBdays[k]=d.birthday;}});
   const ageBuckets={'Puppy (<1yr)':0,'1–2 yrs':0,'3–5 yrs':0,'6–9 yrs':0,'10+ yrs':0,'Unknown':0};
   const ageCols={'Puppy (<1yr)':'#F97316','1–2 yrs':'#EAB308','3–5 yrs':'#22C55E','6–9 yrs':'#0284C7','10+ yrs':'#8B5CF6','Unknown':'#A8A29E'};
-  fpBks.forEach(b=>{const bday=dogBdays[(b.customerId||'')+'_'+(b.dog||'').toLowerCase()];if(!bday){ageBuckets['Unknown']++;return;}const ageYrs=(new Date((normDate(b.sd)||yr+'-01-01')+'T12:00:00Z')-new Date(normDate(bday)+'T12:00:00Z'))/(365.25*864e5);if(ageYrs<1)ageBuckets['Puppy (<1yr)']++;else if(ageYrs<3)ageBuckets['1–2 yrs']++;else if(ageYrs<6)ageBuckets['3–5 yrs']++;else if(ageYrs<10)ageBuckets['6–9 yrs']++;else ageBuckets['10+ yrs']++;});
+  fpBks.forEach(b=>{const bday=dogBdays[(b.customerId||'')+'_'+(b.dog||'').toLowerCase()];if(!bday){ageBuckets['Unknown']++;return;}const ageYrs=(new Date((normDate(b.sd)||yrN+'-01-01')+'T12:00:00Z')-new Date(normDate(bday)+'T12:00:00Z'))/(365.25*864e5);if(ageYrs<1)ageBuckets['Puppy (<1yr)']++;else if(ageYrs<3)ageBuckets['1–2 yrs']++;else if(ageYrs<6)ageBuckets['3–5 yrs']++;else if(ageYrs<10)ageBuckets['6–9 yrs']++;else ageBuckets['10+ yrs']++;});
   const maxAge=Math.max(...Object.values(ageBuckets),1);
   document.getElementById('anAge').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">'+['Puppy (<1yr)','1–2 yrs','3–5 yrs','6–9 yrs','10+ yrs','Unknown'].map(k=>{const v=ageBuckets[k];const col=ageCols[k];return'<div style="margin-bottom:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;margin-bottom:2px;"><span>'+k+'</span><span style="color:'+col+';">'+v+' booking'+(v!==1?'s':'')+'</span></div><div style="height:8px;background:var(--gr4);border-radius:3px;"><div style="height:8px;background:'+col+';border-radius:3px;width:'+(v/maxAge*100).toFixed(0)+'%;"></div></div></div>';}).join('')+'</div>';
 
@@ -2403,7 +2423,7 @@ function renderAnalysis(){
   document.getElementById('anRepeat').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;"><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--gn);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🆕 New</div><div style="font-size:24px;font-weight:800;color:var(--gn);">'+newBks+'</div><div style="font-size:10px;font-weight:700;color:var(--gn);">'+newPct+'% of bookings</div><div style="font-size:9px;color:var(--or);font-weight:700;margin-top:4px;">'+fmtGBP(newRev)+'</div></div><div style="background:var(--gr5);border-radius:var(--r);padding:10px;text-align:center;border-top:3px solid var(--bl);"><div style="font-size:11px;font-weight:700;color:var(--gr);margin-bottom:4px;">🔄 Repeat</div><div style="font-size:24px;font-weight:800;color:var(--bl);">'+repBks+'</div><div style="font-size:10px;font-weight:700;color:var(--bl);">'+repPct+'% of bookings</div><div style="font-size:9px;color:var(--or);font-weight:700;margin-top:4px;">'+fmtGBP(repRev)+'</div></div></div><div style="display:flex;height:8px;border-radius:4px;overflow:hidden;"><div style="width:'+newPct+'%;background:var(--gn);"></div><div style="flex:1;background:var(--bl);"></div></div><div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gr3);margin-top:3px;"><span>New</span><span>Repeat</span></div></div>';
 
   // ── 8. Average Stay Length — fixed order ──
-  const stays=bookings.filter(b=>b.sd&&b.ed&&normDate(b.ed).startsWith(yr)&&b.status==='Fully Paid'&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);}).filter(n=>n>0);
+  const stays=bookings.filter(b=>b.sd&&b.ed&&(allTime||normDate(b.ed).startsWith(yr))&&b.status==='Fully Paid'&&(b.svc||'').toLowerCase().includes('boarding')).map(b=>{const d1=new Date(normDate(b.sd)+'T12:00:00Z');const d2=new Date(normDate(b.ed)+'T12:00:00Z');return Math.round((d2-d1)/864e5);}).filter(n=>n>0);
   let stayHtml='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;">';
   if(stays.length){
     const avg=(stays.reduce((s,v)=>s+v,0)/stays.length).toFixed(1);
@@ -2416,11 +2436,11 @@ function renderAnalysis(){
 
   // ── 9. Occupancy Rate by Day (+ yearly total) ──
   const boardingDays={};MOS.forEach(m=>boardingDays[m]=new Set());
-  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}});
+  bookings.filter(b=>b.sd&&b.ed&&active.includes(b.status)&&(b.svc||'').toLowerCase().includes('boarding')).forEach(b=>{let d=new Date(normDate(b.sd)+'T12:00:00Z');const end=new Date(normDate(b.ed)+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(_occYears.includes(ds.slice(0,4))){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(boardingDays[mo])boardingDays[mo].add(ds);}d=new Date(d.getTime()+864e5);}});
   const totalOccDays=MOS.reduce((s,m)=>s+boardingDays[m].size,0);
   const yrOccPct=Math.round(totalOccDays/daysInYr*100);
   const yrOccCol=yrOccPct>=80?'var(--gn)':yrOccPct>=50?'var(--or)':'var(--gr3)';
-  document.getElementById('anOccupancy').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const occ=boardingDays[m].size;const pct=Math.round(occ/dim*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+dim+'d</div></div>';}).join('')+'</div><div style="border-top:1px solid var(--gr4);padding-top:8px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:10px;color:var(--gr2);font-weight:600;">'+yr+' Total</span><span style="font-size:16px;font-weight:800;color:'+yrOccCol+';">'+yrOccPct+'%</span><span style="font-size:9px;color:var(--gr3);">'+totalOccDays+'/'+daysInYr+' days</span></div></div>';
+  document.getElementById('anOccupancy').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'+MOS.map((m,i)=>{const dim=_dimMo(i);const occ=boardingDays[m].size;const pct=Math.round(occ/dim*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+dim+'d</div></div>';}).join('')+'</div><div style="border-top:1px solid var(--gr4);padding-top:8px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:10px;color:var(--gr2);font-weight:600;">'+(allTime?'All Time':yr)+' Total</span><span style="font-size:16px;font-weight:800;color:'+yrOccCol+';">'+yrOccPct+'%</span><span style="font-size:9px;color:var(--gr3);">'+totalOccDays+'/'+daysInYr+' days</span></div></div>';
 
   // ── 10. Occupancy Rate by Places (max 4 dogs/day, Boarding + DayCare) + yearly total ──
   const placesMo={};MOS.forEach(m=>placesMo[m]=0);
@@ -2428,18 +2448,17 @@ function renderAnalysis(){
     const svcL=(b.svc||'').toLowerCase();const isB=svcL.includes('boarding');const isDC=svcL.includes('daycare')||svcL.includes('day care');
     if(!isB&&!isDC)return;
     const nsd=normDate(b.sd);const ned=normDate(b.ed);if(!nsd||!ned)return;
-    if(isB){let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
-    else{let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(ds.startsWith(yr)){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
+    if(isB){let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(_occYears.includes(ds.slice(0,4))){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
+    else{let d=new Date(nsd+'T12:00:00Z');const end=new Date(ned+'T12:00:00Z');while(d<=end){const ds=d.toISOString().slice(0,10);if(_occYears.includes(ds.slice(0,4))){const mo=new Date(ds+'T12:00:00Z').toLocaleString('en-GB',{month:'short'});if(placesMo[mo]!==undefined)placesMo[mo]++;}d=new Date(d.getTime()+864e5);}}
   });
   const totalPlacesUsed=MOS.reduce((s,m)=>s+placesMo[m],0);const totalCapYr=4*daysInYr;const yrPlacesPct=Math.round(totalPlacesUsed/totalCapYr*100);
   const yrPlacesCol=yrPlacesPct>=80?'var(--gn)':yrPlacesPct>=50?'var(--or)':'var(--gr3)';
-  document.getElementById('anOccPlaces').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'+MOS.map((m,i)=>{const dim=new Date(yrN,i+1,0).getDate();const cap=4*dim;const occ=placesMo[m];const pct=Math.round(occ/cap*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+cap+'</div></div>';}).join('')+'</div><div style="border-top:1px solid var(--gr4);padding-top:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:10px;color:var(--gr2);font-weight:600;">'+yr+' Total</span><span style="font-size:16px;font-weight:800;color:'+yrPlacesCol+';">'+yrPlacesPct+'%</span><span style="font-size:9px;color:var(--gr3);">'+totalPlacesUsed+'/'+totalCapYr+' places</span></div><div style="font-size:8px;color:var(--gr3);text-align:center;">Capacity: 4 dogs × days in month · Boarding days present + Day Care visits</div></div>';
+  document.getElementById('anOccPlaces').innerHTML='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);padding:11px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'+MOS.map((m,i)=>{const dim=_dimMo(i);const cap=4*dim;const occ=placesMo[m];const pct=Math.round(occ/cap*100);const col=pct>=80?'var(--gn)':pct>=50?'var(--or)':'var(--gr3)';return'<div style="text-align:center;background:var(--gr5);border-radius:var(--r);padding:7px 4px;"><div style="font-size:17px;font-weight:800;color:'+col+';">'+pct+'%</div><div style="font-size:8px;color:var(--gr2);">'+m+'</div><div style="font-size:7px;color:var(--gr3);">'+occ+'/'+cap+'</div></div>';}).join('')+'</div><div style="border-top:1px solid var(--gr4);padding-top:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:10px;color:var(--gr2);font-weight:600;">'+(allTime?'All Time':yr)+' Total</span><span style="font-size:16px;font-weight:800;color:'+yrPlacesCol+';">'+yrPlacesPct+'%</span><span style="font-size:9px;color:var(--gr3);">'+totalPlacesUsed+'/'+totalCapYr+' places</span></div><div style="font-size:8px;color:var(--gr3);text-align:center;">Capacity: 4 dogs × days in month · Boarding days present + Day Care visits</div></div>';
 
-  // ── 11. Customer LTV — Top 10, with next booking date. Own year selector (All Time default). ──
-  const ltvYr=document.getElementById('ltvYear')?.value||'all';const ltvAll=(ltvYr==='all');
-  const _ll=document.getElementById('ltvYearLbl');if(_ll)_ll.textContent=ltvAll?'All time':ltvYr;
+  // ── 11. Customer LTV — Top 10, with next booking date. Driven by the unified top filter (23). ──
+  const _ll=document.getElementById('ltvYearLbl');if(_ll)_ll.textContent=allTime?'All time':yr;
   const ltvMap={};
-  bookings.filter(b=>active.includes(b.status)&&(ltvAll||bkMonthFractions(b).some(s=>s.y===ltvYr))).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;const inYrRev=ltvAll?actualRev(b):actualRev(b)*bkMonthFractions(b).filter(s=>s.y===ltvYr).reduce((a,s)=>a+s.frac,0);ltvMap[k].total+=inYrRev;const ned=normDate(b.ed)||'';const nsd=normDate(b.sd)||'';if(nsd&&nsd<=today&&ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});// 'last' = most recent booking that has already started (never a future one)
+  bookings.filter(b=>active.includes(b.status)&&inYr(b)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;if(!ltvMap[k])ltvMap[k]={dog:b.dog,cid:b.customerId,count:0,total:0,lastDate:''};ltvMap[k].count++;const inYrRev=allTime?actualRev(b):actualRev(b)*bkMonthFractions(b).filter(s=>s.y===yr).reduce((a,s)=>a+s.frac,0);ltvMap[k].total+=inYrRev;const ned=normDate(b.ed)||'';const nsd=normDate(b.sd)||'';if(nsd&&nsd<=today&&ned>ltvMap[k].lastDate)ltvMap[k].lastDate=ned;});// 'last' = most recent booking that has already started (never a future one)
   const nextBk={};
   bookings.filter(b=>b.sd&&normDate(b.sd)>today&&active.includes(b.status)).forEach(b=>{const k=b.customerId||b.dog;if(!k)return;const nsd=normDate(b.sd)||'';if(!nextBk[k]||nsd<nextBk[k])nextBk[k]=nsd;});
   const top10=Object.values(ltvMap).sort((a,b)=>b.total-a.total).slice(0,10);
@@ -2453,11 +2472,11 @@ async function submitTraining(){
   const who=gv('st_who');if(!who){alert('Select staff member');return;}
   const btn=document.querySelector('[onclick="submitTraining()"]');const st=document.getElementById('stStatus');if(btn)btn.disabled=true;
   const eid=gv('st_eid');const ri=parseInt(gv('st_ridx'))||null;
-  const vals=[gv('st_date'),who,gv('st_cat'),gv('st_obj'),gv('st_prov'),gv('st_learnt'),gv('st_cpd'),gv('st_link'),''];
+  const vals=[gv('st_date'),who,gv('st_cat'),gv('st_obj'),gv('st_prov'),gv('st_learnt'),gv('st_cpd'),gv('st_link'),gv('st_materials'),gv('st_next'),gv('st_remind')];
   try{
     if(eid&&ri)await updateRow(TABS.TRAIN,ri,vals);else await appendRow(TABS.TRAIN,vals);
     st.textContent=eid?'Updated!':'Saved!';st.className='smsg ok';
-    ['st_obj','st_prov','st_learnt','st_cpd','st_link'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['st_obj','st_prov','st_learnt','st_cpd','st_link','st_materials','st_next','st_remind'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     const eidEl=document.getElementById('st_eid');if(eidEl)eidEl.value='';
     const ridxEl=document.getElementById('st_ridx');if(ridxEl)ridxEl.value='';
     if(btn){btn.textContent='Save Record';}
@@ -2466,7 +2485,7 @@ async function submitTraining(){
 }
 function editTrainingRow(ri,r){
   const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
-  s('st_eid',ri);s('st_ridx',ri);s('st_date',r[0]);s('st_who',r[1]);s('st_cat',r[2]);s('st_obj',r[3]);s('st_prov',r[4]);s('st_learnt',r[5]);s('st_cpd',r[6]);s('st_link',r[7]);
+  s('st_eid',ri);s('st_ridx',ri);s('st_date',r[0]);s('st_who',r[1]);s('st_cat',r[2]);s('st_obj',r[3]);s('st_prov',r[4]);s('st_learnt',r[5]);s('st_cpd',r[6]);s('st_link',r[7]);s('st_materials',r[8]);s('st_next',r[9]);s('st_remind',r[10]);
   const btn=document.querySelector('[onclick="submitTraining()"]');if(btn)btn.textContent='Update Record';
   const stEl=document.getElementById('stStatus');if(stEl){stEl.textContent='Editing record...';stEl.className='smsg';}
   const form=document.getElementById('stForm');if(form)form.scrollIntoView({behavior:'smooth'});
@@ -2474,14 +2493,14 @@ function editTrainingRow(ri,r){
 async function loadTraining(){
   const list=document.getElementById('stList');list.innerHTML='<div class="hload">Loading...</div>';
   try{
-    const rows=await readSheet(TABS.TRAIN,'A2:I');
-    trainRecords=rows.map((r,i)=>({ri:i+2,date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',link:r[7]||''}));
+    const rows=await readSheet(TABS.TRAIN,'A2:K');
+    trainRecords=rows.map((r,i)=>({ri:i+2,date:r[0]||'',staff:r[1]||'',cat:r[2]||'',obj:r[3]||'',prov:r[4]||'',learnt:r[5]||'',cpd:r[6]||'',link:r[7]||'',materials:r[8]||'',next:r[9]||'',remind:r[10]||''}));
     const curMonth=todayStr().slice(0,7);
     const hasThisMonth=trainRecords.some(r=>r.date&&r.date.startsWith(curMonth));
     localStorage.setItem('tcl_train_month',curMonth+':'+(hasThisMonth?'1':'0'));
     updatePendingBadge();
     list.innerHTML=trainRecords.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
-      const rd=JSON.stringify([r.date,r.staff,r.cat,r.obj,r.prov,r.learnt,r.cpd,r.link]).replace(/'/g,"\\'");
+      const rd=JSON.stringify([r.date,r.staff,r.cat,r.obj,r.prov,r.learnt,r.cpd,r.link,r.materials,r.next,r.remind]).replace(/'/g,"\\'");
       return '<div class="hi"><div class="hi-h"><span class="hi-d">'+r.date+'</span><span style="font-size:9px;font-weight:700;color:var(--gr);">'+r.staff+'</span>'+(r.cat?'<span class="htype hti">'+r.cat+'</span>':'')+'<button class="ebtn" style="margin-left:auto;" onclick="editTrainingRow('+r.ri+','+rd+')">Edit</button></div>'+(r.obj?'<div class="hsum">'+r.obj+'</div>':'')+(r.cpd?'<div style="font-size:8px;color:var(--gn);margin-top:2px;">CPD: '+r.cpd+' pts</div>':'')+(r.link?'<div style="font-size:8px;margin-top:2px;"><a href="'+r.link+'" target="_blank" style="color:var(--bl);">Link</a></div>':'')+'</div>';
     }).join('')||'<div class="hload">No records</div>';
   }catch(e){list.innerHTML='<div class="hload" style="color:var(--rd)">'+e.message+'</div>';}
