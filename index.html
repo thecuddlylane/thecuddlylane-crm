@@ -391,6 +391,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 .rem-tpl-sel{font-size:9px;padding:2px 18px 2px 5px;border:1px solid var(--gr4);border-radius:5px;background:var(--wh)!important;color:var(--gr);font-family:var(--fb);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%2344403C' stroke-width='1.2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;}
 /* FORMS */
 .fsec{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--or);margin:10px 0 5px;padding-bottom:2px;border-bottom:1px solid var(--orl);}
+/* (36) Colour-coded form section headers — mirror the profile .psec colours so the register/edit form is easy to scan while updating. */
+.rsec{--sc:var(--or);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--sc);background:var(--wh);border:1px solid var(--gr4);border-left:4px solid var(--sc);border-radius:var(--r);padding:7px 11px;margin:17px 0 9px;letter-spacing:.01em;}
+.rsec .rsec-ic{font-size:14px;line-height:1;}
 .f{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
 .f label{font-size:9px;font-weight:600;color:var(--gr);}
@@ -467,7 +470,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- HEADER -->
 <div class="hdr">
   <button class="hdr-back" id="backBtn" onclick="goBack()">&#8592; Back</button>
-  <div id="hdrTitle"><div class="hdr-logo">THE CUDDLY LANE <span id="appVer" style="font-size:8px;font-weight:600;color:rgba(255,255,255,.4);letter-spacing:0;"></span></div><div class="hdr-sub" id="hdrSub">Staff Portal</div></div>
+  <div id="hdrTitle"><div class="hdr-logo">THE CUDDLY LANE <span id="appVer" style="font-size:8px;font-weight:600;color:rgba(255,255,255,.4);letter-spacing:0;"></span></div></div>
   <div class="hsp"></div>
   <span class="sync-info" id="syncInfo"></span>
   <button class="hbtn or" onclick="refreshBoard()" id="refreshBtn" title="Sync with Google Sheet">&#8635; Sync</button>
@@ -476,6 +479,13 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="toast-wrap" id="toastWrap"></div>
 <!-- SETTINGS -->
 <div class="setup-bar" id="setupBar">
+  <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Text size <span style="font-weight:400;color:var(--gr2);">(this device — bigger on laptops)</span></div>
+  <div style="display:flex;gap:6px;margin-bottom:12px;">
+    <button class="sbtn2" style="font-size:11px;padding:6px 10px;" onclick="setZoom(1)">A− Small</button>
+    <button class="sbtn2" style="font-size:12px;padding:6px 10px;" onclick="setZoom(1.15)">A Normal</button>
+    <button class="sbtn2" style="font-size:14px;padding:6px 10px;" onclick="setZoom(1.3)">A+ Large</button>
+    <button class="sbtn2" style="font-size:16px;padding:6px 10px;" onclick="setZoom(1.5)">A++ XL</button>
+  </div>
   <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Google Sheets &amp; PIN</div>
   <div style="font-size:10px;color:var(--gr2);margin-bottom:7px;">Credentials stored locally only — never sent to anyone except Google.</div>
   <div class="sg">
@@ -492,7 +502,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v80b1</div>
+  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v81b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -524,7 +534,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <div class="screen" id="sc-todo">
   <div class="pg" style="padding-top:0;">
     <div style="position:sticky;top:0;z-index:6;background:var(--hnxl);padding:12px 0 7px;">
-      <div class="pg-t">📋 To-Do</div><div class="pg-s" style="margin-bottom:6px;">Pending actions — tap an item to open &amp; update it</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div class="pg-t">📋 To-Do</div><span id="todoOutstanding" style="font-size:13px;font-weight:800;white-space:nowrap;"></span></div><div class="pg-s" style="margin-bottom:6px;">Pending actions — tap an item to open &amp; update it</div>
       <div id="todoCounter"></div>
     </div>
     <div id="pending_results" style="margin-top:9px;"></div>
@@ -1047,7 +1057,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div style="flex:1;min-width:0;">
         <div class="pnm" id="profName"></div>
         <div class="pmt" id="profMeta"></div>
-        <div class="pid" id="profId"></div>
+        <div class="pid" id="profId" onclick="if(curDog){copyText(curDog.cid);(typeof toast==='function')&&toast('Copied '+curDog.cid+' ✓','ok');}" style="cursor:pointer;" title="Tap to copy ID"></div>
       </div>
     </div>
   </div>
@@ -1120,7 +1130,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <div id="regPhotoCircle" onclick="promptGdriveUrl('register')" title="Tap to paste a Google Drive photo link" style="width:76px;height:76px;border-radius:50%;background:var(--hnxl);border:2px dashed var(--hn);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:26px;position:relative;overflow:hidden;"><span id="regPhotoEmoji">+</span><img id="regPhotoImg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></div>
     </div>
     <input type="hidden" id="reg_eid"><input type="hidden" id="reg_ridx">
-    <div class="fsec">Dog Details</div>
+    <div class="rsec" style="--sc:var(--or);margin-top:6px;"><span class="rsec-ic">🐾</span>Dog Details</div>
     <div class="fr"><div class="f"><label>Name <span class="req">*</span></label><input class="fi" id="reg_name"></div><div class="f"><label>Breed</label><input class="fi" id="reg_breed"></div></div>
     <div class="fr"><div class="f"><label>Gender &amp; Neuter Status</label><select class="fs" id="reg_gender_status"><option value="">Select</option><option>Male – Intact</option><option>Male – Neutered</option><option>Female – Intact</option><option>Female – Spayed</option></select></div><div class="f"><label>Birthday</label>
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
@@ -1168,7 +1178,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       </div>
     </div>
     <div class="f"><label>Friendly with dogs? (breeds to avoid)</label><input class="fi" id="reg_dogfriends" placeholder="e.g. Good with small breeds — avoid Huskies"></div>
-    <div class="fsec">Food &amp; Health</div>
+    <div class="rsec" style="--sc:var(--rd);"><span class="rsec-ic">🩺</span>Food &amp; Health</div>
     <div class="fr"><div class="f"><label>Food type</label><select class="fs" id="reg_food"><option value="">Select</option><option>Dry food</option><option>Wet food</option><option>Mixed</option><option>Raw</option></select></div><div class="f"><label>Food measurement</label><input class="fi" id="reg_food_measure" placeholder="e.g. 150g morning, 150g eve"></div></div>
     <div class="f"><label>Diet notes</label><textarea class="fta" id="reg_diet" style="min-height:48px;"></textarea></div>
     <div class="f"><label>Allergies</label><input class="fi" id="reg_allergies"></div>
@@ -1178,7 +1188,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Untouchable areas</label><input class="fi" id="reg_touch"></div>
     <div class="fr"><div class="f"><label>Last vaccination</label><input class="fi" type="date" id="reg_vacc"></div><div class="f"><label>Flea/tick treatment</label><input class="fi" id="reg_flea"></div></div>
     <div class="f"><label>Vaccination record (Google Drive link)</label><input class="fi" id="reg_vacc_url" placeholder="https://drive.google.com/..."></div>
-    <div class="fsec">Behaviour &amp; Routine</div>
+    <div class="rsec" style="--sc:var(--hn);"><span class="rsec-ic">🦴</span>Behaviour &amp; Routine</div>
     <div class="f"><label>Behaviour at home</label><textarea class="fta" id="reg_behaviour" style="min-height:48px;"></textarea></div>
     <div class="f"><label>Walking schedule</label><input class="fi" id="reg_walk"></div>
     <div class="f"><label>Car seat preference</label><select class="fs" id="reg_car"><option value="">Select</option><option>Back seat</option><option>Car boot</option><option>Dog crate in boot</option><option>Front passenger</option></select></div>
@@ -1192,7 +1202,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>How often should we send updates?</label><input class="fi" id="reg_updates" placeholder="e.g. Daily, every 2 hours during first stay, only if something happens"></div>
     <div class="f"><label>Dog relationships</label><input class="fi" id="reg_rel" placeholder="e.g. Same family as Obi"></div>
     <div class="f"><label>Additional notes</label><textarea class="fta" id="reg_notes" style="min-height:56px;"></textarea></div>
-    <div class="fsec">Owner Details</div>
+    <div class="rsec" style="--sc:var(--bl);"><span class="rsec-ic">📞</span>Owner Details</div>
     <div class="fr"><div class="f"><label>Owner 1 <span class="req">*</span></label><input class="fi" id="reg_owner"></div><div class="f"><label>Phone 1 <span class="req">*</span></label><input class="fi" id="reg_phone" type="tel" placeholder="+447..."></div></div>
     <div class="fr"><div class="f"><label>Owner 2</label><input class="fi" id="reg_owner2"></div><div class="f"><label>Phone 2</label><input class="fi" id="reg_phone2" type="tel" placeholder="+447..."></div></div>
     <div class="fr"><div class="f"><label>Owner 3</label><input class="fi" id="reg_owner3"></div><div class="f"><label>Phone 3</label><input class="fi" id="reg_phone3" type="tel" placeholder="+447..."></div></div>
@@ -1204,7 +1214,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="f"><label>Insurance document (Google Drive link)</label><input class="fi" id="reg_ins_url" placeholder="https://drive.google.com/..."></div>
     <div class="f"><label>Date of first meet &amp; greet</label><input class="fi" type="date" id="reg_meetgreet"></div>
     <div class="fr"><div class="f"><label>Where did they hear about us?</label><select class="fs" id="reg_referral"><option value="">Select</option><option>Social media</option><option>Word of mouth</option><option>Search engine</option><option>Leaflets</option><option>Rover</option><option>Other</option></select></div><div class="f"><label>Referral notes</label><input class="fi" id="reg_ref_notes" placeholder="e.g. Referred by Sophie W."></div></div>
-    <div class="fsec">Service</div>
+    <div class="rsec" style="--sc:var(--gn);"><span class="rsec-ic">🛎️</span>Service</div>
     <div class="f"><label>Service types</label>
       <div id="reg_svc_chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;">
         <button type="button" class="ib" data-svc="💤 Boarding" onclick="toggleSvcChip(this)">💤 Boarding</button>
@@ -1218,7 +1228,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <input type="hidden" id="reg_svc">
     </div>
     <div class="f"><label>Status</label><select class="fs" id="reg_status"><option>Active</option><option>Inactive</option></select></div>
-    <div class="fsec">Staff Remarks</div>
+    <div class="rsec" style="--sc:var(--cn);"><span class="rsec-ic">⭐</span>Staff Remarks</div>
     <div class="f"><label>At home</label><textarea class="fta" id="reg_rm_home" style="min-height:44px;"></textarea></div>
     <div class="f"><label>Outdoor</label><textarea class="fta" id="reg_rm_out" style="min-height:44px;"></textarea></div>
     <div class="f"><label>Indoor</label><textarea class="fta" id="reg_rm_in" style="min-height:44px;"></textarea></div>
