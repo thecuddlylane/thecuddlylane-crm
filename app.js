@@ -473,6 +473,12 @@ function toggleAvailPanel(){
 // --- gender / neuter parsed from the combined GenderStatus string ("Spayed female", "Neutered male", "Male") ---
 function _gsGender(s){s=(s||'').toLowerCase();return /female|bitch/.test(s)?'female':/\bmale|\bdog\b/.test(s)?'male':'';}
 function _gsNeuter(s){s=(s||'').toLowerCase();return /spay/.test(s)?'spayed':/neuter|castrat/.test(s)?'neutered':/intact|entire|\bfull\b|un-?neuter|un-?spay/.test(s)?'intact':'';}
+// (41) Intact = not neutered/spayed → harder to manage, so we flag it on Profile + Calendar + Calendar search.
+// Prefer the structured genderStatus; fall back to the legacy `neut` field ('No'/'Intact' = intact). Unknown/blank ⇒ NOT flagged (no false alarm).
+const INTACT_COL='#D97706';// amber-700 — distinct from the red compat-Fight warning
+function isIntact(dog){if(!dog)return false;const n=_gsNeuter(dog.genderStatus||dog.gender||'');if(n)return n==='intact';const leg=(dog.neut||'').toString().trim().toLowerCase();return leg==='no'||leg==='intact';}
+// Compact inline marker for tight contexts (calendar chips/bars). `cid` → dog via _dogByCid.
+function _intactMark(cid){const d=cid?_dogByCid(cid):null;return isIntact(d)?'<span title="Intact — not neutered/spayed" style="color:'+INTACT_COL+';font-weight:800;">⚠</span>':'';}
 // Compatibility result → colour/emoji/severity. Vocabulary: Friends/Good/Ignore/Not Good/Fight/Did not meet (+ legacy Suitable/Partial/Not Suitable).
 // Shared compatibility vocabulary — same options everywhere (booking overlap + History trial forms) so they never clobber each other (24).
 const COMPAT_OPTS=['Friends','Good','Ignore','Not Good','Fight','Did not meet'];
@@ -523,7 +529,7 @@ function _availMonthBlock(y,m,sd,ed,info){
     const occs=inR?occupantsOn(ds):[];const occ=occs.length;
     const bg=!inMo?'transparent':(inR?_capBg(occ):'var(--gr5)');
     const names=occs.map(b=>{const fl=_availFlag(_bkCid(b),info);
-      return'<span style="display:block;font-size:8px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+fl.col+';font-weight:'+(fl.met?'800':'500')+';">'+(fl.met?fl.emoji:'')+(b.dog||'')+'</span>';}).join('');
+      return'<span style="display:block;font-size:8px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+fl.col+';font-weight:'+(fl.met?'800':'500')+';">'+_intactMark(_bkCid(b))+(fl.met?fl.emoji:'')+(b.dog||'')+'</span>';}).join('');
     cells+='<div style="min-height:34px;border:1px solid var(--gr4);border-radius:4px;padding:2px;background:'+bg+';'+(inR?'box-shadow:inset 0 0 0 2px var(--pu);':'')+(inMo?'':'opacity:.3;')+(ds===today?'outline:1px dashed var(--bl);':'')+'">'
       +'<div style="font-size:8px;font-weight:700;display:flex;justify-content:space-between;color:'+(inMo?'var(--bk)':'var(--gr3)')+';"><span>'+d.getDate()+'</span>'+(inR&&occ?'<span style="color:'+_capCol(occ)+';">'+occ+'/'+CAL_CAP+'</span>':'')+'</div>'+names+'</div>';}
   const hd=['M','T','W','T','F','S','S'].map(x=>'<div style="font-size:7px;font-weight:700;color:var(--gr2);text-align:center;">'+x+'</div>').join('');
@@ -568,7 +574,7 @@ function runAvailCheck(){
     return'<div'+clickAttr+' style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gr4);'+(prof?'cursor:pointer;':'')+'">'
       +av
       +'<div style="flex:1;min-width:0;">'
-      +'<div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--bk);'+(prof?'text-decoration:underline;':'')+'">'+flagDot+'<span>'+(b.dog||'')+'</span><span style="font-size:9px;font-weight:700;color:var(--pu);white-space:nowrap;">· '+days+' day'+(days!==1?'s':'')+' overlap</span></div>'
+      +'<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;font-weight:700;color:var(--bk);'+(prof?'text-decoration:underline;':'')+'">'+flagDot+'<span>'+(b.dog||'')+'</span>'+(isIntact(prof)?'<span title="Not neutered/spayed" style="font-size:8px;font-weight:800;color:#fff;background:'+INTACT_COL+';padding:1px 6px;border-radius:99px;white-space:nowrap;text-decoration:none;">⚠️ Intact</span>':'')+'<span style="font-size:9px;font-weight:700;color:var(--pu);white-space:nowrap;">· '+days+' day'+(days!==1?'s':'')+' overlap</span></div>'
       +(attrs?'<div style="font-size:9px;color:var(--gr2);">'+attrs+'</div>':'')
       +'<div style="font-size:9px;color:var(--gr2);">'+(b.svc||'')+'&nbsp;·&nbsp;overlaps '+winStr+'</div>'
       +metNote
@@ -830,9 +836,20 @@ function renderBoard(){
   });
   week.sort((a,b)=>a.bk.sd.localeCompare(b.bk.sd));
   upcoming.sort((a,b)=>a.bk.sd.localeCompare(b.bk.sd));
-  renderCards(active,document.getElementById('todayCards'),'on');renderCards(week,document.getElementById('weekCards'),'wk');renderCards(upcoming,document.getElementById('upcomingCards'),'up');renderCards(other,document.getElementById('otherCards'),'');
+  const counts=dogOutstandingMap();// per-dog outstanding-task counts for the red card bubble
+  renderCards(active,document.getElementById('todayCards'),'on',counts);renderCards(week,document.getElementById('weekCards'),'wk',counts);renderCards(upcoming,document.getElementById('upcomingCards'),'up',counts);renderCards(other,document.getElementById('otherCards'),'',counts);
 }
-function renderCards(entries,c,cls){
+// Outstanding tasks per dog {cid:n} — same items the To-Do list counts (missing daily logs + workflow checklist steps + vaccination + emergency-contact reminders). Training/selfie are not per-dog / not counted, matching the To-Do "outstanding" total.
+function dogOutstandingMap(){
+  let pa;try{pa=computePendingActions();}catch(e){return {};}
+  const m={};const add=(cid,n)=>{if(cid&&n)m[cid]=(m[cid]||0)+n;};
+  (pa.missingLogs||[]).forEach(x=>add(x.dog&&x.dog.cid,(x.dates||[]).length));
+  (pa.wfTasks||[]).forEach(t=>add(t.bk&&(t.bk.customerId||t.bk.dog),1));
+  (pa.vaccReminders||[]).forEach(v=>add(v.dog&&v.dog.cid,1));
+  (pa.emergReminders||[]).forEach(v=>add(v.dog&&v.dog.cid,1));
+  return m;
+}
+function renderCards(entries,c,cls,counts){counts=counts||{};
   if(!entries.length){c.innerHTML='<div class="empty"><p>-</p></div>';return;}c.innerHTML='';
   const scMap={'Quoted':'sq','Booked':'sb','Prepaid':'spp','Fully Paid':'sf','Credit':'scr','Canceled':'sc'};
   entries.forEach(({dog,bk})=>{
@@ -842,8 +859,10 @@ function renderCards(entries,c,cls){
     const bdMonth=dog.birthday?parseInt(dog.birthday.split('-')[1]):0;const isBdayMo=bdMonth&&bdMonth===(new Date().getMonth()+1);
     // Booking info strip
     const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+bk.svc+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
+    const nOut=counts[dog.cid]||0;// outstanding tasks for this dog → red bubble
+    const outBadge=nOut?'<div class="dc-badge" title="'+nOut+' outstanding task'+(nOut>1?'s':'')+'">'+(nOut>99?'99+':nOut)+'</div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="" onerror="this.style.display=\'none\'">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="" onerror="this.style.display=\'none\'">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+outBadge+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
@@ -967,9 +986,12 @@ function buildProfInfo(dog){
   const vaccRow=dog.vacc?'<div class="irow"><span class="ikey">Last vaccination</span><span class="ival" style="'+(vaccExpired?'color:var(--rd);font-weight:700;':'')+'">'+fmtDateFull(dog.vacc)+(vaccExpired?' ⚠️ Expired':' ✅')+'</span></div>':'';
   const vaccUrlRow=dog.vaccUrl?'<div class="irow"><span class="ikey">Vaccination record</span><span class="ival"><a href="'+gdriveDirect(dog.vaccUrl)+'" target="_blank" style="color:var(--bl);text-decoration:none;">View document 📄</a></span></div>':'';
   const vaccBanner=vaccExpired?'<div style="background:var(--rdl,#fff0f0);border:1px solid var(--rd);border-radius:8px;padding:10px 14px;margin-bottom:10px;color:var(--rd);font-weight:600;font-size:13px;">⚠️ Vaccination expired — please ask owners to update records before the next visit.</div>':'';
+  // (41) Intact (not neutered/spayed) — harder to manage, so warn up front.
+  const intactBanner=isIntact(dog)?'<div style="background:#FEF3C7;border:1px solid '+INTACT_COL+';border-radius:8px;padding:10px 14px;margin-bottom:10px;color:'+INTACT_COL+';font-weight:600;font-size:13px;">⚠️ Not neutered/spayed — take extra care with mixing, marking and escape risk while in our care.</div>':'';
+  const _gsDisplay=(dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+(isIntact(dog)?' <span style="color:'+INTACT_COL+';font-weight:800;">⚠️ Intact</span>':'');
   document.getElementById('profInfoBody').innerHTML=
-    vaccBanner+
-    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+ir('Relationships',dog.rel)+'</div>'+
+    vaccBanner+intactBanner+
+    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',_gsDisplay)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+ir('Relationships',dog.rel)+'</div>'+
     '<div class="psec" style="--sc:var(--rd);"><div class="psec-h"><span class="psec-ic">🩺</span>Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
     '<div class="psec" style="--sc:var(--hn);"><div class="psec-h"><span class="psec-ic">🦴</span>Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="psec" style="--sc:var(--gr2);"><div class="psec-h"><span class="psec-ic">📝</span>Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
@@ -1339,9 +1361,24 @@ function resolvePhotoUrl(dog){const raw=dog.photoUrl||'';return raw?gdriveDirect
 function setPhotoFromUrl(url,context){if(!url)return;const direct=gdriveDirect(url.trim());if(context==='profile'){if(!curDog)return;const w=document.getElementById('profPhotoWrap');let img=w.querySelector('img.pl');if(!img){img=document.createElement('img');img.className='pl';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;';w.appendChild(img);}img.onerror=()=>{img.style.display='none';};img.src=direct;img.style.display='block';
   // Save URL to the dog's Dogs-sheet row so it's visible on all devices
   curDog.photoUrl=direct;updateCopyPhotoBtn();
-  if(curDog.rowIdx){updateRow(TABS.DOGS,curDog.rowIdx,Object.values(mapDogToRow(curDog))).catch(()=>{});}
+  savePhotoToSheet(curDog);// (42) persist to the Dogs sheet + confirm + refresh thumbnails right away
 }else{_regPhotoUrl=direct;document.getElementById('regPhotoImg').src=direct;document.getElementById('regPhotoImg').style.display='block';document.getElementById('regPhotoEmoji').style.display='none';document.getElementById('regPhotoCircle')._pd=direct;}}
 function promptGdriveUrl(context){const cur=(context==='profile'?(curDog&&curDog.photoUrl):_regPhotoUrl)||'';const url=prompt('Google Drive photo link — the existing link is shown below; copy it, or paste a new one to update:',cur);if(url!==null&&url.trim()&&url.trim()!==cur)setPhotoFromUrl(url.trim(),context);}
+// (42) Save the profile photo straight to the Dogs sheet after OK, with confirmation, then refresh the thumbnails shown elsewhere.
+// Re-resolves the row by CustomerID from a fresh read (rowIdx can go stale after a sheet change) — same safe-write approach as the booking-status fix.
+async function savePhotoToSheet(dog){
+  if(!dog)return;
+  try{
+    let ri=dog.rowIdx;
+    try{const fresh=await readSheet(TABS.DOGS,'A1:CZ');const fh=mkHdr(fresh[0]||[]);const idCol=fh['CustomerID']??0;const fi=fresh.slice(1).findIndex(r=>(r[idCol]||'')===dog.cid);if(fi>=0){ri=fi+2;dog.rowIdx=ri;}}catch(e){}
+    if(!ri){if(typeof toast==='function')toast('⚠️ Could not find this dog to save the photo — tap Sync and retry.','err');return;}
+    await updateRow(TABS.DOGS,ri,Object.values(mapDogToRow(dog)));
+    if(typeof toast==='function')toast('Photo updated ✓','ok');
+    // dog is the same object held in allDogs, so re-rendering picks up the new photo everywhere.
+    try{if(typeof renderBoard==='function')renderBoard();}catch(e){}
+    try{if(typeof renderPendingPanel==='function')renderPendingPanel();}catch(e){}
+  }catch(e){if(typeof toast==='function')toast('⚠️ Photo not saved: '+(e&&e.message||e),'err');}
+}
 function copyPhotoUrl(){const url=curDog?.photoUrl;if(!url){alert('No Drive photo link stored for this dog.');return;}navigator.clipboard.writeText(url).then(()=>alert('Photo URL copied!')).catch(()=>{prompt('Copy this URL:',url);});}
 function updateCopyPhotoBtn(){const url=curDog?.photoUrl;const btn=document.getElementById('copyPhotoUrlBtn');if(btn)btn.style.display=(url&&url.startsWith('http'))?'block':'none';}
 
@@ -2211,7 +2248,7 @@ let _calNewRis=new Set();
 function _computeNewRis(){const first={};bookings.forEach(b=>{if(!CAL_ACTIVE.includes(b.status))return;const k=b.customerId||b.dog;if(!k)return;const sd=normDate(b.sd)||'';const c=first[k];if(!c||sd<c.sd||(sd===c.sd&&(b.ri||0)<c.ri))first[k]={sd,ri:b.ri||0};});_calNewRis=new Set(Object.values(first).map(f=>f.ri));}
 function openDogByCid(cid){if(!cid)return;const d=allDogs.find(x=>x.cid===cid);if(d){openProfile(d);showScreen('sc-profile');}}
 // New dogs = dark-orange name (returning dogs stay blue) — a colour cue that takes no extra width, so long names aren't truncated by a badge.
-function _dogChip(b){const isNew=_calNewRis.has(b.ri);return'<span class="cal-dog" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')"'+(isNew?' style="color:var(--cn);font-weight:700;"':'')+' title="'+(b.dog||'')+(isNew?' (new dog)':'')+'">'+(b.dog||'')+'</span>';}
+function _dogChip(b){const isNew=_calNewRis.has(b.ri);const intact=isIntact(_dogByCid(b.customerId));return'<span class="cal-dog" onclick="event.stopPropagation();openDogByCid(\''+(b.customerId||'')+'\')"'+(isNew?' style="color:var(--cn);font-weight:700;"':'')+' title="'+(b.dog||'')+(isNew?' (new dog)':'')+(intact?' — INTACT (not neutered/spayed)':'')+'">'+_intactMark(b.customerId)+(b.dog||'')+'</span>';}
 function setCalView(v){_calView=v;renderCalendar();}
 function calShift(dir){const d=new Date(_calAnchor+'T12:00:00');if(_calView==='month')d.setMonth(d.getMonth()+dir);else d.setDate(d.getDate()+dir*(_calView==='slots'?1:7));_calAnchor=d.toISOString().slice(0,10);_calSelDay='';renderCalendar();}
 function calToday(){_calAnchor=todayStr();_calSelDay='';renderCalendar();}
@@ -2279,10 +2316,10 @@ function _calGridHtml(start,nDays){
   }
   items.forEach(it=>{const b=it.b;const nm=b.dog||'';const per=_fmtT(b.st||(it.k==='day'?'07:00':'09:00'))+'-'+_fmtT(b.et||'18:00');
     const bg=it.quoted?'':('background:'+(it.k==='day'?'var(--or)':'var(--sk)')+';');
-    g+='<div class="cw-bar'+(it.quoted?' cw-quo':'')+'" style="grid-row:'+(it.lane+2)+';grid-column:'+(it.s+2)+' / '+(it.e+3)+';'+bg+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+nm+(it.quoted?' (QUOTED)':'')+' · '+per+'"><span class="cw-nm">'+nm+(it.quoted?' (Q)':'')+'</span><span class="cw-per">'+per+'</span></div>';});
+    g+='<div class="cw-bar'+(it.quoted?' cw-quo':'')+'" style="grid-row:'+(it.lane+2)+';grid-column:'+(it.s+2)+' / '+(it.e+3)+';'+bg+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+nm+(it.quoted?' (QUOTED)':'')+(isIntact(_dogByCid(b.customerId))?' — INTACT':'')+' · '+per+'"><span class="cw-nm">'+_intactMark(b.customerId)+nm+(it.quoted?' (Q)':'')+'</span><span class="cw-per">'+per+'</span></div>';});
   svcRows.forEach((row,ri)=>{const R=nLanes+ri+2;
     g+='<div class="cw-cell cw-svclbl" style="grid-row:'+R+';grid-column:1;" title="'+row.lbl+'">'+row.lbl.split(' ')[0]+'</div>';
-    for(let i=0;i<nDays;i++){const inner=row.perDay[i].map(x=>'<div class="cw-visit'+(x.quoted?' cw-quo':'')+'" onclick="openDogByCid(\''+(x.b.customerId||'')+'\')" title="'+(x.b.dog||'')+' · '+row.lbl+' · '+_fmtT(x.b.st||'')+'">'+_fmtT(x.b.st||'')+' '+(x.b.dog||'')+(x.quoted?' (Q)':'')+'</div>').join('');
+    for(let i=0;i<nDays;i++){const inner=row.perDay[i].map(x=>'<div class="cw-visit'+(x.quoted?' cw-quo':'')+'" onclick="openDogByCid(\''+(x.b.customerId||'')+'\')" title="'+(x.b.dog||'')+(isIntact(_dogByCid(x.b.customerId))?' — INTACT':'')+' · '+row.lbl+' · '+_fmtT(x.b.st||'')+'">'+_fmtT(x.b.st||'')+' '+_intactMark(x.b.customerId)+(x.b.dog||'')+(x.quoted?' (Q)':'')+'</div>').join('');
       g+='<div class="cw-cell cw-bgcell'+(days[i]===today?' cw-today':'')+'" style="grid-row:'+R+';grid-column:'+(i+2)+';">'+inner+'</div>';}
   });
   g+='</div>';
@@ -2357,9 +2394,9 @@ function _calSlotsHtml(){
       else if(it.k==='day')fill='background:var(--orxl);color:var(--cn);border-left:3px solid var(--or);';
       else fill='background:var(--bll);color:var(--bl);border-left:3px solid var(--sk);';
       const per=_fmtT(b.st||(it.k==='day'?'07:00':'09:00'))+'-'+_fmtT(b.et||'18:00');
-      g+='<div class="cw-bar" style="grid-column:'+(ci+2)+';grid-row:'+(sp[0]+2)+' / '+(sp[1]+3)+';font-size:9px;'+barSty+fill+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+(b.dog||'')+(c.over?' (OVERBOOKED)':'')+' · '+per+'"><span class="cw-nm" style="'+vnm+'">'+(b.dog||'')+(it.quoted?' (Q)':'')+'</span></div>';});
+      g+='<div class="cw-bar" style="grid-column:'+(ci+2)+';grid-row:'+(sp[0]+2)+' / '+(sp[1]+3)+';font-size:9px;'+barSty+fill+'" onclick="openDogByCid(\''+(b.customerId||'')+'\')" title="'+(b.dog||'')+(c.over?' (OVERBOOKED)':'')+(isIntact(_dogByCid(b.customerId))?' — INTACT':'')+' · '+per+'"><span class="cw-nm" style="'+vnm+'">'+_intactMark(b.customerId)+(b.dog||'')+(it.quoted?' (Q)':'')+'</span></div>';});
     }else{visits.forEach(v=>{const sp=rowSpan(v.from,v.to);if(!sp)return;
-      g+='<div class="cw-bar" style="grid-column:'+(ci+2)+';grid-row:'+(sp[0]+2)+' / '+(sp[1]+3)+';font-size:8px;'+barSty+'background:var(--pul);color:var(--pu);border-left:3px solid var(--pu);" onclick="openDogByCid(\''+(v.b.customerId||'')+'\')" title="'+(v.b.dog||'')+'"><span class="cw-nm" style="'+vnm+'">'+(v.b.dog||'')+(v.quoted?' (Q)':'')+'</span></div>';});}
+      g+='<div class="cw-bar" style="grid-column:'+(ci+2)+';grid-row:'+(sp[0]+2)+' / '+(sp[1]+3)+';font-size:8px;'+barSty+'background:var(--pul);color:var(--pu);border-left:3px solid var(--pu);" onclick="openDogByCid(\''+(v.b.customerId||'')+'\')" title="'+(v.b.dog||'')+(isIntact(_dogByCid(v.b.customerId))?' — INTACT':'')+'"><span class="cw-nm" style="'+vnm+'">'+_intactMark(v.b.customerId)+(v.b.dog||'')+(v.quoted?' (Q)':'')+'</span></div>';});}
   });
   g+='</div></div>';
   const pre=bookings.filter(b=>CAL_ACTIVE.includes(b.status)&&_svcKind(b)==='stay'&&_slotPresent(b,ds,5*60)).length;

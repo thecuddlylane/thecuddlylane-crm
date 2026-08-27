@@ -114,7 +114,9 @@ body{
 .dcard.up{border-color:var(--pu);border-width:1.5px;}
 .dc-photo{width:100%;aspect-ratio:4/3;background:var(--hnxl);display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden;}
 .dc-photo img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
-.live-badge{position:absolute;top:3px;right:3px;background:var(--gn);color:#fff;font-size:7px;font-weight:700;padding:2px 4px;border-radius:99px;}
+.live-badge{position:absolute;top:3px;left:3px;background:var(--gn);color:#fff;font-size:7px;font-weight:700;padding:2px 4px;border-radius:99px;}
+/* Outstanding-task count bubble on each dog card (top-right corner) */
+.dc-badge{position:absolute;top:3px;right:3px;min-width:17px;height:17px;padding:0 4px;background:var(--rd);color:#fff;font-size:9px;font-weight:800;line-height:1;border-radius:99px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.35);z-index:3;}
 .dc-em-badge{position:absolute;bottom:3px;left:5px;font-size:15px;line-height:1;z-index:2;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
 .dcb{padding:5px 7px;}
 .dcb-n{font-family:var(--fh);font-size:11px;font-weight:800;color:var(--gr);}
@@ -502,7 +504,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v81b1</div>
+  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v82b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
