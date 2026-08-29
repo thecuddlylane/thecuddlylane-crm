@@ -71,7 +71,7 @@ const DEFAULT_RANGES=[{start:'2026-04-03',end:'2026-04-06',label:'Easter 2026'},
 const TP_QUOTE='Hi {{ownerName}},\n\nHere is the rate for our services with THE CUDDLY LANE \u2601\ufe0f\u2728\n\n{{rateBlock}}\n\nHere is your quotation:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\n\nTo secure your booking, a 50% prepayment will be required (non-refundable, but transferable to other dates). Let us know if you\u2019d like to go ahead!\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
 const TP_BOOK='Hi {{ownerName}},\n\nThank you for choosing THE CUDDLY LANE \u2014 we can\u2019t wait to welcome *{{dogs}}*! \ud83d\udc3e\n\nHere is a summary of your booking:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\n\nTo confirm your spot, please send your 50% prepayment:\n*{{prepayAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nThis payment is non-refundable but fully transferable to alternative dates. Once received, your booking is confirmed!\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
 const TP_PREPAY='Hi {{ownerName}},\n\nGreat news \u2014 your prepayment has been received and your booking is confirmed! \ud83c\udf89\n\nHere is your booking summary:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\nPrepayment received: *{{prepayAmt}}*\n*Balance due at drop-off: {{finalAmt}}*\n\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nWe look forward to seeing *{{dogs}}*! \ud83d\udc3e\nKatie & Osbert';
-const TP_FINAL='Hi {{ownerName}},\n\nYour booking is coming up soon! \ud83d\udc3e\n\nHere is your final payment summary:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\nPrepayment received: {{prepayAmt}}\n*Balance due: {{finalAmt}}*\n\nPlease settle the balance before drop-off.\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nLooking forward to seeing *{{dogs}}*!\nKatie & Osbert \ud83d\udc3e';
+const TP_FINAL='Hi {{ownerName}},\n\nYour booking is coming up soon! \ud83d\udc3e\n\nHere is your final payment summary:\n\n{{service}}{{discount}}\n\n*Total: {{total}}*\nPrepayment received: {{prepayAmt}}\n*Balance due: {{finalAmt}}*\n\nPlease settle the balance *48 hours* before drop-off.\nPayment reference: *{{payRef}}*\n{{payLink}}\n\nLooking forward to seeing *{{dogs}}*!\nKatie & Osbert \ud83d\udc3e';
 const TP_AVAIL='Hi {{ownerName}},\n\nThanks for your message! Let me check {{dates}} for {{dogs}} \ud83d\udc3e\n\n{{availability}}\n\n{{overlapBlock}}\nLet me know if you\u2019d like to go ahead and I can put together a quote for you!\n\nThank you!\nKatie & Osbert \ud83d\udc3e';
 const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOG_EMOJIS=['\u{1F436}','\u{1F415}','\u{1F9AE}','\u{1F43A}','\u{1F429}','\u{1F43E}','\u{1F98A}','\u{1F431}','\u{1F490}','\u2B50','\u{1F338}','\u{1F3C6}','\u{1F48E}','\u{1F9E1}','\u{1F525}','\u2728','\u{1F308}','\u{1F33B}','\u{1FAB4}','\u{1F344}','\u{1F31F}','\u{1F4A5}','\u{1F63A}','\u{1F9B4}'];
@@ -845,7 +845,18 @@ function renderBoard(){
   week.sort((a,b)=>a.bk.sd.localeCompare(b.bk.sd));
   upcoming.sort((a,b)=>a.bk.sd.localeCompare(b.bk.sd));
   const counts=dogOutstandingMap();// per-dog outstanding-task counts for the red card bubble
-  renderCards(active,document.getElementById('todayCards'),'on',counts);renderCards(week,document.getElementById('weekCards'),'wk',counts);renderCards(upcoming,document.getElementById('upcomingCards'),'up',counts);renderCards(other,document.getElementById('otherCards'),'',counts);
+  renderCards(active,document.getElementById('todayCards'),'on',counts);renderCards(week,document.getElementById('weekCards'),'wk',counts);renderCards(upcoming,document.getElementById('upcomingCards'),'up',counts);
+  // "All other dogs" is the biggest section (every dog with no upcoming booking) and each card loads a photo — so it stays
+  // COLLAPSED by default and its cards (and their photo fetches) are only rendered when the header is tapped. Big load-time win.
+  _otherEntries=other;const oh=document.getElementById('otherHdr');
+  if(oh)oh.textContent=(_showOther?'▾':'▸')+' All other dogs ('+other.length+')'+(_showOther?'':' — tap to show');
+  const oc=document.getElementById('otherCards');
+  if(oc){if(_showOther){oc.style.display='';renderCards(other,oc,'',counts);}else{oc.style.display='none';oc.innerHTML='';}}
+}
+let _showOther=false,_otherEntries=[];
+function toggleOtherDogs(){_showOther=!_showOther;const oh=document.getElementById('otherHdr'),oc=document.getElementById('otherCards');if(!oc)return;
+  oh&&(oh.textContent=(_showOther?'▾':'▸')+' All other dogs ('+_otherEntries.length+')'+(_showOther?'':' — tap to show'));
+  if(_showOther){oc.style.display='';renderCards(_otherEntries,oc,'',dogOutstandingMap());}else{oc.style.display='none';oc.innerHTML='';}
 }
 // Outstanding tasks per dog {cid:n} — same items the To-Do list counts (missing daily logs + workflow checklist steps + vaccination + emergency-contact reminders). Training/selfie are not per-dog / not counted, matching the To-Do "outstanding" total.
 function dogOutstandingMap(){
@@ -870,7 +881,7 @@ function renderCards(entries,c,cls,counts){counts=counts||{};
     const nOut=counts[dog.cid]||0;// outstanding tasks for this dog → red bubble
     const outBadge=nOut?'<div class="dc-badge" onclick="event.stopPropagation();openDogTodo(\''+dog.cid+'\')" style="cursor:pointer;" title="'+nOut+' outstanding task'+(nOut>1?'s':'')+' — tap to open in To-Do">'+(nOut>99?'99+':nOut)+'</div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
-    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="" onerror="this.style.display=\'none\'">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+outBadge+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
+    card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+outBadge+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
     c.appendChild(card);
   });
 }
@@ -893,8 +904,86 @@ function openProfile(dog){
   const allBtn=document.querySelector('.hfb[onclick*="all"]');if(allBtn)allBtn.classList.add('active');
   setTimeout(()=>{if(allBtn)filtHist('all',allBtn);},100);
   document.querySelectorAll('.ptc').forEach(c=>c.classList.remove('active'));document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('ptab-logs').classList.add('active');document.querySelector('.ptab[data-tab="logs"]').classList.add('active');
+  document.getElementById('ptab-info').classList.add('active');const _it=document.querySelector('.ptab[data-tab="info"]');if(_it)_it.classList.add('active');// Profile tab is the default now
   showScreen('sc-profile');
+}
+// (55) "➕ Add today's log" — a chooser (Routine Log / Health / Dog Compatibility / Transport) opened from the profile hero.
+function openAddLogChooser(){if(!curDog)return;_renderAddLogChooser('main');const m=document.getElementById('addLogModal');if(m){m.style.display='block';m.scrollTop=0;document.body.style.overflow='hidden';}}
+function closeAddLogChooser(){const m=document.getElementById('addLogModal');if(m)m.style.display='none';document.body.style.overflow='';}
+function _renderAddLogChooser(mode){
+  const box=document.getElementById('addLogButtons');if(!box)return;
+  const ttl=document.getElementById('addLogTitle'),sub=document.getElementById('addLogSub');
+  if(ttl)ttl.textContent=mode==='compat'?'Dog Compatibility':"Add today's log";
+  if(sub)sub.textContent=curDog?curDog.name+' · '+fmtDate(todayStr()):'';
+  const btn=(bar,ico,title,desc,onclick)=>'<button onclick="'+onclick+'" style="text-align:left;background:var(--wh);border:1px solid var(--gr4);border-left:5px solid '+bar+';border-radius:13px;padding:14px 15px;cursor:pointer;font-family:var(--fb);display:flex;align-items:center;gap:12px;"><span style="font-size:26px;line-height:1;flex-shrink:0;">'+ico+'</span><span style="min-width:0;"><span style="display:block;font-size:15px;font-weight:800;color:var(--bk);">'+title+'</span><span style="display:block;font-size:11px;color:var(--gr2);margin-top:1px;">'+desc+'</span></span></button>';
+  if(mode==='compat'){
+    box.innerHTML=btn('#16A34A','🤝','Mixing / Trial result','How did they get on with other dogs?',"addLogGo('trial')")+
+      btn('#DC2626','⚡','Fight / Incident','Record a scuffle or incident',"addLogGo('fight')")+
+      '<button onclick="_renderAddLogChooser(\'main\')" style="background:none;border:none;color:var(--bl);font-size:12px;text-decoration:underline;cursor:pointer;font-family:var(--fb);margin-top:2px;align-self:flex-start;">← back to log types</button>';
+  }else{
+    box.innerHTML=btn('var(--or)','🍽️','Routine Log','Food &amp; Medicine · Activities · Hygiene',"addLogRoutine()")+
+      btn('#0284C7','🩺','Health','Log a health issue',"addLogGo('health')")+
+      btn('#7C3AED','🐾','Dog Compatibility','Trial / mixing result, or a fight',"_renderAddLogChooser('compat')")+
+      btn('#F59E0B','🚕','Transport','Log a transport journey',"addLogGo('transport')");
+  }
+}
+function addLogRoutine(){closeAddLogChooser();openRoutineLog();}
+function addLogGo(type){closeAddLogChooser();openAddHistEntry(type,todayStr());}
+function openRoutineLog(){if(!curDog)return;const m=document.getElementById('routineLogModal');if(m){m.style.display='block';m.scrollTop=0;document.body.style.overflow='hidden';}}
+function closeRoutineLog(){const m=document.getElementById('routineLogModal');if(m)m.style.display='none';document.body.style.overflow='';}
+// (59) Quick editor for just the feeding/medication fields (incl. the grey "Diet notes"). Reuses the generic #editModal.
+function openFeedMedEdit(){
+  if(!curDog)return;const d=curDog;
+  const av=v=>(v||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const esc=v=>(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const opt=['','Dry food','Wet food','Mixed','Raw'].map(o=>'<option'+(o===(d.food||'')?' selected':'')+'>'+o+'</option>').join('');
+  document.getElementById('editModalBody').innerHTML=
+    '<div class="fsec">🍽️ Feeding &amp; Medication</div>'+
+    '<div class="fr"><div class="f"><label>Food type</label><select class="fs" id="fm_food">'+opt+'</select></div><div class="f"><label>Food measurement</label><input class="fi" id="fm_measure" value="'+av(d.foodMeasure)+'"></div></div>'+
+    '<div class="f"><label>Diet notes <span style="color:var(--gr3);font-weight:400;">(the grey text)</span></label><textarea class="fta" id="fm_diet">'+esc(d.dietNotes)+'</textarea></div>'+
+    '<div class="f"><label>Allergies</label><input class="fi" id="fm_allerg" value="'+av(d.allerg)+'"></div>'+
+    '<div class="f"><label>Medical / medication</label><input class="fi" id="fm_medical" value="'+av(d.med)+'"></div>'+
+    '<div class="f"><label>Medication volume &amp; schedule</label><input class="fi" id="fm_medsched" value="'+av(d.medSchedule)+'"></div>'+
+    '<div class="srow"><button class="sbtn2" onclick="saveFeedMedEdit()">Save</button><span class="smsg" id="fmStatus"></span></div>';
+  document.getElementById('editModal').classList.add('open');
+}
+async function saveFeedMedEdit(){
+  if(!curDog)return;const st=document.getElementById('fmStatus');if(st){st.textContent='Saving…';st.className='smsg';}
+  curDog.food=gv('fm_food');curDog.foodMeasure=gv('fm_measure');curDog.dietNotes=gv('fm_diet');curDog.allerg=gv('fm_allerg');curDog.med=gv('fm_medical');curDog.medSchedule=gv('fm_medsched');
+  const ok=await saveDogRow(curDog,'Feeding / medication updated ✓');
+  if(ok){buildSummary(curDog);buildProfInfo(curDog);document.getElementById('editModal').classList.remove('open');}
+  else if(st){st.textContent='Not saved — try again';st.className='smsg err';}
+}
+// (60) Per-section profile editors. Each dog-property maps by key; saving writes the whole row via saveDogRow.
+const _PROF_SECTIONS={
+  basic:{title:'🐾 Basic Info',fields:[['name','Name','text'],['breed','Breed','text'],['weight','Weight (kg)','text'],['birthday','Birthday','date'],['genderStatus','Gender & Neuter Status','select',['','Male – Intact','Male – Neutered','Female – Intact','Female – Spayed']],['chip','Microchip','text'],['rescue','Rescue dog?','select',['','Yes','No']],['motivation','Motivation','text'],['dogfriends','Dog compatibility','text'],['rel','Relationships','text']]},
+  food:{title:'🩺 Food & Health',fields:[['food','Food type','select',['','Dry food','Wet food','Mixed','Raw']],['foodMeasure','Food measurement','text'],['dietNotes','Diet notes','textarea'],['allerg','Allergies','text'],['med','Medical / medication','text'],['medSchedule','Medication volume & schedule','text'],['vacc','Last vaccination','date'],['vaccUrl','Vaccination record (Drive link)','text'],['flea','Flea/tick','text']]},
+  behaviour:{title:'🦴 Behaviour & Routine',fields:[['behav','Behaviour at home','textarea'],['walk','Walking schedule','text'],['car','Car seat','select',['','Back seat','Car boot','Dog crate in boot','Front passenger']],['sleep','Normally sleeps','text'],['escape','Escape attempts','text'],['toilet','Toilet trained','text'],['alone','Can be left alone (hrs)','text'],['commands','Training commands','textarea'],['sitters','Previous sitters','text'],['updates','Update frequency','text'],['fears','Fears','text'],['notouch','Untouchable areas','text']]},
+  remarks:{title:'⭐ Staff Remarks',fields:[['nervous','Nervous level (1–5)','num'],['anxiety','Separation anxiety (1–5)','num'],['jog','Jogging suitability (1–5)','num'],['barking','Barking level (1–5)','num'],['socia','Sociability with dogs (1–5)','num'],['rmHome','At home','textarea'],['rmOut','Outdoor','textarea'],['rmIn','Indoor','textarea'],['rmSleep','Sleeping pattern','textarea'],['rmFood','Food','textarea'],['rmDogs','With other dogs','textarea'],['remarks','General remarks','textarea'],['notes','Additional notes','textarea']]},
+  owners:{title:'📞 Owners & Contacts',fields:[['owner','Owner 1','text'],['phone','Phone 1','text'],['owner2','Owner 2','text'],['phone2','Phone 2','text'],['owner3','Owner 3','text'],['phone3','Phone 3','text'],['addr','Address','text'],['postcode','Postcode','text'],['emergName','Emergency name','text'],['emergPhone','Emergency phone','text'],['emergRel','Emergency relationship','text'],['vet','Vet','text'],['ins','Insurance','text'],['insUrl','Insurance document (Drive link)','text'],['meetgreet','Meet & greet date','date'],['referral','Referred by','text'],['refNotes','Referral notes','text']]}
+};
+function openSectionEdit(key){
+  if(!curDog)return;const sec=_PROF_SECTIONS[key];if(!sec)return;const d=curDog;
+  const av=v=>(v||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const esc=v=>(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fld=([k,l,t,opts])=>{let inp;
+    if(t==='textarea')inp='<textarea class="fta" id="se_'+k+'">'+esc(d[k])+'</textarea>';
+    else if(t==='select')inp='<select class="fs" id="se_'+k+'">'+opts.map(o=>'<option'+(o===(d[k]||'')?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+    else if(t==='date')inp='<input class="fi" type="date" id="se_'+k+'" value="'+av(d[k])+'">';
+    else if(t==='num')inp='<input class="fi" type="number" min="1" max="5" id="se_'+k+'" value="'+av(d[k])+'">';
+    else inp='<input class="fi" id="se_'+k+'" value="'+av(d[k])+'">';
+    return '<div class="f"><label>'+l+'</label>'+inp+'</div>';};
+  document.getElementById('editModalBody').innerHTML='<div class="fsec">'+sec.title+'</div>'+sec.fields.map(fld).join('')+'<div class="srow"><button class="sbtn2" onclick="saveSectionEdit(\''+key+'\')">Save</button><span class="smsg" id="seStatus"></span></div>';
+  document.getElementById('editModal').classList.add('open');
+}
+async function saveSectionEdit(key){
+  const sec=_PROF_SECTIONS[key];if(!sec||!curDog)return;const st=document.getElementById('seStatus');
+  if(key==='basic'&&!gv('se_name').trim()){if(st){st.textContent='Name is required';st.className='smsg err';}return;}
+  if(st){st.textContent='Saving…';st.className='smsg';}
+  sec.fields.forEach(([k])=>{curDog[k]=gv('se_'+k);});
+  const ok=await saveDogRow(curDog,sec.title.replace(/^\S+\s/,'')+' updated ✓');
+  if(ok){document.getElementById('profName').textContent=curDog.name;document.getElementById('profMeta').textContent=[curDog.breed,curDog.weight?curDog.weight+'kg':'',calcAge(curDog.birthday)].filter(Boolean).join(' - ');buildSummary(curDog);buildProfInfo(curDog);document.getElementById('editModal').classList.remove('open');}
+  else if(st){st.textContent='Not saved — try again';st.className='smsg err';}
 }
 
 function hasActiveBookingToday(dog){
@@ -933,7 +1022,7 @@ function buildTodayLog(){
     '<div class="cat-sec"><div class="cat-t">Activity</div><div class="tile-row">'+tile('walkAm','&#128062;','AM Walk')+tile('walkPm','&#128062;','PM Walk')+tile('garden','&#127807;','Garden Break')+'</div>'+
     '<div style="margin-top:5px;"><label style="font-size:9px;font-weight:600;color:var(--gr2);">Activities from library</label><div id="log_act_pills" style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;min-height:0;"></div><div style="position:relative;margin-top:3px;"><input class="fi" id="log_act_search" placeholder="Search to add activities..." oninput="filterLogActs()" style="font-size:10px;"><div id="log_act_results" style="position:absolute;z-index:50;background:var(--wh);border:1px solid var(--gr4);border-radius:var(--r);max-height:120px;overflow-y:auto;width:100%;display:none;"></div></div></div></div>'+
     '<div class="cat-sec"><div class="cat-t">Hygiene</div><div class="tile-row">'+tile('bowl','&#129379;','Bowl')+tile('room','&#129524;','Room')+tile('garment','&#129507;','Garment')+'</div></div>'+
-    '<div class="cat-sec"><div class="cat-t">Incidents</div>'+
+    '<div class="cat-sec" id="logIncidents" style="display:none;"><div class="cat-t">Incidents</div>'+
     inc('health','Health','<div class="fr"><div class="f"><label>Category</label><select class="fs" id="ih_cat"><option>Injury</option><option>Illness</option><option>Allergic reaction</option><option>Digestive</option><option>Behavioural</option><option>Medication</option><option>Other</option></select></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'health\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'health\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'health\',\'High\',event)">High</button></div><input type="hidden" id="ih_imp"></div></div><div class="f"><label>Issue</label><input class="fi" id="ih_issue"></div><div class="f"><label>Description</label><textarea class="fta" id="ih_desc" style="min-height:48px;"></textarea></div><div class="f"><label>Root cause</label><input class="fi" id="ih_cause"></div><div class="f"><label>Next steps</label><input class="fi" id="ih_next"></div>')+
     inc('fight','Dog Fight','<div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="if_time"></div><div class="f"><label>Importance</label><div style="display:flex;gap:4px;margin-top:2px;"><button class="ib" onclick="setImp(\'fight\',\'Low\',event)">Low</button><button class="ib" onclick="setImp(\'fight\',\'Med\',event)">Med</button><button class="ib" onclick="setImp(\'fight\',\'High\',event)">High</button></div><input type="hidden" id="if_imp"></div></div><div class="f"><label>Other dogs</label><select class="fs" id="if_others" multiple style="min-height:55px;">'+dogOpts+'</select></div><div class="f"><label>What happened</label><textarea class="fta" id="if_issue" style="min-height:48px;"></textarea></div><div class="f"><label>Injuries</label><input class="fi" id="if_inj"></div><div class="f"><label>Treatment</label><input class="fi" id="if_treat"></div><div class="f"><label>Prevention</label><input class="fi" id="if_prev"></div>')+
     inc('transport','Transport','<div class="fr"><div class="f"><label>Transporter</label><input class="fi" id="it_name"></div><div class="f"><label>Vehicle</label><input class="fi" id="it_vehicle"></div></div><div class="fr"><div class="f"><label>Plate</label><input class="fi" id="it_plate"></div><div class="f"><label>Journey</label><select class="fs" id="it_type"><option>Drop-off</option><option>Pick-up</option><option>Both</option></select></div></div><div class="fr"><div class="f"><label>Time</label><input class="fi" type="time" id="it_time"></div><div class="f"><label>Notes</label><input class="fi" id="it_notes"></div></div><div class="fr"><div class="f"><label>From</label><input class="fi" id="it_from" placeholder="Pickup location"></div><div class="f"><label>To</label><input class="fi" id="it_to" placeholder="Drop-off location"></div></div>')+
@@ -976,7 +1065,7 @@ async function saveLog(){
 // Full-screen big-text food + medication + today's feeding ticks. Opens off curDog.
 let _fvEdit=null;// null | 'food' | 'med' — which measurement is being inline-edited
 let _fvFrom=null;// null (opened from board card / profile) | 'all' (opened from the all-dogs Feeding board) — controls where Back goes
-const _FV_TILES=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM'],['snack','Snack']];
+const _FV_TILES=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM']];// Snack removed per user
 function _fvVal(v){const s=(v||'').toString().trim();return(!s||['no','none','n/a','na','-'].includes(s.toLowerCase()))?'':v;}
 // Daily-log-aligned state styling → [bg, border, textColour, suffix]. Same look + ✓/○/✗/— vocabulary as the LOGS tab tiles (.tile.done-*).
 function _fvState(s){const M={yes:['var(--gnl)','var(--gn)','var(--gn)','✓'],todo:['var(--orl)','var(--or)','var(--or)','○'],refused:['#fff0f0','var(--rd)','var(--rd)','✗'],na:['var(--gr5)','var(--gr3)','var(--gr3)','—'],'':['var(--wh)','var(--gr4)','var(--gr)','']};return M[s]||M[''];}
@@ -997,28 +1086,31 @@ function renderFeedAll(){
   const host=document.getElementById('feedingOverlay');if(!host)return;
   const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const dogs=_fvOnSiteDogs();const today=todayStr();
-  const MEALS=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM'],['snack','Snack']];
+  const MEALS=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM']];// Snack removed per user
   // One uniform, device-dynamic font (smaller cap than the single view since the board is 2 columns).
   let html='<div style="max-width:840px;margin:0 auto;min-height:100dvh;box-sizing:border-box;display:flex;flex-direction:column;padding:.5em .55em .6em;font-size:clamp(13px,3.3vmin,20px);">';
   html+='<div style="display:flex;align-items:center;gap:.4em;flex-shrink:0;margin-bottom:.4em;">'+
     '<button onclick="closeFeedingView()" title="Back to board" style="flex-shrink:0;background:var(--gr5);border:1px solid var(--gr4);border-radius:10px;padding:.3em .6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">← Back</button>'+
     '<div style="flex:1;min-width:0;"><div style="font-weight:800;color:var(--bk);line-height:1.05;">🍽️ Feeding board</div><div style="font-size:.6em;color:var(--gr2);">'+dogs.length+' dog'+(dogs.length!==1?'s':'')+' on-site · '+fmtDate(today)+' · <b style="color:var(--gn);">✓</b> done <b style="color:var(--or);">○</b> to-do <b style="color:var(--rd);">✗</b> refused <b style="color:var(--gr3);">—</b> N/A</div></div></div>';
   if(!dogs.length){html+='<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--gr3);">No dogs on-site today.</div></div>';host.innerHTML=html;return;}
-  html+='<div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.45em;align-content:stretch;min-height:0;">';
+  html+='<div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.45em;align-content:start;min-height:0;">';
   dogs.forEach(d=>{
     const food=_fvVal(d.foodMeasure),medS=_fvVal(d.medSchedule),allerg=_fvVal(d.allerg),diet=_fvVal(d.dietNotes);
+    const noMeds=!medS&&!_fvVal(d.med);// no medication on record → Med AM/PM default to N/A
     const sv=JSON.parse(localStorage.getItem('log_'+d.cid+'_'+today)||'{}');const photo=resolvePhotoUrl(d);
     // Status chips in the daily-log format: light tint + coloured border/text + ✓/○/✗/— suffix.
-    const statusRow=MEALS.map(([k,lbl])=>{const st=_fvState(sv[k]||'');return'<span style="font-size:.72em;font-weight:800;padding:.15em .5em;border-radius:99px;background:'+st[0]+';border:1px solid '+st[1]+';color:'+st[2]+';white-space:nowrap;">'+lbl+' '+(st[3]||'·')+'</span>';}).join('');
+    const statusRow=MEALS.map(([k,lbl])=>{const raw=sv[k]||(((k==='medAm'||k==='medPm')&&noMeds)?'na':'');const st=_fvState(raw);return'<span style="font-size:.72em;font-weight:800;padding:.15em .5em;border-radius:99px;background:'+st[0]+';border:1px solid '+st[1]+';color:'+st[2]+';white-space:nowrap;">'+lbl+' '+(st[3]||'·')+'</span>';}).join('');
     const av=photo?'<img src="'+photo+'" style="width:1.9em;height:1.9em;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--gr4);" onerror="this.style.display=\'none\'">':'<span style="width:1.9em;height:1.9em;border-radius:50%;background:var(--orl);display:flex;align-items:center;justify-content:center;flex-shrink:0;">🐶</span>';
     html+='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:12px;padding:.5em .55em;display:flex;flex-direction:column;gap:.3em;min-width:0;overflow:hidden;">'+
-      '<div style="display:flex;align-items:center;gap:.4em;min-width:0;">'+av+'<div style="flex:1;min-width:0;font-weight:800;color:var(--bk);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(d.name)+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:.4em;min-width:0;">'+av+
+        '<div onclick="closeFeedingView();openDogByCid(\''+d.cid+'\')" title="Open profile" style="flex:1;min-width:0;font-weight:800;color:var(--bl);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-decoration:underline;">'+esc(d.name)+'</div>'+
+        '<button onclick="openFeedingViewForCid(\''+d.cid+'\',\'all\')" style="flex-shrink:0;background:var(--or);color:#fff;border:none;border-radius:8px;padding:.32em .6em;font-size:.82em;font-weight:800;cursor:pointer;font-family:var(--fb);">+Log</button>'+
+      '</div>'+
       (allerg?'<div style="background:var(--rdl);border-radius:7px;padding:.2em .5em;color:var(--rd);font-weight:800;font-size:.8em;line-height:1.2;">⚠️ '+esc(allerg)+'</div>':'')+
       '<div style="font-weight:700;color:var(--bk);line-height:1.2;">🍽️ '+(food?esc(food):'<span style="color:var(--gr3);font-weight:500;">—</span>')+'</div>'+
       (diet?'<div style="font-size:.78em;color:var(--gr2);line-height:1.2;">'+esc(diet)+'</div>':'')+
       (medS?'<div style="font-weight:700;color:var(--bk);line-height:1.2;">💊 '+esc(medS)+'</div>':'')+
       '<div style="display:flex;flex-wrap:wrap;gap:.3em;margin-top:.15em;">'+statusRow+'</div>'+
-      '<button onclick="openFeedingViewForCid(\''+d.cid+'\',\'all\')" style="margin-top:auto;background:var(--or);color:#fff;border:none;border-radius:8px;padding:.5em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">📋 Update log</button>'+
     '</div>';
   });
   html+='</div></div>';
@@ -1058,7 +1150,8 @@ function renderFeedingView(){
     return'<div style="display:flex;align-items:flex-start;gap:.4em;"><div style="flex:1;font-weight:800;line-height:1.2;color:var(--bk);word-break:break-word;">'+(val?esc(val):'<span style="color:var(--gr3);font-weight:500;">'+ph+'</span>')+'</div>'+editBtn(which)+'</div>';
   };
   // Tiles match the LOGS-tab daily-log format: light tint + coloured border/text + ✓ done / ○ to-do / ✗ refused / — N-A.
-  const tileBtn=([k,lbl])=>{const st=_fvState(sv[k]||'');return'<button onclick="fvTogTile(\''+k+'\')" style="text-align:left;background:'+st[0]+';color:'+st[2]+';border:1.5px solid '+st[1]+';border-radius:10px;padding:.45em .6em;cursor:pointer;font-family:var(--fb);font-size:inherit;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:.4em;min-height:2.5em;"><span>'+lbl+'</span><span style="flex-shrink:0;">'+(st[3]||'·')+'</span></button>';};
+  const _noMeds=!medSched&&!med;// no medication → Med AM/PM show N/A by default
+  const tileBtn=([k,lbl])=>{const raw=sv[k]||(((k==='medAm'||k==='medPm')&&_noMeds)?'na':'');const st=_fvState(raw);return'<button onclick="fvTogTile(\''+k+'\')" style="text-align:left;background:'+st[0]+';color:'+st[2]+';border:1.5px solid '+st[1]+';border-radius:10px;padding:.45em .6em;cursor:pointer;font-family:var(--fb);font-size:inherit;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:.4em;min-height:2.5em;"><span>'+lbl+'</span><span style="flex-shrink:0;">'+(st[3]||'·')+'</span></button>';};
   const card=(label,body,bar,grow)=>'<div style="background:var(--wh);border:1px solid var(--gr4);border-left:5px solid '+bar+';border-radius:12px;padding:.5em .65em;'+(grow?'flex:1;display:flex;flex-direction:column;min-height:0;':'')+'"><div style="font-weight:800;color:'+bar+';margin-bottom:.3em;">'+label+'</div>'+body+'</div>';
   let html='<div style="max-width:640px;margin:0 auto;min-height:100dvh;box-sizing:border-box;display:flex;flex-direction:column;gap:.4em;padding:.5em .7em .7em;font-size:clamp(16px,4.6vmin,26px);">';
   html+='<div style="display:flex;align-items:center;gap:.4em;flex-shrink:0;"><div style="flex:1;min-width:0;font-weight:800;color:var(--bk);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(d.name)+'</div><button onclick="fvBack()" title="Back" style="flex-shrink:0;background:var(--gr5);border:1px solid var(--gr4);border-radius:9px;padding:.3em .6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">← Back</button></div>';
@@ -1076,24 +1169,20 @@ function renderFeedingView(){
   html+='</div>';
   const sc=host.scrollTop;host.innerHTML=html;host.scrollTop=sc;
 }
+// Alerts now sit at the TOP of the Profile tab (#profAlerts). Only the red safety alerts — no grey name/breed summary.
 function buildSummary(dog){
-  const alerts=[],notes=[];
-  // Don't raise an alert when the value is empty / No / N/A / None — nothing to be aware of.
+  const el=document.getElementById('profAlerts');if(!el)return;
   const skipAlert=v=>{const s=(v||'').toLowerCase().trim();return !s||s==='no'||s==='none'||s==='n/a'||s==='na'||s==='-';};
+  const alerts=[];
   if(!skipAlert(dog.med))alerts.push('Medical: '+dog.med);
   if(!skipAlert(dog.medSchedule))alerts.push('Med schedule: '+dog.medSchedule);
   if(!skipAlert(dog.allerg))alerts.push('Allergies: '+dog.allerg);
-  const fearsVal=(dog.fears||'').toLowerCase().trim();if(fearsVal&&fearsVal!=='none'&&fearsVal!=='n/a'&&fearsVal!=='na'&&fearsVal!=='-')notes.push('Fears: '+dog.fears);if(dog.rescue==='Yes')notes.push('Rescue dog');
-  if(parseInt(dog.nervous)>=4)notes.push('Very nervous ('+dog.nervous+'/5)');if(parseInt(dog.anxiety)>=4)notes.push('High sep. anxiety');
-  const ageStr=calcAge(dog.birthday);const lines=[dog.name+' - '+(dog.breed||'dog')+(ageStr?' ('+ageStr+')':'')+', owned by '+(dog.owner||'unknown')+'.'];
-  if(notes.length)lines.push(notes.join('. ')+'.');if(dog.remarks)lines.push(dog.remarks);
-  document.getElementById('sumText').textContent=lines.join(' ');
-  document.getElementById('alertRows').innerHTML=alerts.map(a=>'<div class="alert-r">! '+a+'</div>').join('');
-  document.getElementById('smartSum').style.display='block';
+  el.innerHTML=alerts.length?('<div class="sum-c" style="margin-bottom:10px;"><div class="sum-t">⚠️ Alerts</div>'+alerts.map(a=>'<div class="alert-r">! '+a+'</div>').join('')+'</div>'):'';
 }
 function buildProfInfo(dog){
   const nbar=(n,col)=>{const l=parseInt(n)||0;return'<div class="nb-bar" style="flex:1;">'+Array.from({length:5},(_,i)=>'<div class="nb-seg" style="background:'+(i<l?col:'var(--gr4)')+'"></div>').join('')+'</div><span style="font-size:9px;font-weight:700;color:var(--gr2);margin-left:3px;">'+l+'/5</span>';};
   const nc=v=>parseInt(v)>=4?'var(--rd)':parseInt(v)>=3?'var(--hn)':'var(--or)';
+  const eb=k=>'<button onclick="openSectionEdit(\''+k+'\')" style="margin-left:auto;background:var(--gr5);border:1px solid var(--gr4);border-radius:7px;font-size:9px;font-weight:800;color:var(--gr2);padding:3px 9px;cursor:pointer;font-family:var(--fb);">✏️ Edit</button>';// per-section edit
   let vaccExpired=false;if(dog.vacc){try{const vd=new Date(dog.vacc+'T12:00:00');const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);vaccExpired=vd<cutoff;}catch(e){}}
   const vaccRow=dog.vacc?'<div class="irow"><span class="ikey">Last vaccination</span><span class="ival" style="'+(vaccExpired?'color:var(--rd);font-weight:700;':'')+'">'+fmtDateFull(dog.vacc)+(vaccExpired?' ⚠️ Expired':' ✅')+'</span></div>':'';
   const vaccUrlRow=dog.vaccUrl?'<div class="irow"><span class="ikey">Vaccination record</span><span class="ival"><a href="'+gdriveDirect(dog.vaccUrl)+'" target="_blank" style="color:var(--bl);text-decoration:none;">View document 📄</a></span></div>':'';
@@ -1103,12 +1192,12 @@ function buildProfInfo(dog){
   const _gsDisplay=(dog.genderStatus||dog.gender+(dog.neut?(' · '+(dog.neut==='Yes'?'Neutered/Spayed':'Intact')):''))+(isIntact(dog)?' <span style="color:'+INTACT_COL+';font-weight:800;">⚠️ Intact</span>':'');
   document.getElementById('profInfoBody').innerHTML=
     vaccBanner+intactBanner+
-    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Dog</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',_gsDisplay)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+ir('Relationships',dog.rel)+'</div>'+
-    '<div class="psec" style="--sc:var(--rd);"><div class="psec-h"><span class="psec-ic">🩺</span>Food &amp; Health</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
-    '<div class="psec" style="--sc:var(--hn);"><div class="psec-h"><span class="psec-ic">🦴</span>Behaviour &amp; Routine</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
+    '<div class="psec" style="--sc:var(--or);"><div class="psec-h"><span class="psec-ic">🐾</span>Basic Info'+eb('basic')+'</div>'+ir('Name',dog.name)+ir('Breed',dog.breed)+ir('Weight',dog.weight?dog.weight+'kg':'')+ir('Birthday',dog.birthday?(dog.bdayType==='approx'?'Approx. '+fmtDate(dog.birthday):fmtDateFull(dog.birthday)):'')+ir('Age',calcAge(dog.birthday))+ir('Gender & Neuter Status',_gsDisplay)+ir('Microchip',dog.chip)+ir('Rescue',dog.rescue)+ir('Motivation',dog.motivation)+ir('Dog compatibility',dog.dogfriends)+ir('Relationships',dog.rel)+'</div>'+
+    '<div class="psec" style="--sc:var(--rd);"><div class="psec-h"><span class="psec-ic">🩺</span>Food &amp; Health'+eb('food')+'</div>'+ir('Food type',dog.food)+ir('Food measurement',dog.foodMeasure)+ir('Diet notes',dog.dietNotes)+ir('Allergies',dog.allerg)+ir('Medical',dog.med)+ir('Medication schedule',dog.medSchedule)+vaccRow+vaccUrlRow+ir('Flea/tick',dog.flea)+'</div>'+
+    '<div class="psec" style="--sc:var(--hn);"><div class="psec-h"><span class="psec-ic">🦴</span>Behaviour &amp; Routine'+eb('behaviour')+'</div>'+ir('Behaviour',dog.behav)+ir('Walking schedule',dog.walk)+ir('Car seat',dog.car)+ir('Normally sleeps',dog.sleep)+ir('Escape attempts',dog.escape)+ir('Toilet trained',dog.toilet)+ir('Can be left alone',dog.alone?dog.alone+' hrs':'')+ir('Training commands',dog.commands)+ir('Previous sitters',dog.sitters)+ir('Update frequency',dog.updates)+ir('Fears',dog.fears)+ir('Untouchable',dog.notouch)+'</div>'+
     (dog.notes?'<div class="psec" style="--sc:var(--gr2);"><div class="psec-h"><span class="psec-ic">📝</span>Notes</div>'+ir('Notes',dog.notes)+'</div>':'')+
-    '<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks</div>'+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+(dog.barking?'<div class="irow"><span class="ikey">Barking level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.barking,parseInt(dog.barking)>=4?'var(--rd)':'var(--hn)')+'</span></div>':'')+(dog.socia?'<div class="irow"><span class="ikey">Sociability with dogs</span><span class="ival" style="display:flex;align-items:center;gap:4px;flex:1;">'+nbar(dog.socia,'var(--pu)')+'</span></div>':'')+ir('At home',dog.rmHome)+ir('Outdoor',dog.rmOut)+ir('Indoor',dog.rmIn)+ir('Sleeping pattern',dog.rmSleep)+ir('Food',dog.rmFood)+ir('With other dogs',dog.rmDogs)+ir('General',dog.remarks)+'</div>'+
-    '<div class="psec" style="--sc:var(--bl);"><div class="psec-h"><span class="psec-ic">📞</span>Owners &amp; Contacts</div>'+ir('Owner 1',dog.owner)+(dog.phone?'<div class="irow"><span class="ikey">Phone 1</span><span class="ival">'+waLink(dog.phone)+'</span></div>':'')+ir('Owner 2',dog.owner2)+(dog.phone2?'<div class="irow"><span class="ikey">Phone 2</span><span class="ival">'+waLink(dog.phone2)+'</span></div>':'')+ir('Owner 3',dog.owner3)+(dog.phone3?'<div class="irow"><span class="ikey">Phone 3</span><span class="ival">'+waLink(dog.phone3)+'</span></div>':'')+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency name',dog.emergName)+(dog.emergPhone?'<div class="irow"><span class="ikey">Emergency phone</span><span class="ival">'+waLink(dog.emergPhone)+'</span></div>':'')+ir('Emergency relationship',dog.emergRel)+((!dog.emergName&&!dog.emergPhone&&dog.emergency)?ir('Emergency (old)',dog.emergency):'')+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+(dog.insUrl?'<div class="irow"><span class="ikey">Insurance document</span><span class="ival"><a href="'+gdriveDirect(dog.insUrl)+'" target="_blank" style="color:var(--bl);text-decoration:none;">View document 📄</a></span></div>':'')+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
+    '<div class="psec" style="--sc:var(--cn);"><div class="psec-h"><span class="psec-ic">⭐</span>Staff Remarks'+eb('remarks')+'</div>'+(dog.nervous?'<div class="irow"><span class="ikey">Nervous level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.nervous,nc(dog.nervous))+'</span></div>':'')+(dog.anxiety?'<div class="irow"><span class="ikey">Sep. anxiety</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.anxiety,parseInt(dog.anxiety)>=4?'var(--rd)':'var(--pu)')+'</span></div>':'')+(dog.jog?'<div class="irow"><span class="ikey">Jogging suitability</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.jog,'var(--gn)')+'</span></div>':'')+(dog.barking?'<div class="irow"><span class="ikey">Barking level</span><span class="ival" style="display:flex;align-items:center;gap:3px;flex:1;">'+nbar(dog.barking,parseInt(dog.barking)>=4?'var(--rd)':'var(--hn)')+'</span></div>':'')+(dog.socia?'<div class="irow"><span class="ikey">Sociability with dogs</span><span class="ival" style="display:flex;align-items:center;gap:4px;flex:1;">'+nbar(dog.socia,'var(--pu)')+'</span></div>':'')+ir('At home',dog.rmHome)+ir('Outdoor',dog.rmOut)+ir('Indoor',dog.rmIn)+ir('Sleeping pattern',dog.rmSleep)+ir('Food',dog.rmFood)+ir('With other dogs',dog.rmDogs)+ir('General',dog.remarks)+'</div>'+
+    '<div class="psec" style="--sc:var(--bl);"><div class="psec-h"><span class="psec-ic">📞</span>Owners &amp; Contacts'+eb('owners')+'</div>'+ir('Owner 1',dog.owner)+(dog.phone?'<div class="irow"><span class="ikey">Phone 1</span><span class="ival">'+waLink(dog.phone)+'</span></div>':'')+ir('Owner 2',dog.owner2)+(dog.phone2?'<div class="irow"><span class="ikey">Phone 2</span><span class="ival">'+waLink(dog.phone2)+'</span></div>':'')+ir('Owner 3',dog.owner3)+(dog.phone3?'<div class="irow"><span class="ikey">Phone 3</span><span class="ival">'+waLink(dog.phone3)+'</span></div>':'')+(dog.addr||dog.postcode?'<div class="irow"><span class="ikey">Address</span><span class="ival"><a href="https://maps.google.com/?q='+encodeURIComponent((dog.addr||'')+(dog.postcode?' '+dog.postcode:''))+'" target="_blank" style="color:var(--bl);text-decoration:none;">'+(dog.addr||(dog.postcode||''))+'</a></span></div>':'')+ir('Postcode',dog.postcode)+ir('Emergency name',dog.emergName)+(dog.emergPhone?'<div class="irow"><span class="ikey">Emergency phone</span><span class="ival">'+waLink(dog.emergPhone)+'</span></div>':'')+ir('Emergency relationship',dog.emergRel)+((!dog.emergName&&!dog.emergPhone&&dog.emergency)?ir('Emergency (old)',dog.emergency):'')+ir('Vet',dog.vet)+ir('Insurance',dog.ins)+(dog.insUrl?'<div class="irow"><span class="ikey">Insurance document</span><span class="ival"><a href="'+gdriveDirect(dog.insUrl)+'" target="_blank" style="color:var(--bl);text-decoration:none;">View document 📄</a></span></div>':'')+ir('Meet &amp; greet',fmtDateFull(dog.meetgreet))+ir('Referred by',dog.referral)+ir('Referral notes',dog.refNotes)+'</div>'+
     '<div class="psec" style="--sc:var(--gr3);"><div class="psec-h"><span class="psec-ic">🆔</span>Identifiers</div>'+ir('Customer ID',dog.cid)+ir('Microchip',dog.chip)+'</div>';
 }
 async function filtHist(type,btn){
@@ -1574,6 +1663,17 @@ function renderSvcLines(){
       '<button onclick="removeSvcLine('+i+')" style="background:none;border:none;color:var(--rd);cursor:pointer;font-size:16px;line-height:1;">\u00d7</button></div>';
   }).join('');
 }
+// (Quote nights — ONE source of truth. Every quote path (boarding + dog-sit, both the customer text and the per-dog
+// amounts) MUST call this so the maths can never drift or need fixing in multiple places again.)
+// nights = CALENDAR nights = pick-up date − drop-off date (times ignored). e.g. 04/09→16/09 = 12 nights.
+// Extra hours are charged ONLY when the pick-up time of day is LATER than the drop-off time of day (dog stayed past the
+// drop-off-time checkout on the last day); pick-up earlier or equal ⇒ 0 extra. (Rule confirmed with the user 2026-08-29.)
+function stayNightsHrs(sd,st,ed,et){
+  const nights=Math.max(1,Math.round((new Date(ed+'T00:00:00')-new Date(sd+'T00:00:00'))/86400000));
+  const tm=t=>{const p=(t||'').split(':');return (parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0);};
+  const drop=tm(st),pick=tm(et);const exHrs=pick>drop?(pick-drop)/60:0;
+  return {nights,exHrs};
+}
 function calcMultiQ(){
   if(!_svcLines.length){document.getElementById('q_result').style.display='none';return;}
   const r=getRates();let total=0;const lines=[];const descParts=[];
@@ -1592,8 +1692,7 @@ function calcMultiQ(){
       let dogObjs=(l.dogs&&l.dogs.length?l.dogs:_orderedSel()).map(c=>({name:_nm(c),add:_addDogs.includes(c)}));if(!dogObjs.length)dogObjs=[{name:'Dog',add:false}];
       const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');
       if(l.sd&&l.ed){
-        const dropDt=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt=new Date(l.ed+'T'+(l.et||'18:00'));
-        const hrs=(pickDt-dropDt)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
+        const {nights,exHrs}=stayNightsHrs(l.sd,l.st2||'09:00',l.ed,l.et||'18:00');
         const holDates=getHolDates(l.sd,l.ed);let hN=0,sN=0;let d=new Date(l.sd+'T12:00:00');
         for(let ni=0;ni<nights;ni++){const ds=d.toISOString().split('T')[0];if(holDates.includes(ds))hN++;else sN++;d.setDate(d.getDate()+1);}
         const stdR=l.rate>0?l.rate:r.board_std,holR=l.rate>0?l.rate:bH;const em='\u{1F4A4}';
@@ -1643,8 +1742,7 @@ function calcMultiQ(){
       const prim=dogObjs.filter(x=>!x.add),adds=dogObjs.filter(x=>x.add);const allDogStr=dogObjs.map(x=>x.name).join(' & ');const em='\uD83E\uDEB1';
       if(l.sd&&l.ed){
         const holDates2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
-        const dropDt2=new Date(l.sd+'T'+(l.st2||'09:00')),pickDt2=new Date(l.ed+'T'+(l.et||'18:00'));
-        const hrs2=(pickDt2-dropDt2)/3600000;const nights2a=Math.max(1,Math.floor(hrs2/24));
+        const nights2a=stayNightsHrs(l.sd,l.st2||'09:00',l.ed,l.et||'18:00').nights;
         let d2=new Date(l.sd+'T12:00:00');
         for(let ni=0;ni<nights2a;ni++){const ds2=d2.toISOString().split('T')[0];if(holDates2.includes(ds2))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
         const stdR2=l.rate>0?l.rate:r.board_std,holR2=l.rate>0?l.rate:bH;
@@ -1785,8 +1883,7 @@ function _computeDogRevMap(){
     if(l.svc==='extra'||l.svc==='taxi')return;
     const prim=(l.dogs||[]).filter(c=>!_addDogs.includes(c)),adds=(l.dogs||[]).filter(c=>_addDogs.includes(c));
     if(l.svc==='boarding'&&l.sd&&l.ed){
-      const drop=new Date(l.sd+'T'+(l.st2||'09:00')),pick=new Date(l.ed+'T'+(l.et||'18:00'));
-      const hrs=(pick-drop)/3600000;const nights=Math.max(1,Math.floor(hrs/24));const exHrs=hrs-nights*24;
+      const {nights,exHrs}=stayNightsHrs(l.sd,l.st2||'09:00',l.ed,l.et||'18:00');
       const hd=getHolDates(l.sd,l.ed);let hN=0,sN=0;
       let d=new Date(l.sd+'T12:00:00');
       for(let ni=0;ni<nights;ni++){if(hd.includes(d.toISOString().split('T')[0]))hN++;else sN++;d.setDate(d.getDate()+1);}
@@ -1799,8 +1896,7 @@ function _computeDogRevMap(){
       prim.forEach(c=>add(c,mr));adds.forEach(c=>add(c,ar));
     }else if(l.svc==='dogsit'&&l.sd&&l.ed){
       const hd2=getHolDates(l.sd,l.ed);let hN2=0,sN2=0;
-      const dropDtDs=new Date(l.sd+'T'+(l.st2||'09:00')),pickDtDs=new Date(l.ed+'T'+(l.et||'18:00'));
-      const hrsDs=(pickDtDs-dropDtDs)/3600000;const nightsDs=Math.max(1,Math.floor(hrsDs/24));
+      const nightsDs=stayNightsHrs(l.sd,l.st2||'09:00',l.ed,l.et||'18:00').nights;
       let d2=new Date(l.sd+'T12:00:00');
       for(let ni=0;ni<nightsDs;ni++){if(hd2.includes(d2.toISOString().split('T')[0]))hN2++;else sN2++;d2.setDate(d2.getDate()+1);}
       prim.forEach(c=>add(c,(sN2*r.board_std)+(hN2*bH)));adds.forEach(c=>add(c,(sN2*r.board_add)+(hN2*baH)));
@@ -1923,6 +2019,7 @@ function nextBkId(sd){
   return id;
 }
 function openBkModal(editId=null,fromProf=false,editRi=null,tab=1){
+  _wfShowAll=false;// (60) checklist defaults to hiding completed tasks each time a booking opens
   const modal=document.getElementById('bkModal');const ed=editId?bkByRef(editId,editRi):null;// resolve by ri first (unique) so edits hit the right row even with dup ids
   document.getElementById('bm_eid').value=editId||'';document.getElementById('bm_ridx').value=ed?.ri||'';
   document.getElementById('bkMTitle').textContent=ed?'Modify Booking':'Add Booking';document.getElementById('bkBtn').textContent=ed?'Modify Booking':'Save Booking';
@@ -1941,10 +2038,32 @@ function openBkModal(editId=null,fromProf=false,editRi=null,tab=1){
   calcBal();toggleRover();updateStatusFlow();renderOverlapCheck();renderWfChecklist();switchBkTab(tab);modal.classList.add('open');
 }
 function switchBkTab(n){
-  document.getElementById('bkTab1').style.display=n===1?'':'none';
-  document.getElementById('bkTab2').style.display=n===2?'':'none';
-  document.getElementById('bkTabBtn1').classList.toggle('bk-tab-active',n===1);
-  document.getElementById('bkTabBtn2').classList.toggle('bk-tab-active',n===2);
+  [1,2,3].forEach(i=>{const t=document.getElementById('bkTab'+i);if(t)t.style.display=n===i?'':'none';const b=document.getElementById('bkTabBtn'+i);if(b)b.classList.toggle('bk-tab-active',n===i);});
+  if(n===3)renderBkLogs();// (59) load this booking's log history when the Logs tab opens
+}
+// (59) All logs (daily / health / fight / transport / trial) for this booking's dog within its date range.
+async function renderBkLogs(){
+  const el=document.getElementById('bm_bkLogs');if(!el)return;
+  const cid=gv('bm_dog');const sd=gv('bm_sd'),ed=gv('bm_ed')||sd;
+  if(!cid){el.innerHTML='<div class="hload">Pick a dog first.</div>';return;}
+  el.innerHTML='<div class="hload">Loading…</div>';
+  const inRange=dt=>{const d=normDate(dt)||'';return d&&(!sd||d>=sd)&&(!ed||d<=ed);};
+  try{
+    const rows=[];const push=(date,type,col,txt)=>{if(txt&&txt.trim())rows.push({date:normDate(date)||date,type,col,txt:txt.trim()});};
+    // Daily-Log
+    const dl=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dh=mkHdr(dl[0]||[]);
+    dl.slice(1).forEach(r=>{const g=n=>dh[n]!==undefined?(r[dh[n]]||''):'';if((g('CustomerID')===cid)&&inRange(g('Date'))){const parts=['Breakfast','MedAM','Dinner','MedPM','Snack','WalkAM','WalkPM','Garden'].map(k=>g(k)&&g(k)!=='[ ]'?k+' '+g(k):'').filter(Boolean).join(' · ');push(g('Date'),'Daily','#0284C7',(parts||'logged')+(g('Notes')?' — '+g('Notes'):''));}});
+    // Health / Fight / Transport / Trial
+    const [hl,ft,tr,trl]=await Promise.all([readSheet(TABS.HEALTH,'A1:Z').catch(()=>[]),readSheet(TABS.FIGHT,'A1:Z').catch(()=>[]),readSheet(TABS.TRANSPORT,'A1:Z').catch(()=>[]),readSheet(TABS.TRIAL,'A1:Z').catch(()=>[])]);
+    const scan=(sheet,type,col,fmt)=>{const h=mkHdr(sheet[0]||[]);sheet.slice(1).forEach(r=>{const g=n=>h[n]!==undefined?(r[h[n]]||''):'';if(g('CustomerID')===cid&&inRange(g('Date')))push(g('Date'),type,col,fmt(g));});};
+    scan(hl,'Health','#DC2626',g=>[g('Category'),g('Issue'),g('Description'),g('NextStep')].filter(Boolean).join(' · '));
+    scan(ft,'Fight','#DC2626',g=>[g('OtherDogs')?'with '+g('OtherDogs'):'',g('Issue'),g('Injuries')?'injuries: '+g('Injuries'):'',g('Prevention')].filter(Boolean).join(' · '));
+    scan(tr,'Transport','#F59E0B',g=>[g('JourneyType'),g('From')&&g('To')?g('From')+'→'+g('To'):'',g('Transporter'),g('Notes')].filter(Boolean).join(' · '));
+    scan(trl,'Trial','#16A34A',g=>['mixed with '+g('MixedWith'),g('Suitable'),g('Observations')].filter(Boolean).join(' · '));
+    rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(!rows.length){el.innerHTML='<div class="hload">No logs recorded for this booking\'s dates yet.</div>';return;}
+    el.innerHTML=rows.map(r=>'<div style="border-left:3px solid '+r.col+';background:var(--gr5);border-radius:6px;padding:6px 9px;margin-bottom:5px;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-size:9px;font-weight:800;color:'+r.col+';text-transform:uppercase;">'+r.type+'</span><span style="font-size:9px;color:var(--gr2);">'+fmtDate(r.date)+'</span></div><div style="font-size:10px;color:var(--gr);margin-top:1px;">'+r.txt.replace(/</g,'&lt;')+'</div></div>').join('');
+  }catch(e){el.innerHTML='<div class="hload" style="color:var(--rd);">'+e.message+'</div>';}
 }
 // ==================== WORKFLOW CHECKLIST (stored on Bookings sheet) ====================
 function wfAutoLogs(bk){
@@ -2043,19 +2162,25 @@ function renderWfChecklist(){
   let html='<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;margin-bottom:4px;"><span>'+comp.done+' / '+comp.total+' done</span><span style="color:'+(comp.allDone?'var(--gn)':'var(--gr3)')+';">'+pct+'%'+(comp.allDone?' ✅':'')+'</span></div><div style="height:7px;background:var(--gr4);border-radius:4px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(comp.allDone?'var(--gn)':'var(--or)')+';transition:width .2s;"></div></div></div>';
   ['before','during','after'].forEach(g=>{
     const steps=WF_STEPS.filter(s=>s.g===g);if(!steps.length)return;
-    html+='<div style="font-size:9px;font-weight:800;color:var(--gr2);text-transform:uppercase;letter-spacing:.3px;margin:11px 0 5px;">'+(WF_GRP[g]||g)+'</div>';
+    let grp='';
     steps.forEach(s=>{
       const v=wfStepValue(bk,s.k);
+      if(!_wfShowAll&&v)return;// (60) completed tasks hidden by default
       const isAuto=(s.k==='dailyLogs'||s.k==='compat'||s.k==='finalpay')&&(bk.wf?.[s.k]===undefined||bk.wf?.[s.k]==='');
       const autoTag=(isAuto&&v)?' <span style="font-size:8px;color:var(--gr3);">(auto)</span>':'';
-      html+='<div onclick="toggleWfStep(\''+eid+'\',\''+s.k+'\','+(!v)+')" style="display:flex;align-items:center;gap:9px;padding:9px 11px;margin-bottom:5px;border-radius:var(--r);border:1.5px solid '+(v?'var(--gn)':'var(--gr4)')+';background:'+(v?'var(--gnl)':'var(--wh)')+';cursor:pointer;">'+
+      grp+='<div onclick="toggleWfStep(\''+eid+'\',\''+s.k+'\','+(!v)+')" style="display:flex;align-items:center;gap:9px;padding:9px 11px;margin-bottom:5px;border-radius:var(--r);border:1.5px solid '+(v?'var(--gn)':'var(--gr4)')+';background:'+(v?'var(--gnl)':'var(--wh)')+';cursor:pointer;">'+
         '<span style="width:21px;height:21px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:'+(v?'var(--gn)':'var(--wh)')+';color:#fff;border:1.5px solid '+(v?'var(--gn)':'var(--gr3)')+';">'+(v?'✓':'')+'</span>'+
         '<span style="font-size:11px;flex:1;'+(v?'color:var(--gr2);text-decoration:line-through;':'color:var(--gr);font-weight:600;')+'">'+s.l+autoTag+'</span></div>';
-      if(s.k==='review')html+='<label style="display:flex;align-items:center;gap:6px;font-size:10px;cursor:pointer;margin:-2px 0 7px 32px;color:var(--gr2);" onclick="event.stopPropagation()"><input type="checkbox" '+(bk.wf?.review==='na'?'checked':'')+' onchange="setWfReviewNA(\''+eid+'\',this.checked)"> No review needed</label>';
+      if(s.k==='review'&&(_wfShowAll||!v))grp+='<label style="display:flex;align-items:center;gap:6px;font-size:10px;cursor:pointer;margin:-2px 0 7px 32px;color:var(--gr2);" onclick="event.stopPropagation()"><input type="checkbox" '+(bk.wf?.review==='na'?'checked':'')+' onchange="setWfReviewNA(\''+eid+'\',this.checked)"> No review needed</label>';
     });
+    if(grp)html+='<div style="font-size:9px;font-weight:800;color:var(--gr2);text-transform:uppercase;letter-spacing:.3px;margin:11px 0 5px;">'+(WF_GRP[g]||g)+'</div>'+grp;
   });
+  if(!_wfShowAll&&comp.done===comp.total&&comp.total)html+='<div style="text-align:center;font-size:11px;color:var(--gn);font-weight:700;padding:8px;">✅ All tasks done</div>';
+  if(comp.done>0)html+='<button onclick="toggleWfShowAll()" style="width:100%;margin-top:6px;background:var(--gr5);border:1px solid var(--gr4);border-radius:8px;padding:8px;font-size:10px;font-weight:700;color:var(--gr2);cursor:pointer;font-family:var(--fb);">'+(_wfShowAll?'Hide completed tasks':'Show all ('+comp.done+' completed hidden)')+'</button>';
   c.innerHTML=html;
 }
+let _wfShowAll=false;
+function toggleWfShowAll(){_wfShowAll=!_wfShowAll;renderWfChecklist();}
 // ==================== OVERLAP / COMPATIBILITY REMINDER (Trial-Log based) ====================
 function renderOverlapCheck(){
   const c=document.getElementById('bm_overlap');if(!c)return;
@@ -2988,7 +3113,7 @@ applyZoom();// (31) apply saved / desktop-default text size
 loadConfig();checkCreds();loadQSettings();initPin();
 msgTpls=JSON.parse(localStorage.getItem('tcl_msg_tpls')||'[]');
 loadActivities();
-document.getElementById('boardDate').textContent='· '+new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+document.getElementById('boardDate').textContent='· '+new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});// no year → fits one line on mobile
 // Promote the footer version (tcl-vXX) into the header so staff can see which build they're on.
 (function(){const fm=(document.getElementById('verFooter')?.textContent||'').match(/tcl-v[\w.]+/);const av=document.getElementById('appVer');if(fm&&av)av.textContent=fm[0].replace('tcl-','');})();
 document.getElementById('backBtn').style.display='none';
