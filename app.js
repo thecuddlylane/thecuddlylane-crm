@@ -11,9 +11,15 @@ function calcAge(b){if(!b)return'';try{const dob=new Date(b+'T12:00:00'),now=new
 function defEmoji(d){const b=(d.breed||'').toLowerCase();if(b.includes('retriever')||b.includes('golden'))return'\u{1F9AE}';if(b.includes('husky'))return'\u{1F43A}';if(b.includes('collie'))return'\u{1F429}';if(b.includes('bulldog')||b.includes('pug')||b.includes('french'))return'\u{1F43E}';if(b.includes('shiba'))return'\u{1F98A}';if(b.includes('lab'))return'\u{1F415}';return'\u{1F436}';}
 // Dog/Customer ID: TCL- + 2 letters from name + 4-digit random, matching the house convention (e.g. TCL-CB1017).
 // Checks against existing dog IDs (allDogs) so the generated id is unique.
+const CID_RE=/^TCL-[A-Z]{2}\d{4}$/;// the house format — the ONLY shape genId ever produces
+function isValidCid(c){return CID_RE.test(c||'');}
 function genId(n){
-  const pre='TCL-'+((n||'').replace(/[^A-Za-z]/g,'').substring(0,2).toUpperCase().padEnd(2,'X'));
+  // Prefix = exactly 2 uppercase A–Z letters from the name (non-letters stripped; padded with X so it's never short/odd).
+  let letters=((n||'').replace(/[^A-Za-z]/g,'').substring(0,2).toUpperCase()+'XX').replace(/[^A-Z]/g,'X').substring(0,2);
+  const pre='TCL-'+letters;
   const used=new Set((typeof allDogs!=='undefined'&&allDogs?allDogs:[]).map(d=>d&&d.cid).filter(Boolean));
+  // Number = exactly 4 digits (1000–9999). By construction the result always matches CID_RE, so the old
+  // non-standard shape (e.g. TCL-OSVRRWN3, from a retired generator) can no longer be produced.
   let id;let guard=0;do{id=pre+String(Math.floor(1000+Math.random()*9000));}while(used.has(id)&&++guard<50);
   return id;
 }
@@ -116,6 +122,8 @@ function _orderedSel(){return [..._selDogs.filter(c=>!_addDogs.includes(c)),..._
 let _bkSaving=false;
 let _todoFilter='';// To-Do New/Live/Completed pill filter (17)
 function setTodoFilter(b){_todoFilter=(_todoFilter===b)?'':b;renderPendingPanel();}
+// Tapping a dog's red outstanding badge on the board jumps to that dog's card in the To-Do list.
+function openDogTodo(cid){_todoFilter='';showScreen('sc-todo');setTimeout(()=>{const el=document.getElementById('todo-dog-'+cid);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},80);}
 // Date-range linkage (10): picking the start date constrains + defaults the end date and auto-opens its picker, so a range is one flow.
 function _linkStart(sid,eid){const s=document.getElementById(sid),e=document.getElementById(eid);if(!s||!e||s._rangeLinked)return;s._rangeLinked=true;
   s.addEventListener('change',()=>{if(!s.value)return;e.min=s.value;if(!e.value||e.value<s.value)e.value=s.value;try{e.focus();if(e.showPicker)e.showPicker();}catch(_){}});}
@@ -408,7 +416,7 @@ function renderPendingPanel(){
     const photo=d0?resolvePhotoUrl(d0):'';
     const meta=[d0&&d0.breed,d0?calcAge(d0.birthday):''].filter(Boolean).join(' · ');
     const av=photo?'<img src="'+photo+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--gr4);" onerror="this.style.display=\'none\'">':'<span style="width:30px;height:30px;border-radius:50%;background:var(--orl);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;">🐶</span>';
-    html+='<div style="margin-bottom:11px;border:1px solid var(--gr4);border-radius:8px;overflow:hidden;">'+
+    html+='<div id="todo-dog-'+d.cid+'" style="margin-bottom:11px;border:1px solid var(--gr4);border-radius:8px;overflow:hidden;scroll-margin-top:70px;">'+
       '<div onclick="openDogByCid(\''+d.cid+'\')" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 10px;background:var(--gr5);">'+av+
       '<div style="min-width:0;overflow:hidden;"><span style="font-size:12px;font-weight:800;color:var(--bl);">'+d.name+'</span>'+(meta?' <span style="font-size:9px;color:var(--gr3);font-weight:400;white-space:nowrap;">'+meta+'</span>':'')+'</div></div>';
     // High-priority vaccination reminder (expired/missing + an upcoming/in-service paid booking).
@@ -629,7 +637,7 @@ function buildOverlapMsg(kind){
     const dogsNm=(gv('av_msg_dog')||'').trim()||dogName||'your dog(s)';
     let m=getTpls().avail||TP_AVAIL;
     const availability=overDogs.length?'We have some other dogs staying during part of this period — see below for details.':"Good news, we're available for these dates! ✅";
-    const overlapBlock=overDogs.length?('Dogs already booked during this period:\n'+overDogs.map(d=>'• '+_dogAttrLine(d)).join('\n')+'\n\n'):'';
+    const overlapBlock=overDogs.length?('Dogs already booked during this period:\n'+overDogs.map(d=>{const lk=_photoViewLink(d);return '• '+_dogAttrLine(d)+(lk?' — 📷 '+lk:'');}).join('\n')+'\n\n'):'';// attach each overlapped dog's photo link (if the profile has one)
     m=m.replace(/\{\{ownerName\}\}/g,owner).replace(/\{\{dates\}\}/g,dates).replace(/\{\{dogs\}\}/g,dogsNm).replace(/\{\{availability\}\}/g,availability).replace(/\{\{overlapBlock\}\}/g,overlapBlock).replace(/\{\{[^}]*\}\}/g,'');
     msg=m.replace(/\n{3,}/g,'\n\n').trim();
   }else{
@@ -860,7 +868,7 @@ function renderCards(entries,c,cls,counts){counts=counts||{};
     // Booking info strip
     const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+bk.svc+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
     const nOut=counts[dog.cid]||0;// outstanding tasks for this dog → red bubble
-    const outBadge=nOut?'<div class="dc-badge" title="'+nOut+' outstanding task'+(nOut>1?'s':'')+'">'+(nOut>99?'99+':nOut)+'</div>':'';
+    const outBadge=nOut?'<div class="dc-badge" onclick="event.stopPropagation();openDogTodo(\''+dog.cid+'\')" style="cursor:pointer;" title="'+nOut+' outstanding task'+(nOut>1?'s':'')+' — tap to open in To-Do">'+(nOut>99?'99+':nOut)+'</div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
     card.innerHTML='<div class="dc-photo">'+(photo?'<img src="'+photo+'" alt="" onerror="this.style.display=\'none\'">':'')+(cls==='on'?'<div class="live-badge">LIVE</div>':'')+outBadge+'</div><div class="dcb"><div class="dcb-n">'+dog.name+(isBdayMo?' 🎂':'')+'</div><div class="dcb-b">'+(dog.breed||'-')+(dog.birthday?' - '+calcAge(dog.birthday):'')+'</div><div class="dcb-id">'+dog.cid+'</div>'+bkStrip+'<div class="dcb-ch" style="margin-top:4px;">'+(td.breakfast==='yes'||td.breakfast===true?'<span class="chip cg">Fed</span>':'')+(td.walkAm==='yes'||td.walkAm===true?'<span class="chip cg">Walked</span>':'')+(hasAlert?'<span class="chip cr">Alert</span>':'')+(vaccExpired?'<span class="chip cr">Vacc expired</span>':'')+'</div></div>';
     c.appendChild(card);
@@ -963,6 +971,110 @@ async function saveLog(){
   if(document.getElementById('inc_transport')?.classList.contains('open'))saves.push(appendRow(TABS.TRANSPORT,rowFromMap(transportHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,Transporter:gv('it_name'),Vehicle:gv('it_vehicle'),Plate:gv('it_plate'),JourneyType:gv('it_type'),Time:gv('it_time'),Notes:gv('it_notes'),Private:priv,From:gv('it_from'),To:gv('it_to')},TABS.TRANSPORT.h)));
   if(document.getElementById('inc_trial')?.classList.contains('open')){const sel2=document.getElementById('itr_others');const oth2=sel2?Array.from(sel2.selectedOptions).map(o=>o.value).join(', '):'';saves.push(appendRow(TABS.TRIAL,rowFromMap(trialHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,MixedWith:oth2,Observations:gv('itr_obs'),Suitable:gv('itr_suit'),Private:priv},TABS.TRIAL.h)));}
   try{await Promise.all(saves);histCache={};dailyLogSet.add(curDog.cid+'_'+today);_logSelectedActs=[];renderLogActPills();st.style.color='var(--gn)';st.textContent='Log saved!';setTimeout(()=>st.style.display='none',3000);}catch(e){st.style.color='var(--rd)';st.textContent=e.message;}
+}
+// ==================== (45) FEEDING VIEW ====================
+// Full-screen big-text food + medication + today's feeding ticks. Opens off curDog.
+let _fvEdit=null;// null | 'food' | 'med' — which measurement is being inline-edited
+let _fvFrom=null;// null (opened from board card / profile) | 'all' (opened from the all-dogs Feeding board) — controls where Back goes
+const _FV_TILES=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM'],['snack','Snack']];
+function _fvVal(v){const s=(v||'').toString().trim();return(!s||['no','none','n/a','na','-'].includes(s.toLowerCase()))?'':v;}
+// Daily-log-aligned state styling → [bg, border, textColour, suffix]. Same look + ✓/○/✗/— vocabulary as the LOGS tab tiles (.tile.done-*).
+function _fvState(s){const M={yes:['var(--gnl)','var(--gn)','var(--gn)','✓'],todo:['var(--orl)','var(--or)','var(--or)','○'],refused:['#fff0f0','var(--rd)','var(--rd)','✗'],na:['var(--gr5)','var(--gr3)','var(--gr3)','—'],'':['var(--wh)','var(--gr4)','var(--gr)','']};return M[s]||M[''];}
+function _fvShow(){const o=document.getElementById('feedingOverlay');if(!o)return null;o.style.display='block';o.scrollTop=0;document.body.style.overflow='hidden';return o;}
+// On-site dogs = those with a non-cancelled booking whose range covers today (who we actually feed).
+function _fvOnSiteDogs(){const today=todayStr();const seen=new Set();const out=[];
+  bookings.filter(b=>!['Cancelled','Canceled'].includes(b.status)&&b.sd&&b.sd<=today&&(b.ed||b.sd)>=today).forEach(b=>{const d=allDogs.find(x=>bkMatchesDog(b,x));if(d&&!seen.has(d.cid)){seen.add(d.cid);out.push(d);}});
+  out.sort((a,c)=>(a.name||'').localeCompare(c.name||''));return out;}
+function openFeedAll(){if(!_fvShow())return;renderFeedAll();}
+function openFeedingViewForCid(cid,from){const d=allDogs.find(x=>x.cid===cid);if(!d)return;curDog=d;_fvFrom=from||null;_openFvSingle();}
+function openFeedingView(){if(!curDog)return;_fvFrom=null;_openFvSingle();}// from the profile hero
+function _openFvSingle(){_fvEdit=null;if(!_fvShow())return;renderFeedingView();}
+function fvBack(){if(_fvFrom==='all')openFeedAll();else closeFeedingView();}
+function closeFeedingView(){const o=document.getElementById('feedingOverlay');if(o)o.style.display='none';document.body.style.overflow='';}
+// Consolidated read-only feeding info for every on-site dog, each with a button into its own log.
+// One-pager, 2 dogs per row. Read-only feeding reference for every on-site dog; each cell has its own "Update log" button.
+function renderFeedAll(){
+  const host=document.getElementById('feedingOverlay');if(!host)return;
+  const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const dogs=_fvOnSiteDogs();const today=todayStr();
+  const MEALS=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM'],['snack','Snack']];
+  // One uniform, device-dynamic font (smaller cap than the single view since the board is 2 columns).
+  let html='<div style="max-width:840px;margin:0 auto;min-height:100dvh;box-sizing:border-box;display:flex;flex-direction:column;padding:.5em .55em .6em;font-size:clamp(13px,3.3vmin,20px);">';
+  html+='<div style="display:flex;align-items:center;gap:.4em;flex-shrink:0;margin-bottom:.4em;">'+
+    '<button onclick="closeFeedingView()" title="Back to board" style="flex-shrink:0;background:var(--gr5);border:1px solid var(--gr4);border-radius:10px;padding:.3em .6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">← Back</button>'+
+    '<div style="flex:1;min-width:0;"><div style="font-weight:800;color:var(--bk);line-height:1.05;">🍽️ Feeding board</div><div style="font-size:.6em;color:var(--gr2);">'+dogs.length+' dog'+(dogs.length!==1?'s':'')+' on-site · '+fmtDate(today)+' · <b style="color:var(--gn);">✓</b> done <b style="color:var(--or);">○</b> to-do <b style="color:var(--rd);">✗</b> refused <b style="color:var(--gr3);">—</b> N/A</div></div></div>';
+  if(!dogs.length){html+='<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--gr3);">No dogs on-site today.</div></div>';host.innerHTML=html;return;}
+  html+='<div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.45em;align-content:stretch;min-height:0;">';
+  dogs.forEach(d=>{
+    const food=_fvVal(d.foodMeasure),medS=_fvVal(d.medSchedule),allerg=_fvVal(d.allerg),diet=_fvVal(d.dietNotes);
+    const sv=JSON.parse(localStorage.getItem('log_'+d.cid+'_'+today)||'{}');const photo=resolvePhotoUrl(d);
+    // Status chips in the daily-log format: light tint + coloured border/text + ✓/○/✗/— suffix.
+    const statusRow=MEALS.map(([k,lbl])=>{const st=_fvState(sv[k]||'');return'<span style="font-size:.72em;font-weight:800;padding:.15em .5em;border-radius:99px;background:'+st[0]+';border:1px solid '+st[1]+';color:'+st[2]+';white-space:nowrap;">'+lbl+' '+(st[3]||'·')+'</span>';}).join('');
+    const av=photo?'<img src="'+photo+'" style="width:1.9em;height:1.9em;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--gr4);" onerror="this.style.display=\'none\'">':'<span style="width:1.9em;height:1.9em;border-radius:50%;background:var(--orl);display:flex;align-items:center;justify-content:center;flex-shrink:0;">🐶</span>';
+    html+='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:12px;padding:.5em .55em;display:flex;flex-direction:column;gap:.3em;min-width:0;overflow:hidden;">'+
+      '<div style="display:flex;align-items:center;gap:.4em;min-width:0;">'+av+'<div style="flex:1;min-width:0;font-weight:800;color:var(--bk);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(d.name)+'</div></div>'+
+      (allerg?'<div style="background:var(--rdl);border-radius:7px;padding:.2em .5em;color:var(--rd);font-weight:800;font-size:.8em;line-height:1.2;">⚠️ '+esc(allerg)+'</div>':'')+
+      '<div style="font-weight:700;color:var(--bk);line-height:1.2;">🍽️ '+(food?esc(food):'<span style="color:var(--gr3);font-weight:500;">—</span>')+'</div>'+
+      (diet?'<div style="font-size:.78em;color:var(--gr2);line-height:1.2;">'+esc(diet)+'</div>':'')+
+      (medS?'<div style="font-weight:700;color:var(--bk);line-height:1.2;">💊 '+esc(medS)+'</div>':'')+
+      '<div style="display:flex;flex-wrap:wrap;gap:.3em;margin-top:.15em;">'+statusRow+'</div>'+
+      '<button onclick="openFeedingViewForCid(\''+d.cid+'\',\'all\')" style="margin-top:auto;background:var(--or);color:#fff;border:none;border-radius:8px;padding:.5em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">📋 Update log</button>'+
+    '</div>';
+  });
+  html+='</div></div>';
+  host.innerHTML=html;
+}
+function fvTogTile(k){if(!curDog)return;const lk='log_'+curDog.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');const cycle=['','todo','yes','refused','na'];sv[k]=cycle[(cycle.indexOf(sv[k]||'')+1)%cycle.length];localStorage.setItem(lk,JSON.stringify(sv));renderFeedingView();}
+function fvStartEdit(which){_fvEdit=which;renderFeedingView();const ta=document.getElementById('fvEditInput');if(ta)ta.focus();}
+function fvCancelEdit(){_fvEdit=null;renderFeedingView();}
+async function fvSaveEdit(){if(!curDog||!_fvEdit)return;const el=document.getElementById('fvEditInput');if(!el)return;const val=el.value;const which=_fvEdit;if(which==='food')curDog.foodMeasure=val;else curDog.medSchedule=val;_fvEdit=null;renderFeedingView();const ok=await saveDogRow(curDog,(which==='food'?'Food measurement':'Medication')+' updated ✓');if(ok){try{renderBoard();}catch(e){}}}
+// Persist the whole dog row to the Dogs sheet — re-resolves the row by CID from a fresh read (item-39 safe-write).
+async function saveDogRow(dog,okMsg){if(!dog)return false;try{let ri=dog.rowIdx;try{const fresh=await readSheet(TABS.DOGS,'A1:CZ');const fh=mkHdr(fresh[0]||[]);const idCol=fh['CustomerID']??0;const fi=fresh.slice(1).findIndex(r=>(r[idCol]||'')===dog.cid);if(fi>=0){ri=fi+2;dog.rowIdx=ri;}}catch(e){}if(!ri){if(typeof toast==='function')toast('⚠️ Could not find this dog to save — tap Sync and retry.','err');return false;}await updateRow(TABS.DOGS,ri,Object.values(mapDogToRow(dog)));if(typeof toast==='function'&&okMsg)toast(okMsg,'ok');return true;}catch(e){if(typeof toast==='function')toast('⚠️ Not saved: '+(e&&e.message||e),'err');return false;}}
+// Write today's feeding ticks to the Daily-Log sheet — mirrors saveLog's daily-log write, minus the incident/notes UI.
+async function saveFeedingLog(){
+  if(!curDog)return;const today=todayStr();const lk='log_'+curDog.cid+'_'+today;const sv=JSON.parse(localStorage.getItem(lk)||'{}');
+  const btn=document.getElementById('fvSaveBtn');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
+  const row=rowFromMap(dailyHdrRow,{CustomerID:curDog.cid,DogName:curDog.name,Date:today,Breakfast:g('breakfast'),MedAM:g('medAm'),Dinner:g('dinner'),MedPM:g('medPm'),Snack:g('snack'),WalkAM:g('walkAm'),Garden:g('garden'),WalkPM:g('walkPm'),BeforeSleep:g('beforeSleep'),Game:g('game'),Bowl:g('bowl'),Room:g('room'),Garment:g('garment'),Notes:sv.notes||'',Private:priv},TABS.DAILY.h);
+  {const _h=mkHdr(dailyHdrRow);const _ci=_h['CustomerID']??0,_di=_h['Date']??2;const _mi=dailyLogRows.findIndex(x=>(x[_ci]||'')===curDog.cid&&(x[_di]||'')===today);if(_mi>=0)dailyLogRows[_mi]=row;else dailyLogRows.push(row);dailyLogSet.add(curDog.cid+'_'+today);}
+  try{
+    const rawDaily=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dh=mkHdr(rawDaily[0]||[]);const allDaily=rawDaily.slice(1);
+    const existIdx=allDaily.findIndex(r=>(r[dh['Date']??2]===today&&r[dh['CustomerID']??0]===curDog.cid)||(r[0]===today&&r[15]===curDog.cid));
+    await(existIdx>=0?updateRow(TABS.DAILY,existIdx+2,row):appendRow(TABS.DAILY,row));
+    if(typeof toast==='function')toast('Feeding log saved ✓','ok');
+    try{updatePendingBadge();renderBoard();}catch(e){}
+  }catch(e){if(typeof toast==='function')toast('⚠️ Log not saved: '+(e&&e.message||e),'err');}
+  if(btn){btn.disabled=false;btn.textContent='💾 Save feeding log';}
+}
+function renderFeedingView(){
+  const host=document.getElementById('feedingOverlay');if(!host||!curDog)return;const d=curDog;
+  const foodMeas=_fvVal(d.foodMeasure),medSched=_fvVal(d.medSchedule),allerg=_fvVal(d.allerg),food=_fvVal(d.food),diet=_fvVal(d.dietNotes),med=_fvVal(d.med);
+  const lk='log_'+d.cid+'_'+todayStr();const sv=JSON.parse(localStorage.getItem(lk)||'{}');const photo=resolvePhotoUrl(d);
+  const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // One uniform, device-dynamic font (clamp: scales with the screen, capped so it never gets silly). Everything inherits it.
+  const editBtn=which=>'<button onclick="fvStartEdit(\''+which+'\')" title="Edit" style="flex-shrink:0;background:var(--gr5);border:1px solid var(--gr4);border-radius:8px;padding:.15em .45em;font-size:inherit;cursor:pointer;font-family:var(--fb);">✏️</button>';
+  const valBox=(val,ph,which)=>{
+    if(_fvEdit===which)return'<textarea id="fvEditInput" style="width:100%;font-size:inherit;font-weight:700;padding:.4em;border:2px solid var(--or);border-radius:9px;min-height:2.6em;font-family:var(--fb);box-sizing:border-box;">'+esc(val)+'</textarea><div style="display:flex;gap:.4em;margin-top:.4em;"><button onclick="fvSaveEdit()" style="flex:1;background:var(--gn);color:#fff;border:none;border-radius:9px;padding:.5em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">Save</button><button onclick="fvCancelEdit()" style="background:var(--gr4);color:var(--bk);border:none;border-radius:9px;padding:.5em .8em;font-size:inherit;cursor:pointer;font-family:var(--fb);">Cancel</button></div>';
+    return'<div style="display:flex;align-items:flex-start;gap:.4em;"><div style="flex:1;font-weight:800;line-height:1.2;color:var(--bk);word-break:break-word;">'+(val?esc(val):'<span style="color:var(--gr3);font-weight:500;">'+ph+'</span>')+'</div>'+editBtn(which)+'</div>';
+  };
+  // Tiles match the LOGS-tab daily-log format: light tint + coloured border/text + ✓ done / ○ to-do / ✗ refused / — N-A.
+  const tileBtn=([k,lbl])=>{const st=_fvState(sv[k]||'');return'<button onclick="fvTogTile(\''+k+'\')" style="text-align:left;background:'+st[0]+';color:'+st[2]+';border:1.5px solid '+st[1]+';border-radius:10px;padding:.45em .6em;cursor:pointer;font-family:var(--fb);font-size:inherit;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:.4em;min-height:2.5em;"><span>'+lbl+'</span><span style="flex-shrink:0;">'+(st[3]||'·')+'</span></button>';};
+  const card=(label,body,bar,grow)=>'<div style="background:var(--wh);border:1px solid var(--gr4);border-left:5px solid '+bar+';border-radius:12px;padding:.5em .65em;'+(grow?'flex:1;display:flex;flex-direction:column;min-height:0;':'')+'"><div style="font-weight:800;color:'+bar+';margin-bottom:.3em;">'+label+'</div>'+body+'</div>';
+  let html='<div style="max-width:640px;margin:0 auto;min-height:100dvh;box-sizing:border-box;display:flex;flex-direction:column;gap:.4em;padding:.5em .7em .7em;font-size:clamp(16px,4.6vmin,26px);">';
+  html+='<div style="display:flex;align-items:center;gap:.4em;flex-shrink:0;"><div style="flex:1;min-width:0;font-weight:800;color:var(--bk);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(d.name)+'</div><button onclick="fvBack()" title="Back" style="flex-shrink:0;background:var(--gr5);border:1px solid var(--gr4);border-radius:9px;padding:.3em .6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">← Back</button></div>';
+  if(allerg)html+='<div style="background:var(--rdl);border:1px solid var(--rd);border-radius:10px;padding:.4em .6em;color:var(--rd);font-weight:800;flex-shrink:0;">⚠️ Allergies: '+esc(allerg)+'</div>';
+  let foodBody=valBox(foodMeas,'No measurement — tap ✏️',"food");
+  const foodSub=[food?'Type: '+esc(food):'',diet?esc(diet):''].filter(Boolean).join(' · ');
+  if(foodSub)foodBody+='<div style="color:var(--gr2);margin-top:.25em;line-height:1.2;">'+foodSub+'</div>';
+  html+=card('🍽️ Food',foodBody,'var(--or)');
+  let medBody=valBox(medSched,'No medication — tap ✏️',"med");
+  if(med)medBody+='<div style="color:var(--gr2);margin-top:.25em;line-height:1.2;">'+esc(med)+'</div>';
+  html+=card('💊 Medication',medBody,'var(--rd)');
+  const todayBody='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4em;flex:1;align-content:start;">'+_FV_TILES.map(tileBtn).join('')+'</div>';
+  html+=card('✅ Today — '+fmtDate(todayStr()),todayBody,'var(--gn)',true);
+  html+='<button id="fvSaveBtn" onclick="saveFeedingLog()" style="flex-shrink:0;width:100%;background:var(--or);color:#fff;border:none;border-radius:11px;padding:.6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">💾 Save feeding log</button>';
+  html+='</div>';
+  const sc=host.scrollTop;host.innerHTML=html;host.scrollTop=sc;
 }
 function buildSummary(dog){
   const alerts=[],notes=[];
@@ -1792,8 +1904,8 @@ function quoteFromBk(){
   const cid0=_dogByCid(dog)?dog:'';// bm_dog now holds the CID
   _svcLines=[{svc:svcKey,dogs:cid0?[cid0]:[],sd,ed,st2:bst||'09:00',et:et||'18:00',rate:0}];
   _selDogs=cid0?[cid0]:[];_addDogs=[];
-  const dogData=_dd;
-  if(dogData)document.getElementById('q_owner').value=dogData.owner;
+  const dogData=cid0?_dogByCid(cid0):null;// was a stray undefined `_dd` → ReferenceError broke "Open in Quote"
+  if(dogData)document.getElementById('q_owner').value=dogData.owner||'';
   if(actualPrepay>0){const apEl=document.getElementById('q_actual_prepay');if(apEl)apEl.value=actualPrepay.toFixed(2);}
   document.getElementById('bkModal').classList.remove('open');goToTab('customers','quote');
   renderSvcLines();buildQDogMS();buildMainDogBtns();calcMultiQ();

@@ -117,6 +117,8 @@ body{
 .live-badge{position:absolute;top:3px;left:3px;background:var(--gn);color:#fff;font-size:7px;font-weight:700;padding:2px 4px;border-radius:99px;}
 /* Outstanding-task count bubble on each dog card (top-right corner) */
 .dc-badge{position:absolute;top:3px;right:3px;min-width:17px;height:17px;padding:0 4px;background:var(--rd);color:#fff;font-size:9px;font-weight:800;line-height:1;border-radius:99px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.35);z-index:3;}
+/* (45) Feeding shortcut on Live board cards */
+.dc-feed{position:absolute;bottom:4px;right:4px;width:28px;height:28px;padding:0;background:var(--or);color:#fff;border:none;border-radius:50%;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.4);z-index:3;}
 .dc-em-badge{position:absolute;bottom:3px;left:5px;font-size:15px;line-height:1;z-index:2;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
 .dcb{padding:5px 7px;}
 .dcb-n{font-family:var(--fh);font-size:11px;font-weight:800;color:var(--gr);}
@@ -504,7 +506,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <button class="sbtn rd" onclick="confirmCreateSheet()">Create Sheet Structure</button>
   </div>
   <span id="cfgStatus" style="font-size:10px;color:var(--gn);display:block;margin-top:6px;"></span>
-  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v82b1</div>
+  <div id="verFooter" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gr4);font-size:9px;color:var(--gr3);text-align:right;">THE CUDDLY LANE · tcl-v83b1</div>
 </div>
 <!-- NAV -->
 <div class="snav-bar">
@@ -517,7 +519,7 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
 <!-- BOARD -->
 <div class="screen active" id="sc-board">
   <div style="margin:10px 13px 0;background:var(--rdl);border:1px solid #FCA5A5;border-radius:var(--r);padding:9px 11px;font-size:10px;color:var(--rd);display:none;" id="credWarn">No credentials — tap Settings to connect Google Sheets.</div>
-  <div class="brd-hdr"><div class="brd-t">Today's Board <span id="boardDate" style="font-weight:500;color:var(--gr2);"></span></div></div>
+  <div class="brd-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><div class="brd-t">Today's Board <span id="boardDate" style="font-weight:500;color:var(--gr2);"></span></div><button onclick="openFeedAll()" title="Show every on-site dog's food & medication on one page" style="flex-shrink:0;background:var(--or);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--fb);display:flex;align-items:center;gap:5px;box-shadow:0 2px 6px rgba(0,0,0,.15);">🍽️ Feeding board</button></div>
   <div class="srch-row"><span class="srch-ico">&#128269;</span><input class="srch-inp" id="dogSearch" placeholder="Search dog name, breed or ID..." oninput="renderBoard()"></div>
   <div class="bsec">
     <div class="bsec-l on">Active today</div>
@@ -1089,10 +1091,11 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
       <button class="hfb" data-type="activities" onclick="filtHist('activities',this)">Activities</button>
       <button class="hfb" data-type="trial" onclick="filtHist('trial',this)">Trial</button>
     </div>
-    <div style="display:flex;gap:5px;align-items:center;margin:-3px 0 9px;flex-wrap:wrap;">
+    <div style="display:flex;gap:5px;align-items:center;margin:-1px 0 9px;flex-wrap:wrap;background:var(--gr5);border:1px dashed var(--gr3);border-radius:8px;padding:6px 8px;">
+      <span style="font-size:9px;font-weight:800;color:var(--gr2);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;">➕ Add record</span>
       <input type="date" id="hist_add_date" class="fi" style="flex:1;min-width:90px;font-size:10px;padding:4px 8px;">
-      <select id="hist_add_type" class="fs" style="flex:1;font-size:10px;">
-        <option value="daily">Daily</option>
+      <select id="hist_add_type" class="fs" style="flex:1;font-size:10px;" title="Which type of record to add">
+        <option value="daily">Daily log</option>
         <option value="health">Health</option>
         <option value="fight">Fight/Incident</option>
         <option value="transport">Transport</option>
@@ -1460,6 +1463,9 @@ tbody tr:hover{background:var(--gr5)!important;cursor:pointer;}
     <div class="cbts"><button class="ccan" onclick="document.getElementById('confirmDlg').classList.remove('open')">Cancel</button><button class="cok" id="cfmOk">Confirm</button></div>
   </div>
 </div>
+
+<!-- (45) Feeding view — full-screen big-text food/med + today's ticks. Content built by renderFeedingView(). -->
+<div id="feedingOverlay" style="display:none;position:fixed;inset:0;z-index:9998;background:var(--bg,#FDFBF6);overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
 
 <script src="app.js"></script>
 </body>
