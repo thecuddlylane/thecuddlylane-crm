@@ -877,7 +877,7 @@ function renderCards(entries,c,cls,counts){counts=counts||{};
     // Birthday month celebration
     const bdMonth=dog.birthday?parseInt(dog.birthday.split('-')[1]):0;const isBdayMo=bdMonth&&bdMonth===(new Date().getMonth()+1);
     // Booking info strip
-    const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+bk.svc+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
+    const bkStrip=bk?'<div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">'+(bk.svc?'<span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:1px 5px;border-radius:99px;">'+svcDisplay(bk.svc)+'</span>':'')+'<span class="spill '+(scMap[bk.status]||'sb')+'" style="font-size:7px;padding:1px 5px;">'+bk.status+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(bk.sd)+(bk.ed&&bk.ed!==bk.sd?' → '+fmtDate(bk.ed):'')+'</span></div>':'';
     const nOut=counts[dog.cid]||0;// outstanding tasks for this dog → red bubble
     const outBadge=nOut?'<div class="dc-badge" onclick="event.stopPropagation();openDogTodo(\''+dog.cid+'\')" style="cursor:pointer;" title="'+nOut+' outstanding task'+(nOut>1?'s':'')+' — tap to open in To-Do">'+(nOut>99?'99+':nOut)+'</div>':'';
     const card=document.createElement('div');card.className='dcard'+(cls?' '+cls:'');card.onclick=()=>openProfile(dog);
@@ -1066,6 +1066,8 @@ async function saveLog(){
 let _fvEdit=null;// null | 'food' | 'med' — which measurement is being inline-edited
 let _fvFrom=null;// null (opened from board card / profile) | 'all' (opened from the all-dogs Feeding board) — controls where Back goes
 const _FV_TILES=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM']];// Snack removed per user
+// Feeding board items incl. walks, ordered by daily routine (walk before meal). Bulk buttons + per-dog chips use this.
+const _FV_BOARD=[['walkAm','AM Walk'],['breakfast','Breakfast'],['medAm','Med AM'],['walkPm','PM Walk'],['dinner','Dinner'],['medPm','Med PM']];
 function _fvVal(v){const s=(v||'').toString().trim();return(!s||['no','none','n/a','na','-'].includes(s.toLowerCase()))?'':v;}
 // Daily-log-aligned state styling → [bg, border, textColour, suffix]. Same look + ✓/○/✗/— vocabulary as the LOGS tab tiles (.tile.done-*).
 function _fvState(s){const M={yes:['var(--gnl)','var(--gn)','var(--gn)','✓'],todo:['var(--orl)','var(--or)','var(--or)','○'],refused:['#fff0f0','var(--rd)','var(--rd)','✗'],na:['var(--gr5)','var(--gr3)','var(--gr3)','—'],'':['var(--wh)','var(--gr4)','var(--gr)','']};return M[s]||M[''];}
@@ -1086,20 +1088,25 @@ function renderFeedAll(){
   const host=document.getElementById('feedingOverlay');if(!host)return;
   const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const dogs=_fvOnSiteDogs();const today=todayStr();
-  const MEALS=[['breakfast','Breakfast'],['medAm','Med AM'],['dinner','Dinner'],['medPm','Med PM']];// Snack removed per user
   // One uniform, device-dynamic font (smaller cap than the single view since the board is 2 columns).
   let html='<div style="max-width:840px;margin:0 auto;min-height:100dvh;box-sizing:border-box;display:flex;flex-direction:column;padding:.5em .55em .6em;font-size:clamp(13px,3.3vmin,20px);">';
   html+='<div style="display:flex;align-items:center;gap:.4em;flex-shrink:0;margin-bottom:.4em;">'+
     '<button onclick="closeFeedingView()" title="Back to board" style="flex-shrink:0;background:var(--gr5);border:1px solid var(--gr4);border-radius:10px;padding:.3em .6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">← Back</button>'+
-    '<div style="flex:1;min-width:0;"><div style="font-weight:800;color:var(--bk);line-height:1.05;">🍽️ Feeding board</div><div style="font-size:.6em;color:var(--gr2);">'+dogs.length+' dog'+(dogs.length!==1?'s':'')+' on-site · '+fmtDate(today)+' · <b style="color:var(--gn);">✓</b> done <b style="color:var(--or);">○</b> to-do <b style="color:var(--rd);">✗</b> refused <b style="color:var(--gr3);">—</b> N/A</div></div></div>';
+    '<div style="flex:1;min-width:0;"><div style="font-weight:800;color:var(--bk);line-height:1.05;">🍽️ Feeding board</div><div style="font-size:.6em;color:var(--gr2);">'+dogs.length+' dog'+(dogs.length!==1?'s':'')+' on-site · '+fmtDate(today)+' · <b style="color:var(--gn);">✓</b> done <b style="color:var(--rd);">✗</b> refused <b style="color:var(--gr3);">—</b> N/A · tap a chip to change</div></div></div>';
   if(!dogs.length){html+='<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--gr3);">No dogs on-site today.</div></div>';host.innerHTML=html;return;}
+  // (63) Bulk actions — we feed/walk every dog together, so one tap marks an item done for ALL on-site dogs.
+  html+='<div style="flex-shrink:0;background:var(--gnl);border:1px solid var(--gn);border-radius:10px;padding:.4em .5em;margin-bottom:.45em;">'+
+    '<div style="font-size:.62em;font-weight:800;color:var(--gn);text-transform:uppercase;letter-spacing:.03em;margin-bottom:.35em;">✅ Mark all done — '+dogs.length+' dog'+(dogs.length!==1?'s':'')+'</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:.3em;">'+
+    _FV_BOARD.map(([k,lbl])=>'<button onclick="fvBulkMark(\''+k+'\')" style="background:var(--wh);border:1.5px solid var(--gn);color:var(--gn);border-radius:99px;padding:.28em .7em;font-size:.72em;font-weight:800;cursor:pointer;font-family:var(--fb);white-space:nowrap;">'+lbl+' ✓</button>').join('')+
+    '</div></div>';
   html+='<div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.45em;align-content:start;min-height:0;">';
   dogs.forEach(d=>{
     const food=_fvVal(d.foodMeasure),medS=_fvVal(d.medSchedule),allerg=_fvVal(d.allerg),diet=_fvVal(d.dietNotes);
     const noMeds=!medS&&!_fvVal(d.med);// no medication on record → Med AM/PM default to N/A
     const sv=JSON.parse(localStorage.getItem('log_'+d.cid+'_'+today)||'{}');const photo=resolvePhotoUrl(d);
-    // Status chips in the daily-log format: light tint + coloured border/text + ✓/○/✗/— suffix.
-    const statusRow=MEALS.map(([k,lbl])=>{const raw=sv[k]||(((k==='medAm'||k==='medPm')&&noMeds)?'na':'');const st=_fvState(raw);return'<span style="font-size:.72em;font-weight:800;padding:.15em .5em;border-radius:99px;background:'+st[0]+';border:1px solid '+st[1]+';color:'+st[2]+';white-space:nowrap;">'+lbl+' '+(st[3]||'·')+'</span>';}).join('');
+    // Tappable status chips (tap = cycle blank→✓→✗→N/A) in the daily-log colour format.
+    const statusRow=_FV_BOARD.map(([k,lbl])=>{const raw=sv[k]||(((k==='medAm'||k==='medPm')&&noMeds)?'na':'');const st=_fvState(raw);return'<span onclick="fvBoardTog(\''+d.cid+'\',\''+k+'\')" title="Tap to change" style="cursor:pointer;font-size:.72em;font-weight:800;padding:.15em .5em;border-radius:99px;background:'+st[0]+';border:1px solid '+st[1]+';color:'+st[2]+';white-space:nowrap;">'+lbl+' '+(st[3]||'·')+'</span>';}).join('');
     const av=photo?'<img src="'+photo+'" style="width:1.9em;height:1.9em;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--gr4);" onerror="this.style.display=\'none\'">':'<span style="width:1.9em;height:1.9em;border-radius:50%;background:var(--orl);display:flex;align-items:center;justify-content:center;flex-shrink:0;">🐶</span>';
     html+='<div style="background:var(--wh);border:1px solid var(--gr4);border-radius:12px;padding:.5em .55em;display:flex;flex-direction:column;gap:.3em;min-width:0;overflow:hidden;">'+
       '<div style="display:flex;align-items:center;gap:.4em;min-width:0;">'+av+
@@ -1138,6 +1145,30 @@ async function saveFeedingLog(){
   }catch(e){if(typeof toast==='function')toast('⚠️ Log not saved: '+(e&&e.message||e),'err');}
   if(btn){btn.disabled=false;btn.textContent='💾 Save feeding log';}
 }
+// (63) Write one dog's Daily-Log row from its log_ localStorage. Pass `preRead` (a full A1:R read) to avoid re-reading in a bulk loop.
+async function saveDailyLogFor(cid,name,preRead){
+  const today=todayStr();const sv=JSON.parse(localStorage.getItem('log_'+cid+'_'+today)||'{}');
+  const g=k=>{const s=sv[k]||'';return s==='yes'?'[Y]':s==='refused'?'[Refused]':s==='todo'?'[To-do]':s==='na'?'[N/A]':'[ ]';};const priv=sv.priv?'Private':'';
+  const row=rowFromMap(dailyHdrRow,{CustomerID:cid,DogName:name,Date:today,Breakfast:g('breakfast'),MedAM:g('medAm'),Dinner:g('dinner'),MedPM:g('medPm'),Snack:g('snack'),WalkAM:g('walkAm'),Garden:g('garden'),WalkPM:g('walkPm'),BeforeSleep:g('beforeSleep'),Game:g('game'),Bowl:g('bowl'),Room:g('room'),Garment:g('garment'),Notes:sv.notes||'',Private:priv},TABS.DAILY.h);
+  {const _h=mkHdr(dailyHdrRow);const _ci=_h['CustomerID']??0,_di=_h['Date']??2;const _mi=dailyLogRows.findIndex(x=>(x[_ci]||'')===cid&&(x[_di]||'')===today);if(_mi>=0)dailyLogRows[_mi]=row;else dailyLogRows.push(row);dailyLogSet.add(cid+'_'+today);}
+  const raw=preRead||await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);const dh=mkHdr(raw[0]||[]);const body=raw.slice(1);
+  const idx=body.findIndex(r=>(r[dh['Date']??2]===today&&r[dh['CustomerID']??0]===cid)||(r[0]===today&&r[15]===cid));
+  await(idx>=0?updateRow(TABS.DAILY,idx+2,row):appendRow(TABS.DAILY,row));
+}
+// (63) Tap one board chip → cycle blank→✓→✗→N/A for that dog, save.
+async function fvBoardTog(cid,key){
+  const today=todayStr();const lk='log_'+cid+'_'+today;const sv=JSON.parse(localStorage.getItem(lk)||'{}');
+  const cycle=['','yes','refused','na'];sv[key]=cycle[(cycle.indexOf(sv[key]||'')+1)%cycle.length];
+  localStorage.setItem(lk,JSON.stringify(sv));renderFeedAll();
+  const d=_dogByCid(cid);try{await saveDailyLogFor(cid,d?d.name:'');try{updatePendingBadge();renderBoard();}catch(e){}}catch(e){if(typeof toast==='function')toast('⚠️ Not saved: '+(e.message||e),'err');}
+}
+// (63) One tap marks an item ✓ done for EVERY on-site dog (no-med dogs get N/A for the med items).
+async function fvBulkMark(key){
+  const dogs=_fvOnSiteDogs();if(!dogs.length)return;const today=todayStr();
+  dogs.forEach(d=>{const lk='log_'+d.cid+'_'+today;const sv=JSON.parse(localStorage.getItem(lk)||'{}');const noMeds=!_fvVal(d.medSchedule)&&!_fvVal(d.med);sv[key]=((key==='medAm'||key==='medPm')&&noMeds)?'na':'yes';localStorage.setItem(lk,JSON.stringify(sv));});
+  renderFeedAll();if(typeof toast==='function')toast('Saving all…','ok');
+  try{const raw=await readSheet(TABS.DAILY,'A1:R').catch(()=>[]);for(const d of dogs){await saveDailyLogFor(d.cid,d.name,raw);}if(typeof toast==='function')toast('✓ Updated '+dogs.length+' dog'+(dogs.length!==1?'s':''),'ok');try{updatePendingBadge();renderBoard();}catch(e){}}catch(e){if(typeof toast==='function')toast('⚠️ Bulk save failed: '+(e.message||e),'err');}
+}
 function renderFeedingView(){
   const host=document.getElementById('feedingOverlay');if(!host||!curDog)return;const d=curDog;
   const foodMeas=_fvVal(d.foodMeasure),medSched=_fvVal(d.medSchedule),allerg=_fvVal(d.allerg),food=_fvVal(d.food),diet=_fvVal(d.dietNotes),med=_fvVal(d.med);
@@ -1163,9 +1194,12 @@ function renderFeedingView(){
   let medBody=valBox(medSched,'No medication — tap ✏️',"med");
   if(med)medBody+='<div style="color:var(--gr2);margin-top:.25em;line-height:1.2;">'+esc(med)+'</div>';
   html+=card('💊 Medication',medBody,'var(--rd)');
-  const todayBody='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4em;flex:1;align-content:start;">'+_FV_TILES.map(tileBtn).join('')+'</div>';
-  html+=card('✅ Today — '+fmtDate(todayStr()),todayBody,'var(--gn)',true);
-  html+='<button id="fvSaveBtn" onclick="saveFeedingLog()" style="flex-shrink:0;width:100%;background:var(--or);color:#fff;border:none;border-radius:11px;padding:.6em;font-size:inherit;font-weight:800;cursor:pointer;font-family:var(--fb);">💾 Save feeding log</button>';
+  // Meal/med/walk ticks live on the Feeding board now. Here we add the other existing log types for this dog (today).
+  const T=todayStr();
+  const addBtn=(icon,lbl,type)=>'<button onclick="closeFeedingView();openAddHistEntry(\''+type+'\',\''+T+'\')" style="text-align:left;background:var(--wh);border:1.5px solid var(--gr4);border-radius:10px;padding:.5em .7em;cursor:pointer;font-family:var(--fb);font-size:inherit;font-weight:700;color:var(--bk);display:flex;align-items:center;gap:.45em;">'+icon+' '+lbl+'</button>';
+  const addBody='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4em;">'+
+    addBtn('🩺','Health','health')+addBtn('🐾','Compatibility','trial')+addBtn('🚕','Transport','transport')+addBtn('⚠️','Incident','fight')+'</div>';
+  html+=card('📋 Add a log — '+fmtDate(T),addBody,'var(--gn)',true);
   html+='</div>';
   const sc=host.scrollTop;host.innerHTML=html;host.scrollTop=sc;
 }
@@ -1416,6 +1450,9 @@ async function saveConsent(){const st=document.getElementById('consentStatus');i
     if(latestIdx>=0)await updateRow(TABS.CONSENT,latestIdx+2,vals);else await appendRow(TABS.CONSENT,vals);
     st.textContent='Consent saved!';st.className='smsg ok';_renderConsentUI(curDog);setTimeout(()=>st.className='smsg',3000);
   }catch(e){st.textContent=e.message;st.className='smsg err';}}
+// (64) Service → emoji (matches the register chips). svcDisplay strips any existing leading emoji so it never doubles.
+function svcIcon(svc){const s=(svc||'').toLowerCase();if(s.includes('board'))return '💤';if(s.includes('day'))return '☀️';if(s.includes('train'))return '🏅';if(s.includes('walk'))return '🐕';if(s.includes('drop'))return '🔑';if(s.includes('sit'))return '🪑';if(s.includes('tax'))return '🚕';return '📋';}
+function svcDisplay(svc){if(!svc)return '';return svcIcon(svc)+' '+svc.replace(/^[^A-Za-z0-9]+/,'').trim();}
 function buildServices(dog){
   const el=document.getElementById('servicesList');const recs=bookings.filter(r=>bkMatchesDog(r,dog)).sort((a,b)=>b.sd.localeCompare(a.sd));
   if(!recs.length){el.innerHTML='<div class="hload">No bookings yet</div>';return;}
@@ -1423,7 +1460,7 @@ function buildServices(dog){
   el.innerHTML=recs.map(r=>{
     const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);const bal=paid-owed;
     const oc="openBkModal('"+r.id+"',true,"+r.ri+")";
-    return'<div class="sitem" onclick="'+oc+'"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px;"><span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:2px 5px;border-radius:99px;">'+r.svc+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(r.sd)+' - '+fmtDate(r.ed)+'</span>'+(r.priv?'<span class="ptag">Private</span>':'')+'</div><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:10px;font-weight:700;">'+fmtGBP(owed)+'</div><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></div>'+(bal<0?'<div style="font-size:9px;color:var(--rd);margin-top:2px;">'+fmtGBP(Math.abs(bal))+' outstanding</div>':bal>0?'<div style="font-size:9px;color:var(--gn);margin-top:2px;">'+fmtGBP(bal)+' credit</div>':'')+'</div>';
+    return'<div class="sitem" onclick="'+oc+'"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px;"><span style="font-size:8px;font-weight:700;background:var(--bll);color:var(--bl);padding:2px 5px;border-radius:99px;">'+svcDisplay(r.svc)+'</span><span style="font-size:8px;color:var(--gr3);">'+fmtDate(r.sd)+' - '+fmtDate(r.ed)+'</span>'+(r.priv?'<span class="ptag">Private</span>':'')+'</div><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:10px;font-weight:700;">'+fmtGBP(owed)+'</div><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></div>'+(bal<0?'<div style="font-size:9px;color:var(--rd);margin-top:2px;">'+fmtGBP(Math.abs(bal))+' outstanding</div>':bal>0?'<div style="font-size:9px;color:var(--gn);margin-top:2px;">'+fmtGBP(bal)+' credit</div>':'')+'</div>';
   }).join('');
 }
 
@@ -2331,7 +2368,7 @@ function renderBk(){
   document.getElementById('bkBody').innerHTML=recs.map(r=>{
     const owed=(r.rev||0)+(r.tips||0);const paid=(r.prepay||0)+(r.finalPay||0);const bal=paid-owed;
     const oc="openBkModal('"+r.id+"',false,"+r.ri+")";
-    return'<tr onclick="'+oc+'"><td>'+(r.priv?'🔒 ':'')+r.dog+'</td><td style="font-size:8px;">'+r.svc+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
+    return'<tr onclick="'+oc+'"><td>'+(r.priv?'🔒 ':'')+r.dog+'</td><td style="font-size:8px;">'+svcDisplay(r.svc)+'</td><td style="font-size:8px;white-space:nowrap;">'+fmtDate(r.sd)+'<br>'+fmtDate(r.ed)+'</td><td style="font-weight:700;">'+fmtGBP(owed)+'</td><td style="color:var(--gn);">'+fmtGBP(paid)+'</td><td style="font-weight:700;'+(bal>0?'color:var(--gn)':bal<0?'color:var(--rd)':'color:var(--gr2)')+';">'+(bal>0?'+':'')+fmtGBP(bal)+'</td><td><span class="spill '+(sc[r.status]||'sb')+'">'+r.status+'</span></td></tr>';
   }).join('');
 }
 
